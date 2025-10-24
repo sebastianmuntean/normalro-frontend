@@ -213,6 +213,41 @@ export const seoContent = {
     title: 'Calculator Facturi și TVA',
     description: 'Calculator complet pentru linii de factură. Calculează automat prețul net, TVA și prețul brut pornind de la orice valoare cunoscută. Suportă cotele de TVA actuale (21% standard, 11% redus, 0% scutit) și cote personalizate. Perfect pentru facturare, contabilitate, oferte comerciale și verificarea calculelor fiscale. Adaugă linii multiple de factură și vezi totalul automat. Calcul cu precizie de 4 zecimale pentru exactitate maximă.',
     keywords: ['calculator facturi', 'calculator tva', 'calcul tva', 'pret net', 'pret brut', 'facturare', 'invoice calculator', 'vat calculator', 'calculator fiscal', 'tva 21']
+  },
+  'calculator': {
+    title: 'Calculator Matematic Online',
+    description: 'Calculator simplu și rapid pentru operații matematice de bază: adunare, scădere, înmulțire și împărțire. Interface intuitivă pentru calcule rapide zilnice.',
+    keywords: ['calculator', 'calculator online', 'operații matematice', 'calcul rapid', 'math calculator']
+  },
+  'timer': {
+    title: 'Cronometru și Timer Online',
+    description: 'Cronometru precis pentru măsurarea timpului. Perfect pentru antrenamente, gătit, studiu sau orice activitate care necesită urmărirea timpului. Controlează cu start, stop și reset.',
+    keywords: ['timer', 'cronometru', 'stopwatch', 'măsurare timp', 'cronometru online', 'temporizator']
+  },
+  'qr-generator': {
+    title: 'Generator Coduri QR',
+    description: 'Creează coduri QR personalizate pentru URL-uri, text, contacte sau orice informație. Configurează dimensiunea și descarcă codul QR generat ca imagine.',
+    keywords: ['qr code', 'generator qr', 'cod qr', 'qr code generator', 'create qr', 'barcode']
+  },
+  'code-minifier': {
+    title: 'Minificator Cod - HTML, CSS, JavaScript',
+    description: 'Minifică codul HTML, CSS și JavaScript pentru a reduce dimensiunea fișierelor. Elimină spațiile albe și comentariile. Îmbunătățește viteza de încărcare a site-ului.',
+    keywords: ['minify', 'minificator', 'code minifier', 'optimize code', 'compress code', 'minify js css']
+  },
+  'color-extractor': {
+    title: 'Extractor Paleta de Culori din Imagine',
+    description: 'Extrage culorile dominante dintr-o imagine. Încarcă orice imagine și obține o paletă de culori cu coduri HEX și RGB. Perfect pentru designeri care caută inspirație.',
+    keywords: ['color extractor', 'paletă culori', 'extract colors', 'color palette', 'culori imagine', 'color picker']
+  },
+  'unit-converter': {
+    title: 'Convertor Unități de Măsură',
+    description: 'Convertește între diferite unități de măsură: lungime, greutate, temperatură, volum, suprafață. Calculator precis pentru conversii între metric și imperial.',
+    keywords: ['convertor unități', 'unit converter', 'conversie', 'unități măsură', 'metri', 'kilograme', 'temperature']
+  },
+  'text-compressor': {
+    title: 'Comprimare Text',
+    description: 'Comprimă texte mari pentru a reduce dimensiunea. Folosește algoritmi eficienți pentru a economisi spațiu. Decomprimă textele instant în browser.',
+    keywords: ['text compression', 'comprimare text', 'compress text', 'reduce size', 'zip text', 'text compressor']
   }
 };
 

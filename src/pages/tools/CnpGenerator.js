@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Container,
   FormControl,
   InputLabel,
   MenuItem,
@@ -19,6 +18,7 @@ import {
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import { useTranslation } from 'react-i18next';
+import ToolLayout from '../../components/ToolLayout';
 import { generateCnp, validateCnp } from '../../services/api';
 
 const countyOptions = [
@@ -261,27 +261,18 @@ const CnpGenerator = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 6, md: 10 } }}>
+    <ToolLayout
+      title={t('tools.cnpGenerator.heading')}
+      description={t('tools.cnpGenerator.instructions')}
+      seoSlug="cnp-generator"
+    >
       <Stack spacing={4}>
         <Paper
           component="form"
           onSubmit={handleGenerate}
-          sx={{
-            p: { xs: 3, md: 4 },
-            borderRadius: 3,
-            boxShadow: '0 20px 45px rgba(15, 23, 42, 0.08)'
-          }}
+          sx={{ p: 3, borderRadius: 2, bgcolor: 'grey.50' }}
         >
-          <Stack spacing={4}>
-            <Box>
-              <Typography variant="h3" component="h1" sx={{ fontWeight: 600 }} gutterBottom>
-                {t('tools.cnpGenerator.heading')}
-              </Typography>
-              <Typography variant="body1" color="text.secondary">
-                {t('tools.cnpGenerator.instructions')}
-              </Typography>
-            </Box>
-
+          <Stack spacing={3}>
             {generatorError && <Alert severity="error">{generatorError}</Alert>}
 
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
@@ -405,7 +396,7 @@ const CnpGenerator = () => {
           </Stack>
         </Paper>
       </Stack>
-    </Container>
+    </ToolLayout>
   );
 };
 

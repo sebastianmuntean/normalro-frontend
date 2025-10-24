@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Container,
   FormControlLabel,
   Paper,
   Slider,
@@ -16,6 +15,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import { useTranslation } from 'react-i18next';
 import { createPassword } from '../../services/api';
+import ToolLayout from '../../components/ToolLayout';
 
 const PasswordGenerator = () => {
   const { t } = useTranslation();
@@ -82,27 +82,13 @@ const PasswordGenerator = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 6, md: 10 } }}>
-      <Paper
-        component="form"
-        onSubmit={handleSubmit}
-        sx={{
-          p: { xs: 3, md: 4 },
-          borderRadius: 3,
-          boxShadow: '0 20px 45px rgba(15, 23, 42, 0.08)'
-        }}
-      >
-        <Stack spacing={4}>
-          <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: 600 }} gutterBottom>
-              {t('tools.passwordGenerator.heading')}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {t('tools.passwordGenerator.instructions')}
-            </Typography>
-          </Box>
-
-          {error && <Alert severity="error">{error}</Alert>}
+    <ToolLayout
+      title={t('tools.passwordGenerator.heading')}
+      description={t('tools.passwordGenerator.instructions')}
+      seoSlug="password-generator"
+    >
+      <Stack spacing={4} component="form" onSubmit={handleSubmit}>
+        {error && <Alert severity="error">{error}</Alert>}
 
           <Box>
             <Typography variant="subtitle1" gutterBottom>
@@ -166,9 +152,8 @@ const PasswordGenerator = () => {
               </Paper>
             </Stack>
           )}
-        </Stack>
-      </Paper>
-    </Container>
+      </Stack>
+    </ToolLayout>
   );
 };
 

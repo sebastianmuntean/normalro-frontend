@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Container,
   Paper,
   Stack,
   TextField,
@@ -15,6 +14,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import IconButton from '@mui/material/IconButton';
 import { useTranslation } from 'react-i18next';
+import ToolLayout from '../../components/ToolLayout';
 
 const CodeMinifier = () => {
   const { t } = useTranslation();
@@ -75,27 +75,13 @@ const CodeMinifier = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 6, md: 10 } }}>
-      <Paper
-        component="form"
-        onSubmit={handleMinify}
-        sx={{
-          p: { xs: 3, md: 4 },
-          borderRadius: 3,
-          boxShadow: '0 20px 45px rgba(15, 23, 42, 0.08)'
-        }}
-      >
-        <Stack spacing={3}>
-          <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: 600 }} gutterBottom>
-              {t('tools.codeMinifier.heading')}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {t('tools.codeMinifier.instructions')}
-            </Typography>
-          </Box>
-
-          <ToggleButtonGroup value={mode} exclusive onChange={(_, next) => next && setMode(next)}>
+    <ToolLayout
+      title={t('tools.codeMinifier.heading')}
+      description={t('tools.codeMinifier.instructions')}
+      seoSlug="code-minifier"
+    >
+      <Stack spacing={3} component="form" onSubmit={handleMinify}>
+        <ToggleButtonGroup value={mode} exclusive onChange={(_, next) => next && setMode(next)}>
             <ToggleButton value="css">{t('tools.codeMinifier.mode.css')}</ToggleButton>
             <ToggleButton value="js">{t('tools.codeMinifier.mode.js')}</ToggleButton>
           </ToggleButtonGroup>
@@ -144,9 +130,8 @@ const CodeMinifier = () => {
               </Box>
             </Paper>
           )}
-        </Stack>
-      </Paper>
-    </Container>
+      </Stack>
+    </ToolLayout>
   );
 };
 

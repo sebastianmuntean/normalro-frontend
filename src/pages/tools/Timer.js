@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Container,
   Grid,
   Paper,
   Stack,
@@ -11,6 +10,7 @@ import {
   Typography
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import ToolLayout from '../../components/ToolLayout';
 
 const formatTime = (milliseconds) => {
   const totalSeconds = Math.floor(milliseconds / 1000);
@@ -122,25 +122,24 @@ const Timer = () => {
   }, []);
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 6, md: 10 } }}>
+    <ToolLayout
+      title={t('tools.timer.heading')}
+      description={t('tools.timer.instructions')}
+      seoSlug="timer"
+    >
       <Grid container spacing={4}>
-        <Grid item xs={12} lg={6}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Paper
             sx={{
-              p: { xs: 3, md: 4 },
-              borderRadius: 3,
-              boxShadow: '0 20px 45px rgba(15, 23, 42, 0.08)'
+              p: 3,
+              borderRadius: 2,
+              boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)'
             }}
           >
             <Stack spacing={3}>
-              <Box>
-                <Typography variant="h3" component="h1" sx={{ fontWeight: 600 }} gutterBottom>
-                  {t('tools.timer.stopwatch.heading')}
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                  {t('tools.timer.stopwatch.instructions')}
-                </Typography>
-              </Box>
+              <Typography variant="h5" fontWeight="600">
+                {t('tools.timer.stopwatch.heading')}
+              </Typography>
               <Typography variant="h2" sx={{ fontWeight: 600, textAlign: 'center' }}>
                 {formatTime(stopwatchTime)}
               </Typography>
@@ -172,7 +171,7 @@ const Timer = () => {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} lg={6}>
+        <Grid size={{ xs: 12, lg: 6 }}>
           <Paper
             sx={{
               p: { xs: 3, md: 4 },
@@ -232,7 +231,7 @@ const Timer = () => {
           </Paper>
         </Grid>
       </Grid>
-    </Container>
+    </ToolLayout>
   );
 };
 

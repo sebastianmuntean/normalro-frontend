@@ -57,12 +57,10 @@ const InvoiceCalculator = () => {
 
       const updated = { ...line, [field]: value };
 
-      // Calculăm doar dacă se schimbă preț sau TVA, nu și la schimbarea produsului sau cantității
       if (field === 'unitNetPrice' || field === 'vatRate') {
         const net = parseFloat(updated.unitNetPrice);
         const vat = parseFloat(updated.vatRate);
         if (!isNaN(net) && !isNaN(vat)) {
-          // Calculăm cu 4 zecimale de precizie
           const vatAmount = Math.round(net * vat * 10000) / 1000000;
           const gross = net + vatAmount;
           updated.unitGrossPrice = formatNumber(gross);
@@ -71,7 +69,6 @@ const InvoiceCalculator = () => {
         const gross = parseFloat(updated.unitGrossPrice);
         const vat = parseFloat(updated.vatRate);
         if (!isNaN(gross) && !isNaN(vat)) {
-          // Calculăm net cu 4 zecimale de precizie
           const net = Math.round((gross / (1 + vat / 100)) * 10000) / 10000;
           updated.unitNetPrice = formatNumber(net);
         }
@@ -113,7 +110,6 @@ const InvoiceCalculator = () => {
     let totalGross = 0;
 
     lines.forEach(line => {
-      // Adunăm totalurile calculate pe fiecare linie
       totalNet += parseFloat(calculateLineTotal(line, 'net')) || 0;
       totalVat += parseFloat(calculateLineTotal(line, 'vat')) || 0;
       totalGross += parseFloat(calculateLineTotal(line, 'gross')) || 0;
@@ -135,13 +131,13 @@ const InvoiceCalculator = () => {
       maxWidth="lg"
       seoSlug="invoice-calculator"
     >
-      <Stack spacing={3}>
+      <Stack spacing={2}>
         {/* Lines */}
         {lines.map((line, index) => (
           <Card key={line.id} variant="outlined">
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle1" fontWeight="600">
+            <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                <Typography variant="subtitle2" fontWeight="600" color="text.secondary">
                   Linia {index + 1}
                 </Typography>
                 {lines.length > 1 && (
@@ -151,18 +147,18 @@ const InvoiceCalculator = () => {
                     onClick={() => deleteLine(line.id)}
                     title="Șterge linia"
                   >
-                    <DeleteIcon />
+                    <DeleteIcon fontSize="small" />
                   </IconButton>
                 )}
               </Box>
 
-              <Grid container spacing={1.5} alignItems="flex-start">
+              <Grid container spacing={1} alignItems="flex-start">
                 {/* Produs */}
-                <Grid item xs={12} md={3}>
+                <Grid size={{ xs: 12, md: 4.3 }}>
                   <TextField
                     fullWidth
                     size="small"
-                    label="Produs"
+                    label="Produs / Serviciu"
                     value={line.product}
                     onChange={(e) => updateLine(line.id, 'product', e.target.value)}
                     placeholder="Descriere"
@@ -170,7 +166,7 @@ const InvoiceCalculator = () => {
                 </Grid>
 
                 {/* Cantitate */}
-                <Grid item xs={4} md={1.2}>
+                <Grid size={{ xs: 1, md: 0.8 }}>
                   <TextField
                     fullWidth
                     size="small"
@@ -185,7 +181,7 @@ const InvoiceCalculator = () => {
                 </Grid>
 
                 {/* Preț net unitar */}
-                <Grid item xs={4} md={2}>
+                <Grid size={{ xs: 1, md: 1.7 }}>
                   <TextField
                     fullWidth
                     size="small"
@@ -194,15 +190,15 @@ const InvoiceCalculator = () => {
                     value={line.unitNetPrice}
                     onChange={(e) => updateLine(line.id, 'unitNetPrice', e.target.value)}
                     InputProps={{
-                      endAdornment: <InputAdornment position="end"><Typography variant="caption">RON</Typography></InputAdornment>,
+                      endAdornment: <InputAdornment position="end"><Typography variant="caption" fontSize="0.7rem">RON</Typography></InputAdornment>,
                       inputProps: { min: 0, step: 0.01 }
                     }}
                     sx={{ bgcolor: 'grey.50' }}
                   />
                 </Grid>
 
-                {/* TVA */}
-                <Grid item xs={4} md={2.8}>
+                {/* TVA % */}
+                <Grid size={{ xs: 1, md: 1.0 }}>
                   <TextField
                     fullWidth
                     size="small"
@@ -211,24 +207,25 @@ const InvoiceCalculator = () => {
                     value={line.vatRate}
                     onChange={(e) => updateLine(line.id, 'vatRate', e.target.value)}
                     InputProps={{
-                      endAdornment: <InputAdornment position="end"><Typography variant="caption">%</Typography></InputAdornment>,
+                      endAdornment: <InputAdornment position="end"><Typography variant="caption" fontSize="0.7rem">%</Typography></InputAdornment>,
                       inputProps: { min: 0, max: 100, step: 0.01 }
                     }}
                     sx={{ bgcolor: 'info.50' }}
                   />
-                  <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
+                  <Stack direction="row" spacing={0.3} sx={{ mt: 0.5 }}>
                     {[21, 11, 0].map((rate) => (
                       <Box
                         key={rate}
                         onClick={() => updateLine(line.id, 'vatRate', rate.toString())}
                         sx={{
-                          px: 1,
-                          py: 0.3,
+                          px: 0.7,
+                          py: 0.2,
                           bgcolor: line.vatRate === rate.toString() ? 'info.main' : 'grey.200',
                           color: line.vatRate === rate.toString() ? 'white' : 'text.primary',
                           borderRadius: 0.5,
                           cursor: 'pointer',
-                          fontSize: '0.7rem',
+                          fontSize: '0.65rem',
+                          fontWeight: 500,
                           transition: 'all 0.2s',
                           '&:hover': {
                             bgcolor: line.vatRate === rate.toString() ? 'info.dark' : 'grey.300',
@@ -241,8 +238,28 @@ const InvoiceCalculator = () => {
                   </Stack>
                 </Grid>
 
+                {/* Suma TVA calculată */}
+                <Grid size={{ xs: 1, md: 1.4 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Suma TVA"
+                    value={calculateLineVat(line)}
+                    disabled
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end"><Typography variant="caption" fontSize="0.7rem">RON</Typography></InputAdornment>
+                    }}
+                    sx={{ 
+                      '& .MuiInputBase-input.Mui-disabled': {
+                        WebkitTextFillColor: '#1976d2',
+                        fontWeight: 600
+                      }
+                    }}
+                  />
+                </Grid>
+
                 {/* Preț brut unitar */}
-                <Grid item xs={12} md={2}>
+                <Grid size={{ xs: 1, md: 2.8 }}>
                   <TextField
                     fullWidth
                     size="small"
@@ -251,37 +268,24 @@ const InvoiceCalculator = () => {
                     value={line.unitGrossPrice}
                     onChange={(e) => updateLine(line.id, 'unitGrossPrice', e.target.value)}
                     InputProps={{
-                      endAdornment: <InputAdornment position="end"><Typography variant="caption">RON</Typography></InputAdornment>,
+                      endAdornment: <InputAdornment position="end"><Typography variant="caption" fontSize="0.7rem">RON</Typography></InputAdornment>,
                       inputProps: { min: 0, step: 0.01 }
                     }}
                     sx={{ bgcolor: 'success.50' }}
                   />
                 </Grid>
-              </Grid>
 
-              {/* Line totals */}
-              <Box sx={{ mt: 1.5, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                <Stack direction="row" spacing={3} justifyContent="space-around">
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">Total net:</Typography>
-                    <Typography variant="body2" fontWeight="600">
-                      {calculateLineTotal(line, 'net')} RON
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">TVA:</Typography>
-                    <Typography variant="body2" fontWeight="600" color="info.main">
-                      {calculateLineTotal(line, 'vat')} RON
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">Total brut:</Typography>
-                    <Typography variant="body2" fontWeight="600" color="success.dark">
-                      {calculateLineTotal(line, 'gross')} RON
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Box>
+                {/* Total linie - afișare compactă */}
+                {parseFloat(line.quantity) > 1 && (
+                  <Grid size={{ xs: 12 }}>
+                    <Box sx={{ mt: 0.5, p: 0.8, bgcolor: 'grey.50', borderRadius: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary" fontSize="0.7rem">
+                        Total linie (× {line.quantity}): <strong>{calculateLineTotal(line, 'net')}</strong> + <strong style={{color: '#1976d2'}}>{calculateLineTotal(line, 'vat')}</strong> = <strong style={{color: '#2e7d32'}}>{calculateLineTotal(line, 'gross')} RON</strong>
+                      </Typography>
+                    </Box>
+                  </Grid>
+                )}
+              </Grid>
             </CardContent>
           </Card>
         ))}
@@ -289,6 +293,7 @@ const InvoiceCalculator = () => {
         {/* Add Line Button */}
         <Button
           variant="outlined"
+          size="small"
           startIcon={<AddIcon />}
           onClick={addLine}
           sx={{ alignSelf: 'flex-start' }}
@@ -298,26 +303,26 @@ const InvoiceCalculator = () => {
 
         {/* Totals */}
         {lines.length >= 1 && (
-          <Paper sx={{ p: 3, bgcolor: 'primary.50', borderLeft: 4, borderColor: 'primary.main' }}>
-            <Typography variant="h6" gutterBottom color="primary">
+          <Paper sx={{ p: 2.5, bgcolor: 'primary.50', borderLeft: 4, borderColor: 'primary.main' }}>
+            <Typography variant="h6" gutterBottom color="primary" fontSize="1.1rem">
               Total Factură
             </Typography>
             
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={4}>
-                <Typography variant="body2" color="text.secondary">Total net:</Typography>
+              <Grid size={{ xs: 4 }}>
+                <Typography variant="caption" color="text.secondary">Total net:</Typography>
                 <Typography variant="h6" fontWeight="700">
                   {totals.net} RON
                 </Typography>
               </Grid>
-              <Grid item xs={12} sm={4}>
-                <Typography variant="body2" color="text.secondary">Total TVA:</Typography>
+              <Grid size={{ xs: 4 }}>
+                <Typography variant="caption" color="text.secondary">Total TVA:</Typography>
                 <Typography variant="h6" fontWeight="700" color="info.main">
                   {totals.vat} RON
                 </Typography>
               </Grid>
-              <Grid item xs={12} sm={4}>
-                <Typography variant="body2" color="text.secondary">Total brut:</Typography>
+              <Grid size={{ xs: 4 }}>
+                <Typography variant="caption" color="text.secondary">Total brut:</Typography>
                 <Typography variant="h5" fontWeight="800" color="success.dark">
                   {totals.gross} RON
                 </Typography>
@@ -327,9 +332,9 @@ const InvoiceCalculator = () => {
         )}
 
         {/* Info */}
-        <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-          <Typography variant="body2" color="text.secondary">
-            💡 <strong>Sfat:</strong> Modifică orice valoare (net, TVA% sau brut) și restul se actualizează automat. Totalul pe linie = Preț unitar × Cantitate.
+        <Paper sx={{ p: 1.5, bgcolor: 'grey.50' }}>
+          <Typography variant="body2" color="text.secondary" fontSize="0.85rem">
+            💡 <strong>Sfat:</strong> Modifică orice valoare (net, TVA% sau brut) și restul se actualizează automat.
             <br />
             <strong>Cote TVA:</strong> 21% standard, 11% redus, 0% scutit.
           </Typography>

@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Container,
   Paper,
   Stack,
   TextField,
@@ -13,6 +12,7 @@ import {
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { deflate, inflate } from 'pako';
+import ToolLayout from '../../components/ToolLayout';
 
 const TextCompressor = () => {
   const { t } = useTranslation();
@@ -46,27 +46,13 @@ const TextCompressor = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 6, md: 10 } }}>
-      <Paper
-        component="form"
-        onSubmit={handleSubmit}
-        sx={{
-          p: { xs: 3, md: 4 },
-          borderRadius: 3,
-          boxShadow: '0 20px 45px rgba(15, 23, 42, 0.08)'
-        }}
-      >
-        <Stack spacing={3}>
-          <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: 600 }} gutterBottom>
-              {t('tools.textCompressor.heading')}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {t('tools.textCompressor.instructions')}
-            </Typography>
-          </Box>
-
-          <ToggleButtonGroup value={mode} exclusive onChange={(_, next) => next && setMode(next)}>
+    <ToolLayout
+      title={t('tools.textCompressor.heading')}
+      description={t('tools.textCompressor.instructions')}
+      seoSlug="text-compressor"
+    >
+      <Stack spacing={3} component="form" onSubmit={handleSubmit}>
+        <ToggleButtonGroup value={mode} exclusive onChange={(_, next) => next && setMode(next)}>
             <ToggleButton value="compress">{t('tools.textCompressor.mode.compress')}</ToggleButton>
             <ToggleButton value="decompress">{t('tools.textCompressor.mode.decompress')}</ToggleButton>
           </ToggleButtonGroup>
@@ -101,9 +87,8 @@ const TextCompressor = () => {
               />
             </Stack>
           )}
-        </Stack>
-      </Paper>
-    </Container>
+      </Stack>
+    </ToolLayout>
   );
 };
 

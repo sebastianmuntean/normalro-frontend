@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Container,
   Paper,
   Stack,
   TextField,
@@ -12,6 +11,7 @@ import {
 import DownloadIcon from '@mui/icons-material/Download';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'qrcode';
+import ToolLayout from '../../components/ToolLayout';
 
 const QrGenerator = () => {
   const { t } = useTranslation();
@@ -47,27 +47,14 @@ const QrGenerator = () => {
   };
 
   return (
-    <Container maxWidth="sm" sx={{ py: { xs: 6, md: 10 } }}>
-      <Paper
-        component="form"
-        onSubmit={handleGenerate}
-        sx={{
-          p: { xs: 3, md: 4 },
-          borderRadius: 3,
-          boxShadow: '0 20px 45px rgba(15, 23, 42, 0.08)'
-        }}
-      >
-        <Stack spacing={3}>
-          <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: 600 }} gutterBottom>
-              {t('tools.qrGenerator.heading')}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {t('tools.qrGenerator.instructions')}
-            </Typography>
-          </Box>
-
-          {error && <Alert severity="error">{error}</Alert>}
+    <ToolLayout
+      title={t('tools.qrGenerator.heading')}
+      description={t('tools.qrGenerator.instructions')}
+      maxWidth="sm"
+      seoSlug="qr-generator"
+    >
+      <Stack spacing={3} component="form" onSubmit={handleGenerate}>
+        {error && <Alert severity="error">{error}</Alert>}
 
           <TextField
             label={t('tools.qrGenerator.fields.input')}
@@ -106,9 +93,8 @@ const QrGenerator = () => {
               </Button>
             </Stack>
           )}
-        </Stack>
-      </Paper>
-    </Container>
+      </Stack>
+    </ToolLayout>
   );
 };
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Box, Button, Container, Grid, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Button, Grid, Paper, Stack, TextField, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import ToolLayout from '../../components/ToolLayout';
 
 const keys = [
   ['7', '8', '9', '/'],
@@ -47,25 +48,14 @@ const Calculator = () => {
   };
 
   return (
-    <Container maxWidth="xs" sx={{ py: { xs: 6, md: 10 } }}>
-      <Paper
-        sx={{
-          p: { xs: 3, md: 4 },
-          borderRadius: 3,
-          boxShadow: '0 20px 45px rgba(15, 23, 42, 0.08)'
-        }}
-      >
-        <Stack spacing={3}>
-          <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: 600 }} gutterBottom>
-              {t('tools.calculator.heading')}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {t('tools.calculator.instructions')}
-            </Typography>
-          </Box>
-
-          <TextField
+    <ToolLayout
+      title={t('tools.calculator.heading')}
+      description={t('tools.calculator.instructions')}
+      maxWidth="xs"
+      seoSlug="calculator"
+    >
+      <Stack spacing={3}>
+        <TextField
             label={t('tools.calculator.fields.expression')}
             value={expression}
             onChange={(event) => setExpression(event.target.value)}
@@ -124,9 +114,8 @@ const Calculator = () => {
               </Typography>
             </Paper>
           )}
-        </Stack>
-      </Paper>
-    </Container>
+      </Stack>
+    </ToolLayout>
   );
 };
 

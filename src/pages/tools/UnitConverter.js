@@ -1,9 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
-  Box,
   Button,
-  Container,
   FormControl,
   InputLabel,
   MenuItem,
@@ -14,6 +12,7 @@ import {
   Typography
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import ToolLayout from '../../components/ToolLayout';
 
 const buildUnit = (value, labelKey, factor) => ({ value, labelKey, factor });
 
@@ -123,25 +122,14 @@ const UnitConverter = () => {
   };
 
   return (
-    <Container maxWidth="sm" sx={{ py: { xs: 6, md: 10 } }}>
-      <Paper
-        sx={{
-          p: { xs: 3, md: 4 },
-          borderRadius: 3,
-          boxShadow: '0 20px 45px rgba(15, 23, 42, 0.08)'
-        }}
-      >
-        <Stack spacing={3}>
-          <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: 600 }} gutterBottom>
-              {t('tools.unitConverter.heading')}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {t('tools.unitConverter.instructions')}
-            </Typography>
-          </Box>
-
-          {error && <Alert severity="error">{error}</Alert>}
+    <ToolLayout
+      title={t('tools.unitConverter.heading')}
+      description={t('tools.unitConverter.instructions')}
+      maxWidth="sm"
+      seoSlug="unit-converter"
+    >
+      <Stack spacing={3}>
+        {error && <Alert severity="error">{error}</Alert>}
 
           <FormControl fullWidth>
             <InputLabel>{t('tools.unitConverter.fields.category')}</InputLabel>
@@ -196,9 +184,8 @@ const UnitConverter = () => {
               </Typography>
             </Paper>
           )}
-        </Stack>
-      </Paper>
-    </Container>
+      </Stack>
+    </ToolLayout>
   );
 };
 

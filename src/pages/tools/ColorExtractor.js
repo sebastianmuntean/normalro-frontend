@@ -3,13 +3,13 @@ import {
   Alert,
   Box,
   Button,
-  Container,
   Grid,
   Paper,
   Stack,
   Typography
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import ToolLayout from '../../components/ToolLayout';
 
 const sampleColors = (context, width, height, sampleSize = 10) => {
   const colors = {};
@@ -74,25 +74,13 @@ const ColorExtractor = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 6, md: 10 } }}>
-      <Paper
-        sx={{
-          p: { xs: 3, md: 4 },
-          borderRadius: 3,
-          boxShadow: '0 20px 45px rgba(15, 23, 42, 0.08)'
-        }}
-      >
-        <Stack spacing={3}>
-          <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: 600 }} gutterBottom>
-              {t('tools.colorExtractor.heading')}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {t('tools.colorExtractor.instructions')}
-            </Typography>
-          </Box>
-
-          {error && <Alert severity="error">{error}</Alert>}
+    <ToolLayout
+      title={t('tools.colorExtractor.heading')}
+      description={t('tools.colorExtractor.instructions')}
+      seoSlug="color-extractor"
+    >
+      <Stack spacing={3}>
+        {error && <Alert severity="error">{error}</Alert>}
 
           <Button variant="contained" component="label">
             {t('tools.colorExtractor.actions.upload')}
@@ -107,7 +95,7 @@ const ColorExtractor = () => {
           {colors.length > 0 && (
             <Grid container spacing={2}>
               {colors.map((color) => (
-                <Grid item xs={6} sm={3} key={color.hex}>
+                <Grid size={{ xs: 6, sm: 3 }} key={color.hex}>
                   <Stack spacing={1} alignItems="center">
                     <Box sx={{ width: '100%', pt: '75%', borderRadius: 2, background: color.hex, border: '1px solid rgba(0,0,0,0.12)' }} />
                     <Typography variant="body2">{color.hex}</Typography>
@@ -119,9 +107,8 @@ const ColorExtractor = () => {
               ))}
             </Grid>
           )}
-        </Stack>
-      </Paper>
-    </Container>
+      </Stack>
+    </ToolLayout>
   );
 };
 

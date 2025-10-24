@@ -1,9 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
-  Box,
   Button,
-  Container,
   IconButton,
   Paper,
   Stack,
@@ -15,6 +13,7 @@ import {
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import { useTranslation } from 'react-i18next';
+import ToolLayout from '../../components/ToolLayout';
 const Base64Converter = () => {
   const { t } = useTranslation();
   const [mode, setMode] = useState('encode');
@@ -102,27 +101,13 @@ const Base64Converter = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 6, md: 10 } }}>
-      <Paper
-        component="form"
-        onSubmit={handleSubmit}
-        sx={{
-          p: { xs: 3, md: 4 },
-          borderRadius: 3,
-          boxShadow: '0 20px 45px rgba(15, 23, 42, 0.08)'
-        }}
-      >
-        <Stack spacing={3}>
-          <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: 600 }} gutterBottom>
-              {t('tools.base64Converter.heading')}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {t('tools.base64Converter.instructions')}
-            </Typography>
-          </Box>
-
-          <ToggleButtonGroup
+    <ToolLayout
+      title={t('tools.base64Converter.heading')}
+      description={t('tools.base64Converter.instructions')}
+      seoSlug="base64-converter"
+    >
+      <Stack spacing={3} component="form" onSubmit={handleSubmit}>
+        <ToggleButtonGroup
             value={mode}
             exclusive
             onChange={handleModeChange}
@@ -181,9 +166,8 @@ const Base64Converter = () => {
               </Paper>
             </Stack>
           )}
-        </Stack>
-      </Paper>
-    </Container>
+      </Stack>
+    </ToolLayout>
   );
 };
 

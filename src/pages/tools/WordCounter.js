@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Container,
   Grid,
   Paper,
   Stack,
@@ -11,6 +10,7 @@ import {
   Typography
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import ToolLayout from '../../components/ToolLayout';
 const metricsOrder = ['words', 'characters', 'sentences', 'paragraphs', 'estimatedReadingMinutes'];
 
 const WordCounter = () => {
@@ -73,27 +73,13 @@ const WordCounter = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 6, md: 10 } }}>
-      <Paper
-        component="form"
-        onSubmit={handleSubmit}
-        sx={{
-          p: { xs: 3, md: 4 },
-          borderRadius: 3,
-          boxShadow: '0 20px 45px rgba(15, 23, 42, 0.08)'
-        }}
-      >
-        <Stack spacing={3}>
-          <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: 600 }} gutterBottom>
-              {t('tools.wordCounter.heading')}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {t('tools.wordCounter.instructions')}
-            </Typography>
-          </Box>
-
-          {error && <Alert severity="error">{error}</Alert>}
+    <ToolLayout
+      title={t('tools.wordCounter.heading')}
+      description={t('tools.wordCounter.instructions')}
+      seoSlug="word-counter"
+    >
+      <Stack spacing={3} component="form" onSubmit={handleSubmit}>
+        {error && <Alert severity="error">{error}</Alert>}
 
           <TextField
             multiline
@@ -150,9 +136,8 @@ const WordCounter = () => {
               </Grid>
             </Paper>
           )}
-        </Stack>
-      </Paper>
-    </Container>
+      </Stack>
+    </ToolLayout>
   );
 };
 
