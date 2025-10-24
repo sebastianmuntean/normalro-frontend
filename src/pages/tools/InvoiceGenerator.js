@@ -25,6 +25,7 @@ import { getCompanyDataByCUI } from '../../services/anafService';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 
 const InvoiceGenerator = () => {
   const [loadingSupplier, setLoadingSupplier] = useState(false);
@@ -183,6 +184,21 @@ const InvoiceGenerator = () => {
           const net = Math.round((gross / (1 + vat / 100)) * 10000) / 10000;
           updated.unitNetPrice = formatNumber(net);
         }
+      } else if (field === 'lineTotalGross') {
+        // Când se editează totalul brut per linie
+        const totalGross = parseFloat(value);
+        const quantity = parseFloat(updated.quantity);
+        const vat = parseFloat(updated.vatRate);
+        
+        if (!isNaN(totalGross) && !isNaN(quantity) && quantity > 0 && !isNaN(vat)) {
+          // Calculează preț brut unitar = Total Brut / Cantitate
+          const unitGross = totalGross / quantity;
+          updated.unitGrossPrice = formatNumber(unitGross);
+          
+          // Recalculează preț net unitar
+          const unitNet = Math.round((unitGross / (1 + vat / 100)) * 10000) / 10000;
+          updated.unitNetPrice = formatNumber(unitNet);
+        }
       }
 
       return updated;
@@ -235,136 +251,127 @@ const InvoiceGenerator = () => {
 
   const totals = calculateTotals();
 
-  // Helper function pentru diacritice românești în PDF
-  const fixRomanianChars = (text) => {
-    if (!text) return text;
-    return text
-      .replace(/ă/g, String.fromCharCode(0x0103))
-      .replace(/Ă/g, String.fromCharCode(0x0102))
-      .replace(/â/g, String.fromCharCode(0x00E2))
-      .replace(/Â/g, String.fromCharCode(0x00C2))
-      .replace(/î/g, String.fromCharCode(0x00EE))
-      .replace(/Î/g, String.fromCharCode(0x00CE))
-      .replace(/ș/g, String.fromCharCode(0x0219))
-      .replace(/Ș/g, String.fromCharCode(0x0218))
-      .replace(/ț/g, String.fromCharCode(0x021B))
-      .replace(/Ț/g, String.fromCharCode(0x021A));
-  };
+  const exportToPDF = async () => {
+    // Creează un element temporar cu factura HTML (cu diacritice corecte!)
+    const invoiceElement = document.createElement('div');
+    invoiceElement.style.position = 'absolute';
+    invoiceElement.style.left = '-9999px';
+    invoiceElement.style.width = '800px';
+    invoiceElement.style.padding = '40px';
+    invoiceElement.style.backgroundColor = 'white';
+    invoiceElement.style.fontFamily = 'Arial, sans-serif';
 
-  const exportToPDF = () => {
-    const doc = new jsPDF();
+    // Construiește HTML-ul facturii
+    invoiceElement.innerHTML = `
+      <div style="font-family: Arial, sans-serif; font-size: 11px;">
+        <h1 style="text-align: center; font-size: 24px; margin: 0 0 15px 0;">FACTURĂ</h1>
+        <div style="text-align: center; margin-bottom: 25px; font-size: 11px;">
+          <div>Seria: ${invoiceData.series || '-'} Nr: ${invoiceData.number || '-'}</div>
+          <div>Data: ${invoiceData.issueDate || '-'}</div>
+          ${invoiceData.dueDate ? `<div>Scadență: ${invoiceData.dueDate}</div>` : ''}
+        </div>
+        
+        <table style="width: 100%; margin-bottom: 25px; border-collapse: collapse;">
+          <tr>
+            <td style="width: 50%; vertical-align: top; padding-right: 15px;">
+              <strong style="font-size: 12px;">FURNIZOR:</strong><br/>
+              <div style="margin-top: 5px; line-height: 1.6;">
+                ${invoiceData.supplierName || '-'}<br/>
+                CUI: ${invoiceData.supplierCUI || '-'}<br/>
+                ${invoiceData.supplierRegCom ? `Reg Com: ${invoiceData.supplierRegCom}<br/>` : ''}
+                ${invoiceData.supplierAddress || '-'}<br/>
+                ${invoiceData.supplierCity || '-'}
+              </div>
+            </td>
+            <td style="width: 50%; vertical-align: top; padding-left: 15px;">
+              <strong style="font-size: 12px;">BENEFICIAR:</strong><br/>
+              <div style="margin-top: 5px; line-height: 1.6;">
+                ${invoiceData.clientName || '-'}<br/>
+                CUI: ${invoiceData.clientCUI || '-'}<br/>
+                ${invoiceData.clientRegCom ? `Reg Com: ${invoiceData.clientRegCom}<br/>` : ''}
+                ${invoiceData.clientAddress || '-'}<br/>
+                ${invoiceData.clientCity || '-'}
+              </div>
+            </td>
+          </tr>
+        </table>
+        
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+          <thead>
+            <tr style="background-color: #2196F3; color: white;">
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Nr.</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Produs/Serviciu</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Cant.</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Preț Net</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">TVA%</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Suma TVA</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Preț Brut</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Total Net</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Total TVA</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Total Brut</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lines.map((line, index) => `
+              <tr>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${index + 1}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; font-size: 9px;">${line.product || '-'}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${line.quantity}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${line.unitNetPrice} RON</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${line.vatRate}%</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineVat(line)} RON</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${line.unitGrossPrice} RON</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'net')} RON</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'vat')} RON</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'gross')} RON</td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background-color: #f5f5f5; font-weight: bold;">
+              <td colspan="7" style="border: 1px solid #ddd; padding: 8px; font-size: 11px; font-weight: bold;">TOTAL FACTURĂ</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.net} RON</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.vat} RON</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.gross} RON</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
     
-    // Folosește Times care are suport mai bun pentru diacritice
-    doc.setFont('times');
-
-    // Header
-    doc.setFontSize(20);
-    doc.setFont('times', 'bold');
-    doc.text(fixRomanianChars('FACTURĂ'), 105, 20, { align: 'center' });
-
-    // Seria și numărul
-    doc.setFontSize(10);
-    doc.setFont('times', 'normal');
-    doc.text(`Seria: ${invoiceData.series || '-'} Nr: ${invoiceData.number || '-'}`, 105, 28, { align: 'center' });
-    doc.text(`Data: ${invoiceData.issueDate || '-'}`, 105, 34, { align: 'center' });
-    if (invoiceData.dueDate) {
-      doc.text(fixRomanianChars(`Scadență: ${invoiceData.dueDate}`), 105, 40, { align: 'center' });
+    document.body.appendChild(invoiceElement);
+    
+    try {
+      // Convertește HTML-ul la canvas/imagine
+      const canvas = await html2canvas(invoiceElement, {
+        scale: 2, // Calitate mai bună (2x resolution)
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      // Creează PDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgData = canvas.toDataURL('image/png');
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight) * 72 / 96; // Adjust for DPI
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 10;
+      
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      
+      // Salvează PDF
+      pdf.save(`factura_${invoiceData.series || 'X'}_${invoiceData.number || '000'}_${invoiceData.issueDate}.pdf`);
+      
+    } finally {
+      // Șterge elementul temporar
+      document.body.removeChild(invoiceElement);
     }
-
-    // Furnizor și Beneficiar
-    const startY = invoiceData.dueDate ? 48 : 42;
-
-    doc.setFontSize(11);
-    doc.setFont('times', 'bold');
-    doc.text('FURNIZOR:', 14, startY);
-    doc.text('BENEFICIAR:', 110, startY);
-
-    doc.setFontSize(9);
-    doc.setFont('times', 'normal');
-    let yPos = startY + 6;
-
-    // Furnizor details - apply fix to names and addresses
-    doc.text(fixRomanianChars(invoiceData.supplierName) || '-', 14, yPos);
-    doc.text(fixRomanianChars(invoiceData.clientName) || '-', 110, yPos);
-    yPos += 5;
-
-    doc.text(`CUI: ${invoiceData.supplierCUI || '-'}`, 14, yPos);
-    doc.text(`CUI: ${invoiceData.clientCUI || '-'}`, 110, yPos);
-    yPos += 5;
-
-    if (invoiceData.supplierRegCom) {
-      doc.text(`Reg Com: ${invoiceData.supplierRegCom}`, 14, yPos);
-    }
-    if (invoiceData.clientRegCom) {
-      doc.text(`Reg Com: ${invoiceData.clientRegCom}`, 110, yPos);
-    }
-    yPos += 5;
-
-    doc.text(fixRomanianChars(invoiceData.supplierAddress) || '-', 14, yPos);
-    doc.text(fixRomanianChars(invoiceData.clientAddress) || '-', 110, yPos);
-    yPos += 5;
-
-    doc.text(fixRomanianChars(invoiceData.supplierCity) || '-', 14, yPos);
-    doc.text(fixRomanianChars(invoiceData.clientCity) || '-', 110, yPos);
-    yPos += 10;
-
-    // Prepare table data - apply fix to product names
-    const tableData = lines.map((line, index) => [
-      index + 1,
-      fixRomanianChars(line.product) || '-',
-      line.quantity,
-      `${line.unitNetPrice} RON`,
-      `${line.vatRate}%`,
-      `${calculateLineVat(line)} RON`,
-      `${line.unitGrossPrice} RON`,
-      `${calculateLineTotal(line, 'net')} RON`,
-      `${calculateLineTotal(line, 'vat')} RON`,
-      `${calculateLineTotal(line, 'gross')} RON`
-    ]);
-
-    // Add table with Romanian characters fix
-    doc.autoTable({
-      startY: yPos,
-      head: [[
-        'Nr.', 
-        fixRomanianChars('Produs/Serviciu'), 
-        'Cant.', 
-        fixRomanianChars('Preț Net'), 
-        'TVA%', 
-        'Suma TVA', 
-        fixRomanianChars('Preț Brut'), 
-        'Total Net', 
-        'Total TVA', 
-        'Total Brut'
-      ]],
-      body: tableData,
-      foot: [[
-        '', 
-        fixRomanianChars('TOTAL FACTURĂ'), 
-        '', '', '', '', '', 
-        `${totals.net} RON`, 
-        `${totals.vat} RON`, 
-        `${totals.gross} RON`
-      ]],
-      theme: 'grid',
-      headStyles: { fillColor: [33, 150, 243], fontSize: 8, font: 'times' },
-      footStyles: { fillColor: [220, 220, 220], fontStyle: 'bold', fontSize: 9, font: 'times' },
-      styles: { fontSize: 7, cellPadding: 1.5, font: 'times' },
-      columnStyles: {
-        0: { cellWidth: 8 },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 12 },
-        3: { cellWidth: 18 },
-        4: { cellWidth: 12 },
-        5: { cellWidth: 18 },
-        6: { cellWidth: 18 },
-        7: { cellWidth: 22 },
-        8: { cellWidth: 22 },
-        9: { cellWidth: 22 }
-      }
-    });
-
-    doc.save(`factura_${invoiceData.series || 'X'}_${invoiceData.number || '000'}_${invoiceData.issueDate}.pdf`);
   };
 
   const exportToExcel = () => {
