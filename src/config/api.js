@@ -1,7 +1,10 @@
 // You can set REACT_APP_API_URL in Vercel environment variables
-const API_BASE_URL = process.env.REACT_APP_API_URL || 
+let API_BASE_URL = process.env.REACT_APP_API_URL || 
   (process.env.NODE_ENV === 'production'
-    ? 'https://YOUR-BACKEND-URL.vercel.app/api'  // Replace with your actual backend URL
+    ? 'https://normalro-backend.vercel.app/api'  // Updated with actual backend URL
     : 'http://localhost:5000/api');
+
+// Remove trailing slash to avoid double slashes
+API_BASE_URL = API_BASE_URL.replace(/\/+$/, '');
 
 export default API_BASE_URL; 
