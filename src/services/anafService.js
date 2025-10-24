@@ -21,7 +21,7 @@ export const getCompanyDataByCUI = async (cui, date = null) => {
 
   try {
     // Apelează backend-ul nostru care face proxy către ANAF
-    const response = await fetch(`${API_BASE_URL}/anaf/company`, {
+    const response = await fetch(`${API_BASE_URL}/api/anaf/company`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
