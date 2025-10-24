@@ -131,7 +131,7 @@ const ColorConverter = () => {
   };
 
   return (
-    <ToolLayout title={t('tools.colorConverter.heading')} description={t('tools.colorConverter.instructions')}>
+    <ToolLayout title={t('tools.colorConverter.heading')} description={t('tools.colorConverter.instructions')} seoSlug="color-converter">
       {error && <Alert severity="error">{error}</Alert>}
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>

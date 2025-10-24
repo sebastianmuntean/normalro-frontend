@@ -49,7 +49,7 @@ const LoremIpsumGenerator = () => {
   };
 
   return (
-    <ToolLayout title={t('tools.loremIpsum.heading')} description={description}>
+    <ToolLayout title={t('tools.loremIpsum.heading')} description={description} seoSlug="lorem-ipsum">
       {error && <Alert severity="error">{error}</Alert>}
       <Stack spacing={2} alignItems="flex-start">
         <ToggleButtonGroup value={mode} exclusive onChange={(_, next) => next && setMode(next)}>

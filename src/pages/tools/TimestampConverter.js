@@ -36,7 +36,7 @@ const TimestampConverter = () => {
   };
 
   return (
-    <ToolLayout title={t('tools.timestampConverter.heading')} description={t('tools.timestampConverter.instructions')}>
+    <ToolLayout title={t('tools.timestampConverter.heading')} description={t('tools.timestampConverter.instructions')} seoSlug="timestamp-converter">
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
           <Stack spacing={2}>

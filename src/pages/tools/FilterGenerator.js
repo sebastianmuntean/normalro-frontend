@@ -18,7 +18,7 @@ const FilterGenerator = () => {
   );
 
   return (
-    <ToolLayout title={t('tools.filterGenerator.heading')} description={t('tools.filterGenerator.instructions')}>
+    <ToolLayout title={t('tools.filterGenerator.heading')} description={t('tools.filterGenerator.instructions')} seoSlug="filter-generator">
       <Stack spacing={3}>
         <Typography gutterBottom>{t('tools.filterGenerator.fields.blur', { value: blur })}</Typography>
         <Slider min={0} max={20} value={blur} onChange={(_, value) => setBlur(value)} />

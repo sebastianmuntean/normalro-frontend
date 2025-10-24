@@ -30,7 +30,7 @@ const ShortcutSimulator = () => {
   const description = shortcuts[normalized];
 
   return (
-    <ToolLayout title={t('tools.shortcutSimulator.heading')} description={t('tools.shortcutSimulator.instructions')}>
+    <ToolLayout title={t('tools.shortcutSimulator.heading')} description={t('tools.shortcutSimulator.instructions')} seoSlug="shortcut-simulator">
       <Stack spacing={3}>
         <TextField
           label={t('tools.shortcutSimulator.fields.input')}

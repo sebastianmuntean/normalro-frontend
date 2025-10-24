@@ -32,7 +32,7 @@ const TableGenerator = () => {
   };
 
   return (
-    <ToolLayout title={t('tools.tableGenerator.heading')} description={t('tools.tableGenerator.instructions')}>
+    <ToolLayout title={t('tools.tableGenerator.heading')} description={t('tools.tableGenerator.instructions')} seoSlug="table-generator">
       <Grid container spacing={3}>
         <Grid item xs={12} md={5}>
           <Stack spacing={2}>

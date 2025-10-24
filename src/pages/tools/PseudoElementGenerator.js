@@ -27,7 +27,7 @@ const PseudoElementGenerator = () => {
   );
 
   return (
-    <ToolLayout title={t('tools.pseudoElementGenerator.heading')} description={t('tools.pseudoElementGenerator.instructions')}>
+    <ToolLayout title={t('tools.pseudoElementGenerator.heading')} description={t('tools.pseudoElementGenerator.instructions')} seoSlug="pseudo-element-generator">
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <Stack spacing={2}>

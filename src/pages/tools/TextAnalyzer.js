@@ -62,7 +62,7 @@ const TextAnalyzer = () => {
   }, [text]);
 
   return (
-    <ToolLayout title={t('tools.textAnalyzer.heading')} description={t('tools.textAnalyzer.instructions')}>
+    <ToolLayout title={t('tools.textAnalyzer.heading')} description={t('tools.textAnalyzer.instructions')} seoSlug="text-analyzer">
       <Stack spacing={3}>
         <TextField
           label={t('tools.textAnalyzer.fields.input')}

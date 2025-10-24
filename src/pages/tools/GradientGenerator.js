@@ -33,7 +33,7 @@ const GradientGenerator = () => {
   };
 
   return (
-    <ToolLayout title={t('tools.gradientGenerator.heading')} description={t('tools.gradientGenerator.instructions')}>
+    <ToolLayout title={t('tools.gradientGenerator.heading')} description={t('tools.gradientGenerator.instructions')} seoSlug="gradient-generator">
       <Stack spacing={3}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <TextField

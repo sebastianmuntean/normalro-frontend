@@ -16,7 +16,7 @@ const CssBorderGenerator = () => {
   );
 
   return (
-    <ToolLayout title={t('tools.cssBorderGenerator.heading')} description={t('tools.cssBorderGenerator.instructions')}>
+    <ToolLayout title={t('tools.cssBorderGenerator.heading')} description={t('tools.cssBorderGenerator.instructions')} seoSlug="css-border-generator">
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <Stack spacing={2}>

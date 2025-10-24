@@ -19,7 +19,7 @@ const DiceSimulator = () => {
   };
 
   return (
-    <ToolLayout title={t('tools.diceSimulator.heading')} description={t('tools.diceSimulator.instructions')}>
+    <ToolLayout title={t('tools.diceSimulator.heading')} description={t('tools.diceSimulator.instructions')} seoSlug="dice-simulator">
       <Stack spacing={3}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <TextField

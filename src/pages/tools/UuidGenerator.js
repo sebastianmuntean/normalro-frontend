@@ -33,7 +33,7 @@ const UuidGenerator = () => {
   };
 
   return (
-    <ToolLayout title={t('tools.uuidGenerator.heading')} description={t('tools.uuidGenerator.instructions')} maxWidth="sm">
+    <ToolLayout title={t('tools.uuidGenerator.heading')} description={t('tools.uuidGenerator.instructions')} maxWidth="sm" seoSlug="uuid-generator">
       <Stack spacing={3} alignItems="flex-start">
         <Button variant="contained" onClick={handleGenerate}>
           {t('tools.uuidGenerator.actions.generate')}

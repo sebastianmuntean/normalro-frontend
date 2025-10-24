@@ -34,7 +34,7 @@ align-items: ${align};
 gap: ${gap}px;`;
 
   return (
-    <ToolLayout title={t('tools.flexboxGenerator.heading')} description={t('tools.flexboxGenerator.instructions')}>
+    <ToolLayout title={t('tools.flexboxGenerator.heading')} description={t('tools.flexboxGenerator.instructions')} seoSlug="flexbox-generator">
       <Grid container spacing={3}>
         <Grid item xs={12} md={5}>
           <Stack spacing={2}>

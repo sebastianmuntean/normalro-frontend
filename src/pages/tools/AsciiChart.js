@@ -26,7 +26,7 @@ const AsciiChart = () => {
   }, [input, t]);
 
   return (
-    <ToolLayout title={t('tools.asciiChart.heading')} description={t('tools.asciiChart.instructions')}>
+    <ToolLayout title={t('tools.asciiChart.heading')} description={t('tools.asciiChart.instructions')} seoSlug="ascii-chart">
       <Stack spacing={3}>
         <TextField
           label={t('tools.asciiChart.fields.values')}

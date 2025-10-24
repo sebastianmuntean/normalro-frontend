@@ -54,7 +54,7 @@ const ContrastChecker = () => {
   }, [foreground, background, t]);
 
   return (
-    <ToolLayout title={t('tools.contrastChecker.heading')} description={t('tools.contrastChecker.instructions')}>
+    <ToolLayout title={t('tools.contrastChecker.heading')} description={t('tools.contrastChecker.instructions')} seoSlug="contrast-checker">
       {error && <Alert severity="error">{error}</Alert>}
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>

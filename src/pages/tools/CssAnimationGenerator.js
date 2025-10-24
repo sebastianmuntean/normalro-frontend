@@ -108,7 +108,7 @@ const CssAnimationGenerator = () => {
   }, []);
 
   return (
-    <ToolLayout title={t('tools.cssAnimationGenerator.heading')} description={t('tools.cssAnimationGenerator.instructions')}>
+    <ToolLayout title={t('tools.cssAnimationGenerator.heading')} description={t('tools.cssAnimationGenerator.instructions')} seoSlug="css-animation-generator">
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <Stack spacing={2}>

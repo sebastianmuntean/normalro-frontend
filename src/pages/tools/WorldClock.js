@@ -50,7 +50,7 @@ const WorldClock = () => {
   };
 
   return (
-    <ToolLayout title={t('tools.worldClock.heading')} description={t('tools.worldClock.instructions')}>
+    <ToolLayout title={t('tools.worldClock.heading')} description={t('tools.worldClock.instructions')} seoSlug="world-clock">
       <Stack spacing={3}>
         <FormControl sx={{ maxWidth: 320 }}>
           <InputLabel>{t('tools.worldClock.fields.add')}</InputLabel>

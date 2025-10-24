@@ -21,7 +21,7 @@ font-weight: ${fontWeight};`,
   );
 
   return (
-    <ToolLayout title={t('tools.cssTypographyGenerator.heading')} description={t('tools.cssTypographyGenerator.instructions')}>
+    <ToolLayout title={t('tools.cssTypographyGenerator.heading')} description={t('tools.cssTypographyGenerator.instructions')} seoSlug="css-typography-generator">
       <Stack spacing={3}>
         <TextField label={t('tools.cssTypographyGenerator.fields.fontFamily')} value={fontFamily} onChange={(event) => setFontFamily(event.target.value)} />
         <Typography gutterBottom>{t('tools.cssTypographyGenerator.fields.fontSize', { value: fontSize })}</Typography>

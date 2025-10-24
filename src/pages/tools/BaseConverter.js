@@ -19,7 +19,7 @@ const BaseConverter = () => {
   const error = baseValues ? '' : t('tools.baseConverter.messages.invalid');
 
   return (
-    <ToolLayout title={t('tools.baseConverter.heading')} description={t('tools.baseConverter.instructions')}>
+    <ToolLayout title={t('tools.baseConverter.heading')} description={t('tools.baseConverter.instructions')} seoSlug="base-converter">
       <Stack spacing={3}>
         <FormControl>
           <InputLabel>{t('tools.baseConverter.fields.from')}</InputLabel>

@@ -49,7 +49,7 @@ const RegexGenerator = () => {
   };
 
   return (
-    <ToolLayout title={t('tools.regexGenerator.heading')} description={t('tools.regexGenerator.instructions')}>
+    <ToolLayout title={t('tools.regexGenerator.heading')} description={t('tools.regexGenerator.instructions')} seoSlug="regex-generator">
       <Stack spacing={3}>
         <FormControl fullWidth>
           <InputLabel>{t('tools.regexGenerator.fields.pattern')}</InputLabel>

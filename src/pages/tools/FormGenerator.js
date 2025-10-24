@@ -72,7 +72,7 @@ ${fields
 }`;
 
   return (
-    <ToolLayout title={t('tools.formGenerator.heading')} description={t('tools.formGenerator.instructions')}>
+    <ToolLayout title={t('tools.formGenerator.heading')} description={t('tools.formGenerator.instructions')} seoSlug="form-generator">
       <Stack spacing={3}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <FormControl sx={{ minWidth: 160 }}>

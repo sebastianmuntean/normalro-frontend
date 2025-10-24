@@ -13,7 +13,7 @@ const MarkdownCompiler = () => {
   const html = useMemo(() => marked.parse(markdown), [markdown]);
 
   return (
-    <ToolLayout title={t('tools.markdownCompiler.heading')} description={t('tools.markdownCompiler.instructions')}>
+    <ToolLayout title={t('tools.markdownCompiler.heading')} description={t('tools.markdownCompiler.instructions')} seoSlug="markdown-compiler">
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <Stack spacing={2}>

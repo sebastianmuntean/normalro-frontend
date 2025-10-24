@@ -19,7 +19,7 @@ const CssShadowGenerator = () => {
   const cssSnippet = `box-shadow: ${shadow};`;
 
   return (
-    <ToolLayout title={t('tools.cssShadowGenerator.heading')} description={t('tools.cssShadowGenerator.instructions')}>
+    <ToolLayout title={t('tools.cssShadowGenerator.heading')} description={t('tools.cssShadowGenerator.instructions')} seoSlug="css-shadow-generator">
       <Stack spacing={3}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={4}>
           <Box sx={{ flexGrow: 1 }}>

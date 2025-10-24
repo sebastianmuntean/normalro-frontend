@@ -21,7 +21,7 @@ gap: ${gap}px;`,
   const previewColumns = template ? template.split(' ').length : columns;
 
   return (
-    <ToolLayout title={t('tools.gridGenerator.heading')} description={t('tools.gridGenerator.instructions')}>
+    <ToolLayout title={t('tools.gridGenerator.heading')} description={t('tools.gridGenerator.instructions')} seoSlug="grid-generator">
       <Grid container spacing={3}>
         <Grid item xs={12} md={5}>
           <Stack spacing={2}>

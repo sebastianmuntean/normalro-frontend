@@ -17,7 +17,7 @@ const TransformGenerator = () => {
   );
 
   return (
-    <ToolLayout title={t('tools.transformGenerator.heading')} description={t('tools.transformGenerator.instructions')}>
+    <ToolLayout title={t('tools.transformGenerator.heading')} description={t('tools.transformGenerator.instructions')} seoSlug="transform-generator">
       <Stack spacing={3}>
         <Typography gutterBottom>{t('tools.transformGenerator.fields.rotate', { value: rotate })}</Typography>
         <Slider min={-180} max={180} value={rotate} onChange={(_, value) => setRotate(value)} />

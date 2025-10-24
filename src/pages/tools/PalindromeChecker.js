@@ -12,7 +12,7 @@ const PalindromeChecker = () => {
   const isPalindrome = normalized === normalized.split('').reverse().join('');
 
   return (
-    <ToolLayout title={t('tools.palindromeChecker.heading')} description={t('tools.palindromeChecker.instructions')} maxWidth="sm">
+    <ToolLayout title={t('tools.palindromeChecker.heading')} description={t('tools.palindromeChecker.instructions')} maxWidth="sm" seoSlug="palindrome-checker">
       <Stack spacing={3}>
         <TextField label={t('tools.palindromeChecker.fields.input')} value={text} onChange={(event) => setText(event.target.value)} />
         {text.trim() === '' ? (

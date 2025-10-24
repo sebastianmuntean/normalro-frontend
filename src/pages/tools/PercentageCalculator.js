@@ -51,7 +51,7 @@ const PercentageCalculator = () => {
   };
 
   return (
-    <ToolLayout title={t('tools.percentageCalculator.heading')} description={t('tools.percentageCalculator.instructions')}>
+    <ToolLayout title={t('tools.percentageCalculator.heading')} description={t('tools.percentageCalculator.instructions')} seoSlug="percentage-calculator">
       <Stack spacing={3}>
         <FormControl>
           <InputLabel>{t('tools.percentageCalculator.fields.mode')}</InputLabel>

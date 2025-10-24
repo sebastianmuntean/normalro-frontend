@@ -31,7 +31,7 @@ const TextCipher = () => {
   };
 
   return (
-    <ToolLayout title={t('tools.textCipher.heading')} description={t('tools.textCipher.instructions')}>
+    <ToolLayout title={t('tools.textCipher.heading')} description={t('tools.textCipher.instructions')} seoSlug="text-cipher">
       <Stack spacing={3}>
         <TextField
           label={t('tools.textCipher.fields.input')}

@@ -23,7 +23,7 @@ const BackgroundGenerator = () => {
   const cssSnippet = `background: ${backgroundValue};`;
 
   return (
-    <ToolLayout title={t('tools.backgroundGenerator.heading')} description={t('tools.backgroundGenerator.instructions')}>
+    <ToolLayout title={t('tools.backgroundGenerator.heading')} description={t('tools.backgroundGenerator.instructions')} seoSlug="background-generator">
       <Stack spacing={3}>
         <FormControl sx={{ maxWidth: 240 }}>
           <InputLabel>{t('tools.backgroundGenerator.fields.mode')}</InputLabel>

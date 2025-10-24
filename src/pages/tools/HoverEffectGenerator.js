@@ -66,7 +66,7 @@ const HoverEffectGenerator = () => {
   }, [effect]);
 
   return (
-    <ToolLayout title={t('tools.hoverEffectGenerator.heading')} description={t('tools.hoverEffectGenerator.instructions')}>
+    <ToolLayout title={t('tools.hoverEffectGenerator.heading')} description={t('tools.hoverEffectGenerator.instructions')} seoSlug="hover-effect-generator">
       <Stack spacing={3}>
         <FormControl sx={{ maxWidth: 240 }}>
           <InputLabel>{t('tools.hoverEffectGenerator.fields.effect')}</InputLabel>
