@@ -235,38 +235,57 @@ const InvoiceGenerator = () => {
 
   const totals = calculateTotals();
 
+  // Helper function pentru diacritice românești în PDF
+  const fixRomanianChars = (text) => {
+    if (!text) return text;
+    return text
+      .replace(/ă/g, String.fromCharCode(0x0103))
+      .replace(/Ă/g, String.fromCharCode(0x0102))
+      .replace(/â/g, String.fromCharCode(0x00E2))
+      .replace(/Â/g, String.fromCharCode(0x00C2))
+      .replace(/î/g, String.fromCharCode(0x00EE))
+      .replace(/Î/g, String.fromCharCode(0x00CE))
+      .replace(/ș/g, String.fromCharCode(0x0219))
+      .replace(/Ș/g, String.fromCharCode(0x0218))
+      .replace(/ț/g, String.fromCharCode(0x021B))
+      .replace(/Ț/g, String.fromCharCode(0x021A));
+  };
+
   const exportToPDF = () => {
     const doc = new jsPDF();
+    
+    // Folosește Times care are suport mai bun pentru diacritice
+    doc.setFont('times');
 
     // Header
     doc.setFontSize(20);
-    doc.setFont(undefined, 'bold');
-    doc.text('FACTURĂ', 105, 20, { align: 'center' });
+    doc.setFont('times', 'bold');
+    doc.text(fixRomanianChars('FACTURĂ'), 105, 20, { align: 'center' });
 
     // Seria și numărul
     doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
+    doc.setFont('times', 'normal');
     doc.text(`Seria: ${invoiceData.series || '-'} Nr: ${invoiceData.number || '-'}`, 105, 28, { align: 'center' });
     doc.text(`Data: ${invoiceData.issueDate || '-'}`, 105, 34, { align: 'center' });
     if (invoiceData.dueDate) {
-      doc.text(`Scadență: ${invoiceData.dueDate}`, 105, 40, { align: 'center' });
+      doc.text(fixRomanianChars(`Scadență: ${invoiceData.dueDate}`), 105, 40, { align: 'center' });
     }
 
     // Furnizor și Beneficiar
     const startY = invoiceData.dueDate ? 48 : 42;
 
     doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
+    doc.setFont('times', 'bold');
     doc.text('FURNIZOR:', 14, startY);
     doc.text('BENEFICIAR:', 110, startY);
 
     doc.setFontSize(9);
-    doc.setFont(undefined, 'normal');
+    doc.setFont('times', 'normal');
     let yPos = startY + 6;
 
-    // Furnizor details
-    doc.text(invoiceData.supplierName || '-', 14, yPos);
-    doc.text(invoiceData.clientName || '-', 110, yPos);
+    // Furnizor details - apply fix to names and addresses
+    doc.text(fixRomanianChars(invoiceData.supplierName) || '-', 14, yPos);
+    doc.text(fixRomanianChars(invoiceData.clientName) || '-', 110, yPos);
     yPos += 5;
 
     doc.text(`CUI: ${invoiceData.supplierCUI || '-'}`, 14, yPos);
@@ -281,18 +300,18 @@ const InvoiceGenerator = () => {
     }
     yPos += 5;
 
-    doc.text(invoiceData.supplierAddress || '-', 14, yPos);
-    doc.text(invoiceData.clientAddress || '-', 110, yPos);
+    doc.text(fixRomanianChars(invoiceData.supplierAddress) || '-', 14, yPos);
+    doc.text(fixRomanianChars(invoiceData.clientAddress) || '-', 110, yPos);
     yPos += 5;
 
-    doc.text(invoiceData.supplierCity || '-', 14, yPos);
-    doc.text(invoiceData.clientCity || '-', 110, yPos);
+    doc.text(fixRomanianChars(invoiceData.supplierCity) || '-', 14, yPos);
+    doc.text(fixRomanianChars(invoiceData.clientCity) || '-', 110, yPos);
     yPos += 10;
 
-    // Prepare table data
+    // Prepare table data - apply fix to product names
     const tableData = lines.map((line, index) => [
       index + 1,
-      line.product || '-',
+      fixRomanianChars(line.product) || '-',
       line.quantity,
       `${line.unitNetPrice} RON`,
       `${line.vatRate}%`,
@@ -303,16 +322,34 @@ const InvoiceGenerator = () => {
       `${calculateLineTotal(line, 'gross')} RON`
     ]);
 
-    // Add table
+    // Add table with Romanian characters fix
     doc.autoTable({
       startY: yPos,
-      head: [['Nr.', 'Produs/Serviciu', 'Cant.', 'Preț Net', 'TVA%', 'Suma TVA', 'Preț Brut', 'Total Net', 'Total TVA', 'Total Brut']],
+      head: [[
+        'Nr.', 
+        fixRomanianChars('Produs/Serviciu'), 
+        'Cant.', 
+        fixRomanianChars('Preț Net'), 
+        'TVA%', 
+        'Suma TVA', 
+        fixRomanianChars('Preț Brut'), 
+        'Total Net', 
+        'Total TVA', 
+        'Total Brut'
+      ]],
       body: tableData,
-      foot: [['', 'TOTAL FACTURĂ', '', '', '', '', '', `${totals.net} RON`, `${totals.vat} RON`, `${totals.gross} RON`]],
+      foot: [[
+        '', 
+        fixRomanianChars('TOTAL FACTURĂ'), 
+        '', '', '', '', '', 
+        `${totals.net} RON`, 
+        `${totals.vat} RON`, 
+        `${totals.gross} RON`
+      ]],
       theme: 'grid',
-      headStyles: { fillColor: [33, 150, 243], fontSize: 8 },
-      footStyles: { fillColor: [220, 220, 220], fontStyle: 'bold', fontSize: 9 },
-      styles: { fontSize: 7, cellPadding: 1.5 },
+      headStyles: { fillColor: [33, 150, 243], fontSize: 8, font: 'times' },
+      footStyles: { fillColor: [220, 220, 220], fontStyle: 'bold', fontSize: 9, font: 'times' },
+      styles: { fontSize: 7, cellPadding: 1.5, font: 'times' },
       columnStyles: {
         0: { cellWidth: 8 },
         1: { cellWidth: 40 },
