@@ -806,6 +806,9 @@
         "hue": "Hue: {{value}}°",
         "saturate": "Saturation: {{value}}%"
       }
+    },
+    "invoiceCalculator": {
+      "title": "Invoice VAT calculator"
     }
   },
   "common": {

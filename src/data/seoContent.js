@@ -208,6 +208,11 @@ export const seoContent = {
     title: 'Cifrare și Decifrare Text',
     description: 'Criptează și decriptează mesaje folosind algoritmi simpli de cifrare. Perfect pentru jocuri, mesaje secrete sau învățarea conceptelor de criptografie. Include mai multe metode de cifrare.',
     keywords: ['cipher', 'encryption', 'cifrare', 'criptare', 'encrypt text', 'decode message']
+  },
+  'invoice-calculator': {
+    title: 'Calculator Facturi și TVA',
+    description: 'Calculator complet pentru linii de factură. Calculează automat prețul net, TVA și prețul brut pornind de la orice valoare cunoscută. Suportă cotele de TVA actuale (21% standard, 11% redus, 0% scutit) și cote personalizate. Perfect pentru facturare, contabilitate, oferte comerciale și verificarea calculelor fiscale. Adaugă linii multiple de factură și vezi totalul automat. Calcul cu precizie de 4 zecimale pentru exactitate maximă.',
+    keywords: ['calculator facturi', 'calculator tva', 'calcul tva', 'pret net', 'pret brut', 'facturare', 'invoice calculator', 'vat calculator', 'calculator fiscal', 'tva 21']
   }
 };
 

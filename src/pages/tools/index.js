@@ -40,6 +40,7 @@ import BackgroundGenerator from './BackgroundGenerator';
 import PseudoElementGenerator from './PseudoElementGenerator';
 import TransformGenerator from './TransformGenerator';
 import FilterGenerator from './FilterGenerator';
+import InvoiceCalculator from './InvoiceCalculator';
 
 export const toolComponents = {
   'base64-converter': Base64Converter,
@@ -83,7 +84,8 @@ export const toolComponents = {
   'background-generator': BackgroundGenerator,
   'pseudo-element-generator': PseudoElementGenerator,
   'transform-generator': TransformGenerator,
-  'filter-generator': FilterGenerator
+  'filter-generator': FilterGenerator,
+  'invoice-calculator': InvoiceCalculator
 };
 
 export default toolComponents;

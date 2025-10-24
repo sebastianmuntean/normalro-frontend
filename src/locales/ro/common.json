@@ -806,6 +806,9 @@
         "hue": "Nuanță: {{value}}°",
         "saturate": "Saturație: {{value}}%"
       }
+    },
+    "invoiceCalculator": {
+      "title": "Calculator facturi TVA"
     }
   },
   "common": {
