@@ -223,11 +223,11 @@ const InvoiceCalculator = () => {
                 </Grid>
 
                 {/* Cantitate */}
-                <Grid size={{ xs: 1, md: 0.8 }}>
+                <Grid size={{ xs: 12, md: 0.8 }}>
                   <TextField
                     fullWidth
                     size="small"
-                    label="Cant."
+                    label="Cantitate"
                     type="number"
                     value={line.quantity}
                     onChange={(e) => updateLine(line.id, 'quantity', e.target.value)}
@@ -238,11 +238,11 @@ const InvoiceCalculator = () => {
                 </Grid>
 
                 {/* Preț net unitar */}
-                <Grid size={{ xs: 1, md: 1.7 }}>
+                <Grid size={{ xs: 12, md: 1.7 }}>
                   <TextField
                     fullWidth
                     size="small"
-                    label="Net"
+                    label="Preț net unitar"
                     type="number"
                     value={line.unitNetPrice}
                     onChange={(e) => updateLine(line.id, 'unitNetPrice', e.target.value)}
@@ -255,11 +255,11 @@ const InvoiceCalculator = () => {
                 </Grid>
 
                 {/* TVA % */}
-                <Grid size={{ xs: 1, md: 1.0 }}>
+                <Grid size={{ xs: 12, md: 1.0 }}>
                   <TextField
                     fullWidth
                     size="small"
-                    label="TVA"
+                    label="TVA %"
                     type="number"
                     value={line.vatRate}
                     onChange={(e) => updateLine(line.id, 'vatRate', e.target.value)}
@@ -296,7 +296,7 @@ const InvoiceCalculator = () => {
                 </Grid>
 
                 {/* Suma TVA calculată */}
-                <Grid size={{ xs: 1, md: 1.4 }}>
+                <Grid size={{ xs: 12, md: 1.4 }}>
                   <TextField
                     fullWidth
                     size="small"
@@ -316,11 +316,11 @@ const InvoiceCalculator = () => {
                 </Grid>
 
                 {/* Preț brut unitar */}
-                <Grid size={{ xs: 1, md: 2.8 }}>
+                <Grid size={{ xs: 12, md: 2.8 }}>
                   <TextField
                     fullWidth
                     size="small"
-                    label="Brut"
+                    label="Preț brut unitar"
                     type="number"
                     value={line.unitGrossPrice}
                     onChange={(e) => updateLine(line.id, 'unitGrossPrice', e.target.value)}
