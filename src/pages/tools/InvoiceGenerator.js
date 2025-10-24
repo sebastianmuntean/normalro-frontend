@@ -446,6 +446,11 @@ const InvoiceGenerator = () => {
                 <Typography variant="h6" gutterBottom color="primary">
                   Furnizor
                 </Typography>
+                <Paper sx={{ p: 1, mb: 2, bgcolor: 'info.50', borderLeft: 3, borderColor: 'info.main' }}>
+                  <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
+                    🔍 <strong>Auto-completare ANAF:</strong> Introdu CUI-ul și apasă pe 🔍 pentru a prelua automat datele companiei din registrul ANAF.
+                  </Typography>
+                </Paper>
                 <Stack spacing={1.5}>
                   <TextField
                     fullWidth
@@ -549,6 +554,11 @@ const InvoiceGenerator = () => {
                 <Typography variant="h6" gutterBottom color="secondary">
                   Beneficiar
                 </Typography>
+                <Paper sx={{ p: 1, mb: 2, bgcolor: 'secondary.50', borderLeft: 3, borderColor: 'secondary.main' }}>
+                  <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
+                    🔍 <strong>Auto-completare ANAF:</strong> Introdu CUI-ul și apasă pe 🔍 pentru date automate.
+                  </Typography>
+                </Paper>
                 <Stack spacing={1.5}>
                   <TextField
                     fullWidth
