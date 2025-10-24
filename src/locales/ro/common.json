@@ -809,6 +809,9 @@
     },
     "invoiceCalculator": {
       "title": "Calculator facturi TVA"
+    },
+    "invoiceGenerator": {
+      "title": "Generator facturi complete"
     }
   },
   "common": {

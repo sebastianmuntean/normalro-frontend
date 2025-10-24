@@ -214,6 +214,11 @@ export const seoContent = {
     description: 'Calculator complet pentru linii de factură. Calculează automat prețul net, TVA și prețul brut pornind de la orice valoare cunoscută. Suportă cotele de TVA actuale (21% standard, 11% redus, 0% scutit) și cote personalizate. Perfect pentru facturare, contabilitate, oferte comerciale și verificarea calculelor fiscale. Adaugă linii multiple de factură și vezi totalul automat. Calcul cu precizie de 4 zecimale pentru exactitate maximă.',
     keywords: ['calculator facturi', 'calculator tva', 'calcul tva', 'pret net', 'pret brut', 'facturare', 'invoice calculator', 'vat calculator', 'calculator fiscal', 'tva 21']
   },
+  'invoice-generator': {
+    title: 'Generator Facturi Complete - PDF și Excel',
+    description: 'Creează facturi complete profesionale cu toate detaliile necesare: furnizor, beneficiar, serie, număr, date, linii de produse/servicii. Include calcul automat TVA cu precizie de 4 zecimale. Export direct în PDF (formatat profesional, gata de printat) sau Excel (editabil). Perfect pentru freelanceri, PFA, SRL și orice companie care emite facturi. Suportă toate cotele de TVA din România (21%, 11%, 0%) și linii multiple de factură.',
+    keywords: ['generator facturi', 'factura pdf', 'factura excel', 'emitere facturi', 'facturare online', 'invoice generator', 'factura tva', 'facturi romania', 'factura profesionala']
+  },
   'calculator': {
     title: 'Calculator Matematic Online',
     description: 'Calculator simplu și rapid pentru operații matematice de bază: adunare, scădere, înmulțire și împărțire. Interface intuitivă pentru calcule rapide zilnice.',

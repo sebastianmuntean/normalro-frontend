@@ -809,6 +809,9 @@
     },
     "invoiceCalculator": {
       "title": "Invoice VAT calculator"
+    },
+    "invoiceGenerator": {
+      "title": "Complete invoice generator"
     }
   },
   "common": {

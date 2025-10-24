@@ -14,7 +14,13 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
+import DescriptionIcon from '@mui/icons-material/Description';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import ToolLayout from '../../components/ToolLayout';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 const InvoiceCalculator = () => {
   const [lines, setLines] = useState([
@@ -179,6 +185,109 @@ const InvoiceCalculator = () => {
   const cancelTotalEdit = () => {
     setEditingTotal(false);
     setCustomTotal('');
+  };
+
+  const exportToExcel = () => {
+    // Pregătește datele pentru Excel
+    const data = lines.map((line, index) => ({
+      'Nr.': index + 1,
+      'Produs': line.product || '-',
+      'Cantitate': line.quantity,
+      'Preț net': line.unitNetPrice,
+      'TVA %': line.vatRate,
+      'Suma TVA': calculateLineVat(line),
+      'Preț brut': line.unitGrossPrice,
+      'Total net': calculateLineTotal(line, 'net'),
+      'Total TVA': calculateLineTotal(line, 'vat'),
+      'Total brut': calculateLineTotal(line, 'gross')
+    }));
+
+    // Adaugă rând de total
+    data.push({
+      'Nr.': '',
+      'Produs': 'TOTAL FACTURĂ',
+      'Cantitate': '',
+      'Preț net': '',
+      'TVA %': '',
+      'Suma TVA': '',
+      'Preț brut': '',
+      'Total net': totals.net,
+      'Total TVA': totals.vat,
+      'Total brut': totals.gross
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Factură');
+
+    // Setează lățimile coloanelor
+    worksheet['!cols'] = [
+      { wch: 5 },  // Nr
+      { wch: 25 }, // Produs
+      { wch: 10 }, // Cantitate
+      { wch: 12 }, // Preț net
+      { wch: 8 },  // TVA %
+      { wch: 12 }, // Suma TVA
+      { wch: 12 }, // Preț brut
+      { wch: 12 }, // Total net
+      { wch: 12 }, // Total TVA
+      { wch: 12 }  // Total brut
+    ];
+
+    const date = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(workbook, `factura_${date}.xlsx`);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+
+    // Header
+    doc.setFontSize(18);
+    doc.text('Factură - Detalii Linii', 14, 20);
+    
+    doc.setFontSize(10);
+    const date = new Date().toLocaleDateString('ro-RO');
+    doc.text(`Data: ${date}`, 14, 28);
+
+    // Prepare table data
+    const tableData = lines.map((line, index) => [
+      index + 1,
+      line.product || '-',
+      line.quantity,
+      line.unitNetPrice,
+      `${line.vatRate}%`,
+      calculateLineVat(line),
+      line.unitGrossPrice,
+      calculateLineTotal(line, 'net'),
+      calculateLineTotal(line, 'vat'),
+      calculateLineTotal(line, 'gross')
+    ]);
+
+    // Add table
+    doc.autoTable({
+      startY: 35,
+      head: [['Nr.', 'Produs', 'Cant.', 'Net', 'TVA%', 'Suma TVA', 'Brut', 'Total Net', 'Total TVA', 'Total Brut']],
+      body: tableData,
+      foot: [['', 'TOTAL', '', '', '', '', '', totals.net, totals.vat, totals.gross]],
+      theme: 'grid',
+      headStyles: { fillColor: [33, 150, 243] },
+      footStyles: { fillColor: [200, 200, 200], fontStyle: 'bold' },
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 10 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 15 },
+        3: { cellWidth: 18 },
+        4: { cellWidth: 12 },
+        5: { cellWidth: 18 },
+        6: { cellWidth: 18 },
+        7: { cellWidth: 20 },
+        8: { cellWidth: 20 },
+        9: { cellWidth: 20 }
+      }
+    });
+
+    doc.save(`factura_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   return (
@@ -348,15 +457,34 @@ const InvoiceCalculator = () => {
         ))}
 
         {/* Add Line Button */}
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={addLine}
-          sx={{ alignSelf: 'flex-start' }}
-        >
-          Adaugă linie
-        </Button>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={addLine}
+          >
+            Adaugă linie
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            size="small"
+            startIcon={<PictureAsPdfIcon />}
+            onClick={exportToPDF}
+          >
+            Export PDF
+          </Button>
+          <Button
+            variant="contained"
+            color="success"
+            size="small"
+            startIcon={<DescriptionIcon />}
+            onClick={exportToExcel}
+          >
+            Export Excel
+          </Button>
+        </Stack>
 
         {/* Totals */}
         {lines.length >= 1 && (
