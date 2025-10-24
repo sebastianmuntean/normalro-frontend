@@ -27,6 +27,8 @@ const InvoiceCalculator = () => {
       unitGrossPrice: '121.00' 
     }
   ]);
+  const [editingTotal, setEditingTotal] = useState(false);
+  const [customTotal, setCustomTotal] = useState('');
 
   const formatNumber = (value) => {
     const num = parseFloat(value);
@@ -123,6 +125,61 @@ const InvoiceCalculator = () => {
   };
 
   const totals = calculateTotals();
+
+  const handleTotalEdit = () => {
+    setEditingTotal(true);
+    setCustomTotal(totals.gross);
+  };
+
+  const handleTotalChange = (e) => {
+    setCustomTotal(e.target.value);
+  };
+
+  const applyCustomTotal = () => {
+    const newTotal = parseFloat(customTotal);
+    const currentTotal = parseFloat(totals.gross);
+    
+    if (isNaN(newTotal) || newTotal <= 0 || lines.length === 0) {
+      setEditingTotal(false);
+      return;
+    }
+
+    // Calculează diferența care trebuie distribuită
+    const difference = newTotal - currentTotal;
+    
+    // Distribuie proporțional pe fiecare linie bazat pe totalul brut al liniei
+    const updatedLines = lines.map(line => {
+      const lineGross = parseFloat(calculateLineTotal(line, 'gross'));
+      const lineProportion = lineGross / currentTotal;
+      const lineAdjustment = difference * lineProportion;
+      
+      // Noul total brut al liniei
+      const newLineGross = lineGross + lineAdjustment;
+      
+      // Calculează noul preț unitar brut
+      const qty = parseFloat(line.quantity) || 1;
+      const newUnitGross = newLineGross / qty;
+      
+      // Recalculează prețul net din noul preț brut
+      const vat = parseFloat(line.vatRate);
+      const newUnitNet = Math.round((newUnitGross / (1 + vat / 100)) * 10000) / 10000;
+      
+      return {
+        ...line,
+        unitNetPrice: formatNumber(newUnitNet),
+        unitGrossPrice: formatNumber(newUnitGross)
+      };
+    });
+
+    setLines(updatedLines);
+    setEditingTotal(false);
+    setCustomTotal('');
+  };
+
+  const cancelTotalEdit = () => {
+    setEditingTotal(false);
+    setCustomTotal('');
+  };
 
   return (
     <ToolLayout 
@@ -323,9 +380,47 @@ const InvoiceCalculator = () => {
               </Grid>
               <Grid size={{ xs: 4 }}>
                 <Typography variant="caption" color="text.secondary">Total brut:</Typography>
-                <Typography variant="h5" fontWeight="800" color="success.dark">
-                  {totals.gross} RON
-                </Typography>
+                {editingTotal ? (
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <TextField
+                      size="small"
+                      type="number"
+                      value={customTotal}
+                      onChange={handleTotalChange}
+                      InputProps={{
+                        endAdornment: <InputAdornment position="end">RON</InputAdornment>,
+                        inputProps: { min: 0, step: 0.01 }
+                      }}
+                      sx={{ maxWidth: 150 }}
+                      autoFocus
+                    />
+                    <Button size="small" variant="contained" onClick={applyCustomTotal}>
+                      OK
+                    </Button>
+                    <Button size="small" variant="text" onClick={cancelTotalEdit}>
+                      ✕
+                    </Button>
+                  </Stack>
+                ) : (
+                  <Box>
+                    <Typography 
+                      variant="h5" 
+                      fontWeight="800" 
+                      color="success.dark"
+                      sx={{ 
+                        cursor: 'pointer',
+                        '&:hover': { textDecoration: 'underline' }
+                      }}
+                      onClick={handleTotalEdit}
+                      title="Click pentru a rotunji totalul"
+                    >
+                      {totals.gross} RON
+                    </Typography>
+                    <Typography variant="caption" color="text.disabled" fontSize="0.65rem">
+                      (click pentru rotunjire)
+                    </Typography>
+                  </Box>
+                )}
               </Grid>
             </Grid>
           </Paper>
@@ -335,6 +430,8 @@ const InvoiceCalculator = () => {
         <Paper sx={{ p: 1.5, bgcolor: 'grey.50' }}>
           <Typography variant="body2" color="text.secondary" fontSize="0.85rem">
             💡 <strong>Sfat:</strong> Modifică orice valoare (net, TVA% sau brut) și restul se actualizează automat.
+            <br />
+            📊 <strong>Rotunjire total:</strong> Click pe totalul brut pentru a-l rotunji. Diferența se distribuie proporțional pe toate liniile.
             <br />
             <strong>Cote TVA:</strong> 21% standard, 11% redus, 0% scutit.
           </Typography>
