@@ -1,0 +1,819 @@
+{
+  "nav": {
+    "home": "Trusa",
+    "slugGenerator": "Generator slug",
+    "wordCounter": "Contor cuvinte",
+    "passwordGenerator": "Generator parolă",
+    "base64Converter": "Convertor Base64",
+    "cnpGenerator": "Generator CNP",
+    "openMenu": "Deschide meniul",
+    "closeMenu": "Închide meniul"
+  },
+  "home": {
+    "title": "normal.ro – trusa de scule",
+    "subtitle": "Micro-scule rapide pentru sarcinile tale web de zi cu zi.",
+    "exploreButton": "Deschide prima unealtă",
+    "toolsTitle": "Alege o unealtă",
+    "toolsSubtitle": "Fiecare utilitar funcționează independent și este optimizat atât pentru conținut în română, cât și în engleză.",
+    "openTool": "Deschide unealta"
+  },
+  "tools": {
+    "slugGenerator": {
+      "title": "Generator slug",
+      "description": "Transformă orice titlu într-un slug curat, gata de folosit în URL.",
+      "heading": "Generator de slug-uri",
+      "instructions": "Introdu sau lipește textul pe care vrei să îl transformi în slug.",
+      "placeholder": "Exemplu: Ghid rapid pentru editori de conținut",
+      "actions": {
+        "generate": "Generează slug",
+        "reset": "Curăță"
+      },
+      "result": {
+        "label": "Slug generat"
+      },
+      "messages": {
+        "empty": "Scrie ceva pentru a genera un slug."
+      }
+    },
+    "wordCounter": {
+      "title": "Contor cuvinte",
+      "description": "Numără cuvinte, propoziții, paragrafe și estimează timpul de citire.",
+      "heading": "Metrii pentru text",
+      "instructions": "Lipește orice conținut pentru a primi statistici instant.",
+      "placeholder": "Începe să scrii sau lipește textul aici...",
+      "actions": {
+        "analyze": "Analizează textul",
+        "reset": "Curăță"
+      },
+      "metrics": {
+        "words": "Cuvinte",
+        "characters": "Caractere",
+        "sentences": "Propoziții",
+        "paragraphs": "Paragrafe",
+        "estimatedReadingMinutes": "Timp estimat de citire (minute)"
+      },
+      "messages": {
+        "empty": "Adaugă text pentru analiză."
+      }
+    },
+    "passwordGenerator": {
+      "title": "Generator parolă",
+      "description": "Creează parole sigure cu setări flexibile.",
+      "heading": "Generator de parole sigure",
+      "instructions": "Ajustează opțiunile de mai jos și generează imediat o parolă nouă.",
+      "length": "Lungime",
+      "options": {
+        "uppercase": "Include litere mari",
+        "numbers": "Include cifre",
+        "symbols": "Include simboluri"
+      },
+      "actions": {
+        "generate": "Generează parolă",
+        "reset": "Resetează"
+      },
+      "result": {
+        "label": "Parola ta"
+      },
+      "messages": {
+        "noCharset": "Selectează cel puțin un tip de caracter.",
+        "invalidLength": "Lungimea trebuie să fie între 4 și 64 de caractere."
+      }
+    },
+    "base64Converter": {
+      "title": "Convertor Base64",
+      "description": "Codifică sau decodifică șiruri Base64 local.",
+      "heading": "Codificare și decodificare Base64",
+      "instructions": "Adaugă textul, alege modul și convertește.",
+      "placeholder": "Lipește text de codificat sau șir Base64 de decodificat...",
+      "mode": {
+        "encode": "Codifică",
+        "decode": "Decodifică"
+      },
+      "actions": {
+        "convert": "Convertește",
+        "swap": "Schimbă modul",
+        "reset": "Curăță"
+      },
+      "messages": {
+        "empty": "Adaugă text înainte de conversie.",
+        "invalid": "Textul introdus nu a putut fi convertit. Verifică datele."
+      },
+      "result": {
+        "label": "Rezultat convertit"
+      }
+    },
+    "cnpGenerator": {
+      "title": "Generator CNP",
+      "description": "Generează sau validează coduri numerice personale (CNP).",
+      "heading": "Generator CNP românesc",
+      "instructions": "Completează opțional data nașterii, sexul și județul sau lasă-le libere pentru o variantă aleatorie.",
+      "fields": {
+        "birthDate": "Data nașterii",
+        "gender": "Sex",
+        "county": "Județ",
+        "autoSelect": "Selectare automată"
+      },
+      "gender": {
+        "random": "Aleatoriu",
+        "male": "Masculin",
+        "female": "Feminin",
+        "unknown": "Necunoscut"
+      },
+      "actions": {
+        "generate": "Generează CNP",
+        "reset": "Resetează"
+      },
+      "result": {
+        "label": "CNP generat",
+        "detailsTitle": "Detalii",
+        "gender": "Sex",
+        "birthDate": "Data nașterii",
+        "county": "Județ",
+        "serial": "Număr serie",
+        "controlDigit": "Cifră de control"
+      },
+      "messages": {
+        "invalidBirthDate": "Data nașterii trebuie să fie în format AAAA-LL-ZZ și între 1800 și 2099.",
+        "invalidGender": "Selectează o opțiune validă de sex.",
+        "invalidCounty": "Selectează un cod de județ valid.",
+        "invalidCnp": "CNP-ul introdus nu este valid.",
+        "invalidCnpFormat": "Un CNP trebuie să conțină exact 13 cifre.",
+        "emptyCnp": "Introdu un CNP pentru validare."
+      },
+      "validation": {
+        "heading": "Validează un CNP existent",
+        "subtitle": "Verifică dacă un CNP este valid și extrage detaliile.",
+        "label": "CNP de validat",
+        "placeholder": "Exemplu: 1960416400018",
+        "validateButton": "Validează CNP",
+        "resetButton": "Curăță"
+      }
+    },
+    "unitConverter": {
+      "title": "Convertor unități",
+      "heading": "Convertiri rapide de unități",
+      "instructions": "Alege categoria, unitățile și obții rezultatul instant.",
+      "categories": {
+        "length": "Lungime",
+        "weight": "Greutate",
+        "temperature": "Temperatură"
+      },
+      "units": {
+        "meter": "Metru",
+        "centimeter": "Centimetru",
+        "kilometer": "Kilometru",
+        "inch": "Inci",
+        "foot": "Picior",
+        "mile": "Milă",
+        "kilogram": "Kilogram",
+        "gram": "Gram",
+        "pound": "Liră",
+        "ounce": "Uncie",
+        "celsius": "Celsius",
+        "fahrenheit": "Fahrenheit",
+        "kelvin": "Kelvin"
+      },
+      "fields": {
+        "category": "Categorie",
+        "value": "Valoare",
+        "from": "Unitate sursă",
+        "to": "Unitate destinație"
+      },
+      "actions": {
+        "convert": "Convertește"
+      },
+      "messages": {
+        "empty": "Introdu o valoare pentru conversie.",
+        "invalidNumber": "Folosește doar valori numerice."
+      },
+      "result": {
+        "label": "Valoare convertită",
+        "formatted": "{{value}}"
+      }
+    },
+    "codeMinifier": {
+      "title": "Minificator CSS/JS",
+      "heading": "Minifică CSS sau JavaScript",
+      "instructions": "Lipește codul, alege formatul și obține varianta compactă.",
+      "mode": {
+        "css": "CSS",
+        "js": "JavaScript"
+      },
+      "placeholder": "Lipește aici cod CSS sau JavaScript...",
+      "actions": {
+        "minify": "Minifică",
+        "reset": "Curăță"
+      },
+      "messages": {
+        "empty": "Adaugă cod înainte de minificare."
+      },
+      "result": {
+        "label": "Ieșire minificată"
+      }
+    },
+    "qrGenerator": {
+      "title": "Generator cod QR",
+      "heading": "Creează coduri QR instant",
+      "instructions": "Scrie un URL sau un mesaj scurt și descarcă imaginea generată.",
+      "fields": {
+        "input": "Text sau URL"
+      },
+      "placeholder": "https://normal.ro",
+      "actions": {
+        "generate": "Generează QR",
+        "download": "Descarcă PNG"
+      },
+      "messages": {
+        "empty": "Adaugă text înainte de generarea codului."
+      },
+      "qrAlt": "Previzualizare cod QR"
+    },
+    "calculator": {
+      "title": "Calculator",
+      "heading": "Calculator numeric",
+      "instructions": "Folosește tastatura sau butoanele pentru a evalua expresii rapide.",
+      "fields": {
+        "expression": "Expresie"
+      },
+      "actions": {
+        "clear": "Șterge tot",
+        "delete": "Șterge ultimul"
+      },
+      "messages": {
+        "invalid": "Expresia nu a putut fi evaluată."
+      },
+      "result": {
+        "label": "Rezultat"
+      }
+    },
+    "timer": {
+      "title": "Cronometru și timer",
+      "messages": {
+        "invalidDuration": "Setează o durată pozitivă înainte de a porni timer-ul."
+      },
+      "stopwatch": {
+        "heading": "Cronometru",
+        "instructions": "Pornește, pune pe pauză sau resetează cronometru și copiază timpul parcurs.",
+        "actions": {
+          "start": "Start",
+          "pause": "Pauză",
+          "reset": "Reset",
+          "copy": "Copiază timpul"
+        }
+      },
+      "countdown": {
+        "heading": "Timer invers",
+        "instructions": "Definește minutele și secundele, apoi pornește numărătoarea inversă.",
+        "fields": {
+          "minutes": "Minute",
+          "seconds": "Secunde"
+        },
+        "actions": {
+          "start": "Pornește timer",
+          "reset": "Reset"
+        }
+      }
+    },
+    "loremIpsum": {
+      "title": "Generator lorem ipsum",
+      "heading": "Generează text placeholder",
+      "instructions": "Alege paragrafe sau cuvinte și generează instant textul.",
+      "mode": {
+        "paragraphs": "Paragrafe",
+        "words": "Cuvinte"
+      },
+      "labels": {
+        "paragraphs": "{{count}} paragraf(e)",
+        "words": "{{count}} cuvânt(e)"
+      },
+      "actions": {
+        "generate": "Generează text"
+      },
+      "messages": {
+        "invalidAmount": "Selectează cel puțin un paragraf sau un cuvânt."
+      }
+    },
+    "colorConverter": {
+      "title": "Convertor culori",
+      "heading": "Convertire HEX, RGB, HSL",
+      "instructions": "Introdu o valoare în orice format pentru a vedea echivalențele.",
+      "fields": {
+        "hex": "HEX",
+        "rgb": "RGB",
+        "hsl": "HSL"
+      },
+      "preview": {
+        "label": "Previzualizare"
+      },
+      "messages": {
+        "invalidHex": "Valoare HEX invalidă.",
+        "invalidRgb": "Format RGB invalid.",
+        "invalidHsl": "Format HSL invalid."
+      }
+    },
+    "colorExtractor": {
+      "title": "Extractor paletă din imagine",
+      "heading": "Extrage culorile dominante",
+      "instructions": "Încarcă o imagine locală și obține paleta de culori principală.",
+      "actions": {
+        "upload": "Încarcă imagine"
+      },
+      "previewAlt": "Previzualizare imagine",
+      "messages": {
+        "invalidFile": "Selectează un fișier imagine."
+      }
+    },
+    "gradientGenerator": {
+      "title": "Generator gradient",
+      "heading": "Compune gradientul",
+      "instructions": "Alege culori multiple și ajustează unghiul pentru gradient liniar sau radial.",
+      "fields": {
+        "angle": "Unghi",
+        "type": "Tip gradient",
+        "color": "Culoare {{index}}"
+      },
+      "types": {
+        "linear": "Gradient liniar",
+        "radial": "Gradient radial"
+      },
+      "actions": {
+        "addStop": "Adaugă culoare"
+      },
+      "helpers": {
+        "angleDisabled": "Unghiul se aplică doar pentru gradient liniar"
+      }
+    },
+    "contrastChecker": {
+      "title": "Verificator contrast",
+      "heading": "Asigură perechi accesibile",
+      "instructions": "Compară culorile de fundal și text folosind raportul de contrast WCAG.",
+      "fields": {
+        "foreground": "Culoare text",
+        "background": "Culoare fundal"
+      },
+      "previewText": "Text accesibil",
+      "rating": "Scor: {{rating}}",
+      "messages": {
+        "invalid": "Folosește culori HEX de forma #3366ff."
+      }
+    },
+    "textCompressor": {
+      "title": "Compresor text (zlib)",
+      "heading": "Comprimă sau decomprimă text",
+      "instructions": "Rulează compresia zlib local și copiază rezultatul Base64.",
+      "mode": {
+        "compress": "Comprimă",
+        "decompress": "Decomprimă"
+      },
+      "placeholder": "Lipește text pentru compresie...",
+      "actions": {
+        "compress": "Comprimă",
+        "decompress": "Decomprimă"
+      },
+      "messages": {
+        "empty": "Adaugă text înainte de procesare.",
+        "failed": "Nu am putut procesa textul."
+      },
+      "result": {
+        "label": "Rezultat"
+      }
+    },
+    "tableGenerator": {
+      "title": "Generator tabel HTML",
+      "heading": "Generează un tabel",
+      "instructions": "Setează numărul de rânduri și coloane, adaugă opțional antet și copiază codul.",
+      "fields": {
+        "rows": "Rânduri",
+        "columns": "Coloane",
+        "includeHeader": "Include antet"
+      },
+      "actions": {
+        "generate": "Generează tabel"
+      },
+      "result": {
+        "label": "Cod HTML"
+      },
+      "sample": {
+        "header": "Antet {{index}}",
+        "cell": "Rând {{row}}, col {{column}}"
+      }
+    },
+    "worldClock": {
+      "title": "Ceas global",
+      "heading": "Urmărește mai multe fusuri orare",
+      "instructions": "Adaugă orașe și vezi timpul curent pentru fiecare.",
+      "fields": {
+        "add": "Adaugă fus orar",
+        "choose": "Selectează fusul orar"
+      },
+      "actions": {
+        "remove": "Elimină"
+      }
+    },
+    "shortcutSimulator": {
+      "title": "Simulator scurtături",
+      "heading": "Caută scurtături de tastatură",
+      "instructions": "Scrie o combinație (Ctrl+Shift+K) pentru a vedea ce face în aplicațiile uzuale.",
+      "fields": {
+        "input": "Combinație"
+      },
+      "result": {
+        "label": "Acțiune"
+      },
+      "messages": {
+        "unknown": "Nu există potrivire."
+      },
+      "reference": {
+        "title": "Scurtături frecvente"
+      },
+      "shortcuts": {
+        "copy": "Copiere",
+        "paste": "Lipire",
+        "cut": "Tăiere",
+        "undo": "Anulează",
+        "redo": "Refă",
+        "new incognito window (Chrome)": "Fereastră incognito nouă (Chrome)",
+        "reopen last closed tab": "Redeschide ultimul tab închis",
+        "focus address bar": "Focalizează bara de adrese",
+        "open dev tools console (Firefox)": "Deschide consola (Firefox)",
+        "open dev tools": "Deschide instrumentele pentru dezvoltatori",
+        "print": "Tipărire",
+        "switch windows": "Schimbă aplicațiile",
+        "copy (macOS)": "Copiere (macOS)",
+        "paste (macOS)": "Lipire (macOS)",
+        "screenshot (macOS)": "Captură ecran complet (macOS)",
+        "area screenshot (macOS)": "Captură zonă selectată (macOS)"
+      }
+    },
+    "regexGenerator": {
+      "title": "Generator regex",
+      "heading": "Generează și testează expresii regulate",
+      "instructions": "Pornește de la modele uzuale și testează pe textul tău.",
+      "fields": {
+        "pattern": "Model",
+        "regex": "Expresie",
+        "test": "Text de test"
+      },
+      "actions": {
+        "test": "Testează"
+      },
+      "messages": {
+        "invalidRegex": "Expresia nu este validă."
+      },
+      "result": {
+        "label": "Rezultat",
+        "match": "Potrivire",
+        "noMatch": "Fără potrivire"
+      },
+      "patterns": {
+        "email": "Adresă de email",
+        "phone": "Număr de telefon",
+        "url": "URL",
+        "postal": "Cod poștal"
+      }
+    },
+    "timestampConverter": {
+      "title": "Convertor timestamp",
+      "heading": "Convertește date și timestamp-uri",
+      "instructions": "Transformă între secunde UNIX, șiruri ISO și formate lizibile.",
+      "fields": {
+        "unix": "Timestamp UNIX",
+        "iso": "Șir ISO",
+        "readable": "Dată lizibilă"
+      },
+      "result": {
+        "label": "Conversie curentă",
+        "unix": "Unix: {{value}}",
+        "iso": "ISO: {{value}}",
+        "readable": "Lizibil: {{value}}"
+      }
+    },
+    "textCipher": {
+      "title": "Cifru de text",
+      "heading": "Cifru Caesar",
+      "instructions": "Aplică un shift pe litere pentru a cripta sau decripta.",
+      "fields": {
+        "input": "Text",
+        "shift": "Shift: {{value}}"
+      },
+      "actions": {
+        "encrypt": "Criptează",
+        "decrypt": "Decriptează"
+      }
+    },
+    "uuidGenerator": {
+      "title": "Generator UUID",
+      "heading": "Generează UUID v4",
+      "instructions": "Produce șiruri UUID conforme direct în browser.",
+      "actions": {
+        "generate": "Generează UUID"
+      }
+    },
+    "markdownCompiler": {
+      "title": "Markdown în HTML",
+      "heading": "Compilează Markdown în HTML",
+      "instructions": "Scrie Markdown în stânga și vezi rezultatul HTML în dreapta.",
+      "fields": {
+        "input": "Markdown"
+      },
+      "preview": {
+        "label": "Previzualizare"
+      }
+    },
+    "percentageCalculator": {
+      "title": "Calculator procente",
+      "heading": "Rezolvă rapid procentaje",
+      "instructions": "Răspunde la întrebările \"cât la sută\" sau aplică procente de creștere/scădere.",
+      "fields": {
+        "mode": "Tip calcul",
+        "base": "Valoare de bază",
+        "value": "A doua valoare"
+      },
+      "modes": {
+        "part-of": "Găsește X% dintr-o valoare",
+        "percentage-of": "Ce procent reprezintă o valoare din alta",
+        "increase": "Crește o valoare cu %",
+        "decrease": "Scade o valoare cu %"
+      },
+      "messages": {
+        "invalidNumber": "Folosește doar valori numerice."
+      },
+      "result": {
+        "label": "Rezultat",
+        "partOf": "{{percent}}% din {{base}} = {{result}}",
+        "percentageOf": "{{value}} reprezintă {{result}}% din {{base}}",
+        "increase": "{{base}} crescut cu {{percent}}% = {{result}}",
+        "decrease": "{{base}} scăzut cu {{percent}}% = {{result}}"
+      }
+    },
+    "asciiChart": {
+      "title": "Grafic ASCII",
+      "heading": "Transformă numere în bare ASCII",
+      "instructions": "Introdu numere separate prin virgulă și obține un grafic text.",
+      "fields": {
+        "values": "Valori"
+      },
+      "helpers": {
+        "example": "Exemplu: 5, 8, 13, 4"
+      },
+      "messages": {
+        "invalid": "Nu am putut interpreta numerele."
+      }
+    },
+    "palindromeChecker": {
+      "title": "Verificator palindrom",
+      "heading": "Verifică palindroame",
+      "instructions": "Ignoră semnele de punctuație și majusculele pentru a testa fraze.",
+      "fields": {
+        "input": "Text"
+      },
+      "messages": {
+        "empty": "Introdu un text pentru verificare."
+      },
+      "result": {
+        "yes": "Da, este palindrom!",
+        "no": "Nu este palindrom."
+      }
+    },
+    "baseConverter": {
+      "title": "Convertor baze numerice",
+      "heading": "Convertire între binar, zecimal, hex",
+      "instructions": "Introdu un număr într-o bază și vezi echivalentele.",
+      "fields": {
+        "from": "Bază sursă",
+        "value": "Valoare"
+      },
+      "messages": {
+        "invalid": "Valoarea nu poate fi interpretată în baza selectată."
+      },
+      "baseLabel": "Baza {{base}}",
+      "resultLabel": "Baza {{base}}"
+    },
+    "formGenerator": {
+      "title": "Generator formular HTML",
+      "heading": "Construiește rapid un formular",
+      "instructions": "Adaugă câmpuri și copiază șablonul HTML/CSS.",
+      "fields": {
+        "type": "Tip câmp",
+        "label": "Etichetă"
+      },
+      "types": {
+        "text": "Câmp text",
+        "email": "Email",
+        "number": "Număr",
+        "textarea": "Zonă text",
+        "checkbox": "Bifă",
+        "select": "Listă derulantă"
+      },
+      "actions": {
+        "add": "Adaugă câmp"
+      },
+      "result": {
+        "label": "Markup generat"
+      },
+      "sample": {
+        "submit": "Trimite"
+      }
+    },
+    "diceSimulator": {
+      "title": "Simulator de zaruri",
+      "heading": "Aruncă zaruri virtuale",
+      "instructions": "Alege numărul de zaruri și fețe, apoi vezi rezultatele și totalul.",
+      "fields": {
+        "dice": "Zaruri",
+        "sides": "Fețe"
+      },
+      "actions": {
+        "roll": "Aruncă"
+      },
+      "result": {
+        "label": "Aruncări",
+        "total": "Total: {{total}}"
+      }
+    },
+    "textAnalyzer": {
+      "title": "Analiză text",
+      "heading": "Statistici pentru text",
+      "instructions": "Vezi frecvența literelor, cuvintele comune și lungimea medie a cuvintelor.",
+      "fields": {
+        "input": "Text"
+      },
+      "sections": {
+        "letters": "Top litere",
+        "commonWords": "Cuvinte frecvente",
+        "summary": "Rezumat"
+      },
+      "summary": {
+        "wordCount": "Cuvinte: {{count}}",
+        "averageLength": "Lungime medie: {{value}}"
+      }
+    },
+    "cssShadowGenerator": {
+      "title": "Generator umbre CSS",
+      "heading": "Construiește umbre pentru box-shadow",
+      "instructions": "Ajustează offset-urile, blur-ul, spread-ul și culoarea.",
+      "fields": {
+        "offsetX": "Offset orizontal: {{value}}px",
+        "offsetY": "Offset vertical: {{value}}px",
+        "blur": "Blur: {{value}}px",
+        "spread": "Întindere: {{value}}px",
+        "color": "Culoare umbră"
+      }
+    },
+    "cssBorderGenerator": {
+      "title": "Generator bordură CSS",
+      "heading": "Configurează borduri",
+      "instructions": "Schimbă lățimea, stilul, culoarea și raza colțurilor.",
+      "fields": {
+        "width": "Lățime: {{value}}px",
+        "style": "Stil bordură",
+        "color": "Culoare bordură",
+        "radius": "Rază: {{value}}px"
+      },
+      "helpers": {
+        "style": "solid, dashed, dotted..."
+      }
+    },
+    "cssAnimationGenerator": {
+      "title": "Generator animații CSS",
+      "heading": "Compune animații cu keyframes",
+      "instructions": "Setează durata, deplasarea și opacitatea pentru o animație de intrare.",
+      "fields": {
+        "name": "Nume animație",
+        "duration": "Durată: {{value}}s",
+        "translateX": "Translate X: {{value}}px",
+        "opacityStart": "Opacitate inițială: {{value}}",
+        "opacityEnd": "Opacitate finală: {{value}}"
+      },
+      "actions": {
+        "preview": "Previzualizare",
+        "copy": "Copiază codul"
+      },
+      "messages": {
+        "copied": "CSS-ul animației a fost copiat",
+        "copyFailed": "Copiere indisponibilă. Copiază manual."
+      }
+    },
+    "flexboxGenerator": {
+      "title": "Generator layout Flexbox",
+      "heading": "Experimentează cu flexbox",
+      "instructions": "Schimbă direcția, alinierea și spațiile, apoi copiază CSS-ul.",
+      "fields": {
+        "direction": "Direcție",
+        "justify": "Justify content",
+        "align": "Align items",
+        "gap": "Spațiu: {{value}}px"
+      }
+    },
+    "gridGenerator": {
+      "title": "Generator grilă CSS",
+      "heading": "Planifică layout-uri pe grid",
+      "instructions": "Setează coloane, rânduri, spațiere sau scrie un template personalizat.",
+      "fields": {
+        "columns": "Coloane",
+        "rows": "Rânduri",
+        "template": "Template coloane",
+        "gap": "Spațiu: {{value}}px"
+      },
+      "helpers": {
+        "template": "Exemplu: 1fr 2fr 1fr"
+      }
+    },
+    "cssTypographyGenerator": {
+      "title": "Generator tipografie",
+      "heading": "Ajustează stilurile de font",
+      "instructions": "Configurează familia, dimensiunea, înălțimea rândului, spațiul și greutatea.",
+      "fields": {
+        "fontFamily": "Familie font",
+        "fontSize": "Dimensiune font: {{value}}px",
+        "lineHeight": "Înălțime rând: {{value}}",
+        "letterSpacing": "Spațiere litere: {{value}}px",
+        "fontWeight": "Greutate: {{value}}"
+      },
+      "preview": {
+        "sample": "normal.ro → Creează mai rapid cu snippet-uri reutilizabile"
+      }
+    },
+    "hoverEffectGenerator": {
+      "title": "Generator efecte hover",
+      "heading": "Creează interacțiuni la hover",
+      "instructions": "Alege un preset și copiază CSS-ul.",
+      "fields": {
+        "effect": "Efect"
+      },
+      "effects": {
+        "color": "Schimbă culoarea de fundal",
+        "scale": "Mărește elementul",
+        "rotate": "Rotește",
+        "lift": "Ridică și mărește umbra"
+      },
+      "preview": {
+        "text": "Plasează cursorul aici"
+      }
+    },
+    "backgroundGenerator": {
+      "title": "Generator background",
+      "heading": "Generează fundaluri CSS",
+      "instructions": "Comută între culori solide, gradient liniar sau radial.",
+      "fields": {
+        "mode": "Tip background",
+        "colorA": "Culoare A",
+        "colorB": "Culoare B",
+        "angle": "Unghi"
+      },
+      "modes": {
+        "solid": "Culoare solidă",
+        "linear": "Gradient liniar",
+        "radial": "Gradient radial"
+      }
+    },
+    "pseudoElementGenerator": {
+      "title": "Generator pseudo-element",
+      "heading": "Desenează ::before decorativ",
+      "instructions": "Poziționează elemente decorative în jurul unui card.",
+      "fields": {
+        "content": "Conținut",
+        "background": "Fundal",
+        "width": "Lățime: {{value}}px",
+        "height": "Înălțime: {{value}}px",
+        "top": "Offset sus: {{value}}px",
+        "left": "Offset stânga: {{value}}px"
+      },
+      "preview": {
+        "text": "Pseudo-element"
+      }
+    },
+    "transformGenerator": {
+      "title": "Generator transformări",
+      "heading": "Combină transformările CSS",
+      "instructions": "Manipulează translate, scale, rotate și skew.",
+      "fields": {
+        "rotate": "Rotire: {{value}}°",
+        "scale": "Scală: {{value}}",
+        "translateX": "Translate X: {{value}}px",
+        "translateY": "Translate Y: {{value}}px",
+        "skew": "Înclinare: {{value}}°"
+      }
+    },
+    "filterGenerator": {
+      "title": "Generator filtre",
+      "heading": "Combină filtre CSS",
+      "instructions": "Ajustează blur, luminozitate, contrast, nuanță și saturație.",
+      "fields": {
+        "blur": "Blur: {{value}}px",
+        "brightness": "Luminozitate: {{value}}%",
+        "contrast": "Contrast: {{value}}%",
+        "hue": "Nuanță: {{value}}°",
+        "saturate": "Saturație: {{value}}%"
+      }
+    }
+  },
+  "common": {
+    "copy": "Copiază",
+    "copied": "Copiat!",
+    "result": "Rezultat",
+    "error": "Eroare",
+    "tryAgain": "Încearcă din nou.",
+    "genericError": "A apărut o eroare. Încearcă din nou."
+  }
+} 

@@ -1,0 +1,819 @@
+{
+  "nav": {
+    "home": "Toolbox",
+    "slugGenerator": "Slug Generator",
+    "wordCounter": "Word Counter",
+    "passwordGenerator": "Password Generator",
+    "base64Converter": "Base64 Converter",
+    "cnpGenerator": "CNP Generator",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
+  "home": {
+    "title": "normal.ro toolbox",
+    "subtitle": "Handy micro-tools to speed up your daily web tasks.",
+    "exploreButton": "Launch first tool",
+    "toolsTitle": "Pick a tool",
+    "toolsSubtitle": "Each utility works independently and is optimized for both Romanian and English content.",
+    "openTool": "Open tool"
+  },
+  "tools": {
+    "slugGenerator": {
+      "title": "Slug generator",
+      "description": "Transform any title into a clean, URL-ready slug.",
+      "heading": "Clean URL slug generator",
+      "instructions": "Paste or type the text you want to transform into a slug.",
+      "placeholder": "Example: A fast guide for content editors",
+      "actions": {
+        "generate": "Generate slug",
+        "reset": "Clear"
+      },
+      "result": {
+        "label": "Generated slug"
+      },
+      "messages": {
+        "empty": "Write something to generate a slug."
+      }
+    },
+    "wordCounter": {
+      "title": "Word counter",
+      "description": "Count words, sentences, paragraphs, and estimate reading time.",
+      "heading": "Word & text metrics",
+      "instructions": "Paste any content to get live insights.",
+      "placeholder": "Start typing or paste your text here...",
+      "actions": {
+        "analyze": "Analyze text",
+        "reset": "Clear"
+      },
+      "metrics": {
+        "words": "Words",
+        "characters": "Characters",
+        "sentences": "Sentences",
+        "paragraphs": "Paragraphs",
+        "estimatedReadingMinutes": "Estimated reading time (minutes)"
+      },
+      "messages": {
+        "empty": "Add some text to analyze."
+      }
+    },
+    "passwordGenerator": {
+      "title": "Password generator",
+      "description": "Create secure passwords with granular control.",
+      "heading": "Secure password generator",
+      "instructions": "Adjust the options below and generate a new password instantly.",
+      "length": "Length",
+      "options": {
+        "uppercase": "Include uppercase letters",
+        "numbers": "Include numbers",
+        "symbols": "Include symbols"
+      },
+      "actions": {
+        "generate": "Generate password",
+        "reset": "Reset"
+      },
+      "result": {
+        "label": "Your password"
+      },
+      "messages": {
+        "noCharset": "Select at least one character type.",
+        "invalidLength": "Length must be between 4 and 64 characters."
+      }
+    },
+    "base64Converter": {
+      "title": "Base64 converter",
+      "description": "Encode or decode strings with Base64 safely.",
+      "heading": "Base64 encoder & decoder",
+      "instructions": "Add your text, pick the mode, and convert.",
+      "placeholder": "Paste text to encode or Base64 string to decode...",
+      "mode": {
+        "encode": "Encode",
+        "decode": "Decode"
+      },
+      "actions": {
+        "convert": "Convert",
+        "swap": "Switch mode",
+        "reset": "Clear"
+      },
+      "messages": {
+        "empty": "Add some text before converting.",
+        "invalid": "The provided text could not be converted. Please verify the input."
+      },
+      "result": {
+        "label": "Converted output"
+      }
+    },
+    "cnpGenerator": {
+      "title": "CNP generator",
+      "description": "Create or validate Romanian personal numeric codes (CNP).",
+      "heading": "Romanian CNP generator",
+      "instructions": "Provide an optional birth date, gender, and county code, or leave them blank for a random combination.",
+      "fields": {
+        "birthDate": "Birth date",
+        "gender": "Gender",
+        "county": "County",
+        "autoSelect": "Auto-select county"
+      },
+      "gender": {
+        "random": "Random",
+        "male": "Male",
+        "female": "Female",
+        "unknown": "Unknown"
+      },
+      "actions": {
+        "generate": "Generate CNP",
+        "reset": "Reset"
+      },
+      "result": {
+        "label": "Generated CNP",
+        "detailsTitle": "Breakdown",
+        "gender": "Gender",
+        "birthDate": "Birth date",
+        "county": "County",
+        "serial": "Serial number",
+        "controlDigit": "Control digit"
+      },
+      "messages": {
+        "invalidBirthDate": "Birth date must follow the YYYY-MM-DD format and be between 1800 and 2099.",
+        "invalidGender": "Select a valid gender option.",
+        "invalidCounty": "Select a valid Romanian county code.",
+        "invalidCnp": "The provided CNP is not valid.",
+        "invalidCnpFormat": "A CNP must contain exactly 13 digits.",
+        "emptyCnp": "Enter a CNP before validating."
+      },
+      "validation": {
+        "heading": "Validate an existing CNP",
+        "subtitle": "Check whether a CNP is valid and extract its details.",
+        "label": "CNP to validate",
+        "placeholder": "Example: 1960416400018",
+        "validateButton": "Validate CNP",
+        "resetButton": "Clear"
+      }
+    },
+    "unitConverter": {
+      "title": "Unit converter",
+      "heading": "Quick unit conversions",
+      "instructions": "Pick a category, choose the units, and convert instantly without leaving the page.",
+      "categories": {
+        "length": "Length",
+        "weight": "Weight",
+        "temperature": "Temperature"
+      },
+      "units": {
+        "meter": "Meter",
+        "centimeter": "Centimeter",
+        "kilometer": "Kilometer",
+        "inch": "Inch",
+        "foot": "Foot",
+        "mile": "Mile",
+        "kilogram": "Kilogram",
+        "gram": "Gram",
+        "pound": "Pound",
+        "ounce": "Ounce",
+        "celsius": "Celsius",
+        "fahrenheit": "Fahrenheit",
+        "kelvin": "Kelvin"
+      },
+      "fields": {
+        "category": "Category",
+        "value": "Value",
+        "from": "From unit",
+        "to": "To unit"
+      },
+      "actions": {
+        "convert": "Convert"
+      },
+      "messages": {
+        "empty": "Enter a value to convert.",
+        "invalidNumber": "Use numeric values only."
+      },
+      "result": {
+        "label": "Converted value",
+        "formatted": "{{value}}"
+      }
+    },
+    "codeMinifier": {
+      "title": "CSS/JS minifier",
+      "heading": "Minify CSS or JavaScript",
+      "instructions": "Paste your snippet, choose CSS or JavaScript, and get a compact version you can ship.",
+      "mode": {
+        "css": "CSS",
+        "js": "JavaScript"
+      },
+      "placeholder": "Paste CSS or JavaScript code here...",
+      "actions": {
+        "minify": "Minify code",
+        "reset": "Clear"
+      },
+      "messages": {
+        "empty": "Add some code before minifying."
+      },
+      "result": {
+        "label": "Minified output"
+      }
+    },
+    "qrGenerator": {
+      "title": "QR code generator",
+      "heading": "Create QR codes instantly",
+      "instructions": "Type a URL or short message and download the generated QR code.",
+      "fields": {
+        "input": "Text or URL"
+      },
+      "placeholder": "https://normal.ro",
+      "actions": {
+        "generate": "Generate QR",
+        "download": "Download PNG"
+      },
+      "messages": {
+        "empty": "Add some text before generating a QR code."
+      },
+      "qrAlt": "Generated QR code preview"
+    },
+    "calculator": {
+      "title": "Calculator",
+      "heading": "Basic calculator",
+      "instructions": "Use the keypad or type directly to evaluate quick expressions.",
+      "fields": {
+        "expression": "Expression"
+      },
+      "actions": {
+        "clear": "Clear all",
+        "delete": "Delete last"
+      },
+      "messages": {
+        "invalid": "Expression could not be evaluated."
+      },
+      "result": {
+        "label": "Result"
+      }
+    },
+    "timer": {
+      "title": "Stopwatch & timer",
+      "messages": {
+        "invalidDuration": "Set a positive duration before starting the countdown."
+      },
+      "stopwatch": {
+        "heading": "Stopwatch",
+        "instructions": "Start, pause, or reset the stopwatch and copy the elapsed time when needed.",
+        "actions": {
+          "start": "Start",
+          "pause": "Pause",
+          "reset": "Reset",
+          "copy": "Copy time"
+        }
+      },
+      "countdown": {
+        "heading": "Countdown timer",
+        "instructions": "Define minutes and seconds, then start the countdown.",
+        "fields": {
+          "minutes": "Minutes",
+          "seconds": "Seconds"
+        },
+        "actions": {
+          "start": "Start timer",
+          "reset": "Reset"
+        }
+      }
+    },
+    "loremIpsum": {
+      "title": "Lorem ipsum generator",
+      "heading": "Generate placeholder text",
+      "instructions": "Choose between whole paragraphs or a specific number of words.",
+      "mode": {
+        "paragraphs": "Paragraphs",
+        "words": "Words"
+      },
+      "labels": {
+        "paragraphs": "{{count}} paragraph(s)",
+        "words": "{{count}} word(s)"
+      },
+      "actions": {
+        "generate": "Generate text"
+      },
+      "messages": {
+        "invalidAmount": "Select at least one paragraph or word."
+      }
+    },
+    "colorConverter": {
+      "title": "Color converter",
+      "heading": "Convert HEX, RGB, HSL",
+      "instructions": "Enter a value in any format to instantly view the equivalents.",
+      "fields": {
+        "hex": "HEX",
+        "rgb": "RGB",
+        "hsl": "HSL"
+      },
+      "preview": {
+        "label": "Preview"
+      },
+      "messages": {
+        "invalidHex": "Invalid HEX value.",
+        "invalidRgb": "Invalid RGB format.",
+        "invalidHsl": "Invalid HSL format."
+      }
+    },
+    "colorExtractor": {
+      "title": "Color palette from image",
+      "heading": "Extract dominant colors",
+      "instructions": "Upload a local image and sample the top colors for your palette.",
+      "actions": {
+        "upload": "Upload image"
+      },
+      "previewAlt": "Uploaded preview",
+      "messages": {
+        "invalidFile": "Select an image file to continue."
+      }
+    },
+    "gradientGenerator": {
+      "title": "Gradient generator",
+      "heading": "Compose gradients",
+      "instructions": "Pick two or more colors and tweak the angle to create linear or radial gradients.",
+      "fields": {
+        "angle": "Angle",
+        "type": "Gradient type",
+        "color": "Color stop {{index}}"
+      },
+      "types": {
+        "linear": "Linear gradient",
+        "radial": "Radial gradient"
+      },
+      "actions": {
+        "addStop": "Add color stop"
+      },
+      "helpers": {
+        "angleDisabled": "Angle applies to linear gradients"
+      }
+    },
+    "contrastChecker": {
+      "title": "Contrast checker",
+      "heading": "Ensure accessible color pairs",
+      "instructions": "Compare foreground and background colors using WCAG contrast ratios.",
+      "fields": {
+        "foreground": "Foreground color",
+        "background": "Background color"
+      },
+      "previewText": "Accessible text",
+      "rating": "Rating: {{rating}}",
+      "messages": {
+        "invalid": "Use HEX colors like #3366ff."
+      }
+    },
+    "textCompressor": {
+      "title": "Text compressor (zlib)",
+      "heading": "Compress or decompress text",
+      "instructions": "Run zlib compression locally and copy the Base64 payload.",
+      "mode": {
+        "compress": "Compress",
+        "decompress": "Decompress"
+      },
+      "placeholder": "Paste text to compress...",
+      "actions": {
+        "compress": "Compress",
+        "decompress": "Decompress"
+      },
+      "messages": {
+        "empty": "Add text before processing.",
+        "failed": "Unable to process the provided string."
+      },
+      "result": {
+        "label": "Output"
+      }
+    },
+    "tableGenerator": {
+      "title": "HTML table generator",
+      "heading": "Generate a table snippet",
+      "instructions": "Set the number of rows and columns, optionally include a header, and copy the markup.",
+      "fields": {
+        "rows": "Rows",
+        "columns": "Columns",
+        "includeHeader": "Include header row"
+      },
+      "actions": {
+        "generate": "Generate table"
+      },
+      "result": {
+        "label": "HTML output"
+      },
+      "sample": {
+        "header": "Header {{index}}",
+        "cell": "Row {{row}}, column {{column}}"
+      }
+    },
+    "worldClock": {
+      "title": "World clock",
+      "heading": "Track multiple time zones",
+      "instructions": "Add cities and monitor their current time side by side.",
+      "fields": {
+        "add": "Add timezone",
+        "choose": "Select timezone"
+      },
+      "actions": {
+        "remove": "Remove"
+      }
+    },
+    "shortcutSimulator": {
+      "title": "Shortcut simulator",
+      "heading": "Look up keyboard shortcuts",
+      "instructions": "Type a key combination (Ctrl+Shift+K) to learn what it does in common apps.",
+      "fields": {
+        "input": "Key combination"
+      },
+      "result": {
+        "label": "Action"
+      },
+      "messages": {
+        "unknown": "No shortcut matched."
+      },
+      "reference": {
+        "title": "Common shortcuts"
+      },
+      "shortcuts": {
+        "copy": "Copy",
+        "paste": "Paste",
+        "cut": "Cut",
+        "undo": "Undo",
+        "redo": "Redo",
+        "new incognito window (Chrome)": "Open new incognito window (Chrome)",
+        "reopen last closed tab": "Reopen last closed tab",
+        "focus address bar": "Focus address bar",
+        "open dev tools console (Firefox)": "Open browser console (Firefox)",
+        "open dev tools": "Open developer tools",
+        "print": "Print",
+        "switch windows": "Switch application window",
+        "copy (macOS)": "Copy (macOS)",
+        "paste (macOS)": "Paste (macOS)",
+        "screenshot (macOS)": "Capture full screen (macOS)",
+        "area screenshot (macOS)": "Capture selection (macOS)"
+      }
+    },
+    "regexGenerator": {
+      "title": "Regex generator",
+      "heading": "Generate & test regular expressions",
+      "instructions": "Start from common patterns and tweak them before testing on sample text.",
+      "fields": {
+        "pattern": "Pattern",
+        "regex": "Regular expression",
+        "test": "Sample text"
+      },
+      "actions": {
+        "test": "Test expression"
+      },
+      "messages": {
+        "invalidRegex": "Expression is not a valid regular expression."
+      },
+      "result": {
+        "label": "Match result",
+        "match": "Match",
+        "noMatch": "No match"
+      },
+      "patterns": {
+        "email": "Email address",
+        "phone": "Phone number",
+        "url": "URL",
+        "postal": "Postal code"
+      }
+    },
+    "timestampConverter": {
+      "title": "Timestamp converter",
+      "heading": "Convert dates and timestamps",
+      "instructions": "Swap between UNIX seconds, ISO strings, and human friendly dates.",
+      "fields": {
+        "unix": "Unix timestamp",
+        "iso": "ISO string",
+        "readable": "Readable date"
+      },
+      "result": {
+        "label": "Current conversion",
+        "unix": "Unix: {{value}}",
+        "iso": "ISO: {{value}}",
+        "readable": "Readable: {{value}}"
+      }
+    },
+    "textCipher": {
+      "title": "Text cipher",
+      "heading": "Caesar cipher",
+      "instructions": "Shift characters forward or backward by a chosen offset.",
+      "fields": {
+        "input": "Text",
+        "shift": "Shift: {{value}}"
+      },
+      "actions": {
+        "encrypt": "Encrypt",
+        "decrypt": "Decrypt"
+      }
+    },
+    "uuidGenerator": {
+      "title": "UUID generator",
+      "heading": "Generate UUID v4",
+      "instructions": "Produce standards-compliant UUID strings locally and copy them for later use.",
+      "actions": {
+        "generate": "Generate UUID"
+      }
+    },
+    "markdownCompiler": {
+      "title": "Markdown to HTML",
+      "heading": "Convert Markdown to HTML",
+      "instructions": "Write Markdown on the left and preview the compiled HTML on the right.",
+      "fields": {
+        "input": "Markdown"
+      },
+      "preview": {
+        "label": "Preview"
+      }
+    },
+    "percentageCalculator": {
+      "title": "Percentage calculator",
+      "heading": "Solve percentage questions",
+      "instructions": "Answer \"what percent\" questions or apply increases/decreases instantly.",
+      "fields": {
+        "mode": "Calculation type",
+        "base": "Base value",
+        "value": "Second value"
+      },
+      "modes": {
+        "part-of": "Find X% of a value",
+        "percentage-of": "Find what percent one value is of another",
+        "increase": "Increase a value by %",
+        "decrease": "Decrease a value by %"
+      },
+      "messages": {
+        "invalidNumber": "Use numeric values only."
+      },
+      "result": {
+        "label": "Result",
+        "partOf": "{{percent}}% of {{base}} = {{result}}",
+        "percentageOf": "{{value}} is {{result}}% of {{base}}",
+        "increase": "{{base}} increased by {{percent}}% = {{result}}",
+        "decrease": "{{base}} decreased by {{percent}}% = {{result}}"
+      }
+    },
+    "asciiChart": {
+      "title": "ASCII chart",
+      "heading": "Visualise numbers as ASCII bars",
+      "instructions": "Provide comma-separated numbers and get a text-only bar chart.",
+      "fields": {
+        "values": "Values"
+      },
+      "helpers": {
+        "example": "Example: 5, 8, 13, 4"
+      },
+      "messages": {
+        "invalid": "Could not parse any numbers."
+      }
+    },
+    "palindromeChecker": {
+      "title": "Palindrome checker",
+      "heading": "Check palindromes",
+      "instructions": "Ignore punctuation and case to see if a phrase reads the same backwards.",
+      "fields": {
+        "input": "Text"
+      },
+      "messages": {
+        "empty": "Enter text to check."
+      },
+      "result": {
+        "yes": "Yes, it is a palindrome!",
+        "no": "Not a palindrome."
+      }
+    },
+    "baseConverter": {
+      "title": "Number base converter",
+      "heading": "Convert between binary, decimal, hex",
+      "instructions": "Type a number in any supported base to see the equivalents.",
+      "fields": {
+        "from": "Input base",
+        "value": "Value"
+      },
+      "messages": {
+        "invalid": "Value cannot be parsed in the selected base."
+      },
+      "baseLabel": "Base {{base}}",
+      "resultLabel": "Base {{base}}"
+    },
+    "formGenerator": {
+      "title": "HTML form generator",
+      "heading": "Build a simple form",
+      "instructions": "Add fields and copy the ready-made HTML/CSS template.",
+      "fields": {
+        "type": "Field type",
+        "label": "Label"
+      },
+      "types": {
+        "text": "Text input",
+        "email": "Email input",
+        "number": "Number input",
+        "textarea": "Textarea",
+        "checkbox": "Checkbox",
+        "select": "Select dropdown"
+      },
+      "actions": {
+        "add": "Add field"
+      },
+      "result": {
+        "label": "Generated markup"
+      },
+      "sample": {
+        "submit": "Submit"
+      }
+    },
+    "diceSimulator": {
+      "title": "Dice simulator",
+      "heading": "Roll virtual dice",
+      "instructions": "Pick dice count and sides, then roll to see each result and the total.",
+      "fields": {
+        "dice": "Dice",
+        "sides": "Sides"
+      },
+      "actions": {
+        "roll": "Roll"
+      },
+      "result": {
+        "label": "Rolls",
+        "total": "Total: {{total}}"
+      }
+    },
+    "textAnalyzer": {
+      "title": "Text analyzer",
+      "heading": "Text statistics",
+      "instructions": "Inspect letter frequency, frequent words, and average word length.",
+      "fields": {
+        "input": "Text"
+      },
+      "sections": {
+        "letters": "Top letters",
+        "commonWords": "Common words",
+        "summary": "Summary"
+      },
+      "summary": {
+        "wordCount": "Words: {{count}}",
+        "averageLength": "Average word length: {{value}}"
+      }
+    },
+    "cssShadowGenerator": {
+      "title": "CSS shadow generator",
+      "heading": "Design box shadows",
+      "instructions": "Tweak offsets, blur, spread, and color to craft the perfect shadow.",
+      "fields": {
+        "offsetX": "Horizontal offset: {{value}}px",
+        "offsetY": "Vertical offset: {{value}}px",
+        "blur": "Blur: {{value}}px",
+        "spread": "Spread: {{value}}px",
+        "color": "Shadow color"
+      }
+    },
+    "cssBorderGenerator": {
+      "title": "CSS border generator",
+      "heading": "Create border styles",
+      "instructions": "Adjust width, style, color, and border radius.",
+      "fields": {
+        "width": "Width: {{value}}px",
+        "style": "Border style",
+        "color": "Border color",
+        "radius": "Radius: {{value}}px"
+      },
+      "helpers": {
+        "style": "solid, dashed, dotted, ..."
+      }
+    },
+    "cssAnimationGenerator": {
+      "title": "CSS animation generator",
+      "heading": "Compose keyframe animations",
+      "instructions": "Set duration, translate distance, and opacity for a simple entrance animation.",
+      "fields": {
+        "name": "Animation name",
+        "duration": "Duration: {{value}}s",
+        "translateX": "Translate X: {{value}}px",
+        "opacityStart": "Start opacity: {{value}}",
+        "opacityEnd": "End opacity: {{value}}"
+      },
+      "actions": {
+        "preview": "Preview",
+        "copy": "Copy code"
+      },
+      "messages": {
+        "copied": "Animation CSS copied",
+        "copyFailed": "Copy not available. Please copy manually."
+      }
+    },
+    "flexboxGenerator": {
+      "title": "Flexbox layout generator",
+      "heading": "Play with flex layouts",
+      "instructions": "Experiment with direction, alignment, and gaps while copying the CSS snippet.",
+      "fields": {
+        "direction": "Flex direction",
+        "justify": "Justify content",
+        "align": "Align items",
+        "gap": "Gap: {{value}}px"
+      }
+    },
+    "gridGenerator": {
+      "title": "CSS grid generator",
+      "heading": "Plan grid layouts",
+      "instructions": "Set columns, rows, gaps, or write your own template expression.",
+      "fields": {
+        "columns": "Columns",
+        "rows": "Rows",
+        "template": "Template columns",
+        "gap": "Gap: {{value}}px"
+      },
+      "helpers": {
+        "template": "Example: 1fr 2fr 1fr"
+      }
+    },
+    "cssTypographyGenerator": {
+      "title": "Typography generator",
+      "heading": "Tune font styles",
+      "instructions": "Adjust font family, size, line height, spacing, and weight.",
+      "fields": {
+        "fontFamily": "Font family",
+        "fontSize": "Font size: {{value}}px",
+        "lineHeight": "Line height: {{value}}",
+        "letterSpacing": "Letter spacing: {{value}}px",
+        "fontWeight": "Font weight: {{value}}"
+      },
+      "preview": {
+        "sample": "normal.ro → Design faster with reusable snippets"
+      }
+    },
+    "hoverEffectGenerator": {
+      "title": "Hover effect generator",
+      "heading": "Craft hover interactions",
+      "instructions": "Pick a preset and copy the hover CSS.",
+      "fields": {
+        "effect": "Effect"
+      },
+      "effects": {
+        "color": "Background color shift",
+        "scale": "Scale up",
+        "rotate": "Rotate",
+        "lift": "Lift with shadow"
+      },
+      "preview": {
+        "text": "Hover me"
+      }
+    },
+    "backgroundGenerator": {
+      "title": "Background generator",
+      "heading": "Generate CSS backgrounds",
+      "instructions": "Switch between solid, linear, and radial backgrounds.",
+      "fields": {
+        "mode": "Background type",
+        "colorA": "Color A",
+        "colorB": "Color B",
+        "angle": "Angle"
+      },
+      "modes": {
+        "solid": "Solid color",
+        "linear": "Linear gradient",
+        "radial": "Radial gradient"
+      }
+    },
+    "pseudoElementGenerator": {
+      "title": "Pseudo-element generator",
+      "heading": "Design ::before shapes",
+      "instructions": "Position decorative pseudo-elements around a card.",
+      "fields": {
+        "content": "Content",
+        "background": "Background",
+        "width": "Width: {{value}}px",
+        "height": "Height: {{value}}px",
+        "top": "Top offset: {{value}}px",
+        "left": "Left offset: {{value}}px"
+      },
+      "preview": {
+        "text": "Pseudo-element"
+      }
+    },
+    "transformGenerator": {
+      "title": "Transform generator",
+      "heading": "Combine CSS transforms",
+      "instructions": "Manipulate translate, scale, rotate, and skew values.",
+      "fields": {
+        "rotate": "Rotate: {{value}}°",
+        "scale": "Scale: {{value}}",
+        "translateX": "Translate X: {{value}}px",
+        "translateY": "Translate Y: {{value}}px",
+        "skew": "Skew: {{value}}°"
+      }
+    },
+    "filterGenerator": {
+      "title": "Filter generator",
+      "heading": "Compose CSS filters",
+      "instructions": "Adjust blur, brightness, contrast, hue, and saturation to style backgrounds.",
+      "fields": {
+        "blur": "Blur: {{value}}px",
+        "brightness": "Brightness: {{value}}%",
+        "contrast": "Contrast: {{value}}%",
+        "hue": "Hue: {{value}}°",
+        "saturate": "Saturation: {{value}}%"
+      }
+    }
+  },
+  "common": {
+    "copy": "Copy",
+    "copied": "Copied!",
+    "result": "Result",
+    "error": "Error",
+    "tryAgain": "Please try again.",
+    "genericError": "Something went wrong. Please try again."
+  }
+} 
