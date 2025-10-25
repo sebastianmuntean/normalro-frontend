@@ -120,10 +120,14 @@ const InvoiceGenerator = () => {
   const saveSupplierDataToCookie = () => {
     if (!saveDataConsent) return;
 
+    // Extrage cota de TVA din prima linie (dacă există)
+    const defaultVatRate = lines.length > 0 ? lines[0].vatRate : '21';
+
     const dataToSave = {
       series: invoiceData.series,
       number: invoiceData.number,
       currency: invoiceData.currency,
+      defaultVatRate: defaultVatRate,
       supplierName: invoiceData.supplierName,
       supplierCUI: invoiceData.supplierCUI,
       supplierRegCom: invoiceData.supplierRegCom,
@@ -139,6 +143,31 @@ const InvoiceGenerator = () => {
     setCookie(COOKIE_NAME, encryptedData, 90); // 90 zile
   };
 
+  const incrementInvoiceNumber = (numberStr) => {
+    if (!numberStr) return '1';
+    
+    // Încearcă să parseze numărul
+    const parsed = parseInt(numberStr, 10);
+    if (!isNaN(parsed)) {
+      // Dacă e număr simplu, incrementează
+      const incremented = parsed + 1;
+      // Păstrează numărul de zerouri din față (ex: 001 -> 002)
+      return incremented.toString().padStart(numberStr.length, '0');
+    }
+    
+    // Dacă numărul conține caractere non-numerice, încearcă să găsești partea numerică la final
+    const match = numberStr.match(/^(.*?)(\d+)$/);
+    if (match) {
+      const prefix = match[1];
+      const numPart = match[2];
+      const incremented = parseInt(numPart, 10) + 1;
+      return prefix + incremented.toString().padStart(numPart.length, '0');
+    }
+    
+    // Dacă nu găsește niciun număr, returnează string-ul original + '1'
+    return numberStr + '1';
+  };
+
   const loadSupplierDataFromCookie = () => {
     const encryptedData = getCookie(COOKIE_NAME);
     if (!encryptedData) return;
@@ -148,7 +177,7 @@ const InvoiceGenerator = () => {
       setInvoiceData(prev => ({
         ...prev,
         series: data.series || '',
-        number: data.number || '',
+        number: incrementInvoiceNumber(data.number), // Incrementează numărul automat
         currency: data.currency || 'RON',
         supplierName: data.supplierName || '',
         supplierCUI: data.supplierCUI || '',
@@ -160,6 +189,17 @@ const InvoiceGenerator = () => {
         supplierBank: data.supplierBank || '',
         supplierIBAN: data.supplierIBAN || ''
       }));
+      
+      // Restaurează cota de TVA din cookie
+      const savedVatRate = data.defaultVatRate || '21';
+      setLines(prevLines => 
+        prevLines.map((line, index) => 
+          index === 0 
+            ? { ...line, vatRate: savedVatRate }
+            : line
+        )
+      );
+      
       setSaveDataConsent(true); // Bifează automat checkbox-ul dacă există date salvate
     }
   };
@@ -547,7 +587,7 @@ const InvoiceGenerator = () => {
                 🔒 <strong>Sunt de acord cu salvarea datelor mele într-un cookie criptat, pentru folosire ulterioară.</strong>
                 <br />
                 <Typography component="span" variant="caption" color="text.secondary" fontSize="0.75rem">
-                  Dacă bifezi această opțiune, datele furnizorului (nume, CUI, adresă, etc.), seria, numărul și moneda vor fi salvate automat în browser-ul tău (criptate) pentru 90 de zile, la apăsarea butonului de descărcare. La următoarea vizită, acestea vor fi pre-completate automat.
+                  Dacă bifezi această opțiune, datele furnizorului (nume, CUI, adresă, etc.), seria, numărul, moneda și cota de TVA vor fi salvate automat în browser-ul tău (criptate) pentru 90 de zile, la apăsarea butonului de descărcare. La următoarea vizită, acestea vor fi pre-completate automat, iar numărul facturii va fi incrementat automat.
                 </Typography>
               </Typography>
             }
