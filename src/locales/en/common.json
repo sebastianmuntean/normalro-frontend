@@ -827,6 +827,10 @@
         },
         "cta": "Start creating invoices →"
       }
+    },
+    "proformaInvoiceGenerator": {
+      "title": "Proforma invoice generator",
+      "description": "Create professional proforma invoices for quotes and price estimates. Informational document without fiscal value. Includes ANAF integration, automatic VAT calculation, PDF and Excel export."
     }
   },
   "common": {

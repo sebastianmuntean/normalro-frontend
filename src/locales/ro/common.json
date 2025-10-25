@@ -814,7 +814,7 @@
       "title": "Generator facturi complete",
       "description": "Emite facturi cu date furnizor și beneficiar complete. Include integrare ANAF pentru auto-completare, calcul automat TVA, export PDF, Excel și XML (e-Factura).",
       "featured": {
-        "title": "🧾 Generator Facturi Profesionale",
+        "title": "Generator Facturi",
         "subtitle": "Sculă rapidă pentru generarea facturilor din România",
         "features": {
           "xml": "📋 Generare XML (e-Factura) – gata de încărcare pe portal RoE-Factura (ANAF)",
@@ -825,8 +825,12 @@
           "export": "📄 Export profesional în PDF și Excel pentru arhivare și contabilitate",
           "secure": "🔒 Salvare securizată (criptată) a datelor în browser"
         },
-        "cta": "Începe să creezi facturi →"
+        "cta": "Începe să emiţi facturi →"
       }
+    },
+    "proformaInvoiceGenerator": {
+      "title": "Generator facturi proforma",
+      "description": "Creează facturi proforma profesionale pentru oferte și estimări de preț. Document informativ, fără valoare fiscală. Include integrare ANAF, calcul automat TVA, export PDF și Excel."
     }
   },
   "common": {

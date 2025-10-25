@@ -1,5 +1,6 @@
 export const tools = [
   { slug: 'invoice-generator', titleKey: 'tools.invoiceGenerator.title' },
+  { slug: 'proforma-invoice-generator', titleKey: 'tools.proformaInvoiceGenerator.title' },
   { slug: 'invoice-calculator', titleKey: 'tools.invoiceCalculator.title' },
   { slug: 'unit-converter', titleKey: 'tools.unitConverter.title' },
   { slug: 'code-minifier', titleKey: 'tools.codeMinifier.title' },

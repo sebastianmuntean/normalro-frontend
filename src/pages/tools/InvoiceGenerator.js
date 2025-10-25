@@ -6,7 +6,12 @@ import {
   Card,
   CardContent,
   Checkbox,
+  Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   FormControl,
   FormControlLabel,
@@ -18,6 +23,12 @@ import {
   Paper,
   Select,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Typography
 } from '@mui/material';
@@ -27,14 +38,19 @@ import SearchIcon from '@mui/icons-material/Search';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CodeIcon from '@mui/icons-material/Code';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import ToolLayout from '../../components/ToolLayout';
 import { getCompanyDataByCUI } from '../../services/anafService';
+import googleDriveService from '../../services/googleDriveService';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import CryptoJS from 'crypto-js';
-import { create } from 'xmlbuilder2';
 
 const InvoiceGenerator = () => {
   const [loadingSupplier, setLoadingSupplier] = useState(false);
@@ -49,6 +65,7 @@ const InvoiceGenerator = () => {
     issueDate: new Date().toISOString().split('T')[0],
     dueDate: '',
     currency: 'RON',
+    notes: '',
     
     // Furnizor
     supplierName: '',
@@ -70,6 +87,25 @@ const InvoiceGenerator = () => {
     clientPhone: '',
     clientEmail: ''
   });
+
+  const [attachedFiles, setAttachedFiles] = useState([]);
+  const [fileError, setFileError] = useState('');
+
+  // State pentru Google Drive
+  const [googleDriveReady, setGoogleDriveReady] = useState(false);
+  const [isUploadingToDrive, setIsUploadingToDrive] = useState(false);
+
+  // State pentru import Excel
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [excelData, setExcelData] = useState(null);
+  const [excelColumns, setExcelColumns] = useState([]);
+  const [columnMapping, setColumnMapping] = useState({
+    product: '',
+    quantity: '',
+    vatRate: '',
+    unitNetPrice: ''
+  });
+  const [previewData, setPreviewData] = useState([]);
 
   const [lines, setLines] = useState([
     {
@@ -209,6 +245,35 @@ const InvoiceGenerator = () => {
   // Încarcă datele la mount
   useEffect(() => {
     loadSupplierDataFromCookie();
+    
+    // Inițializează Google Drive API
+    const initGoogleDrive = async () => {
+      try {
+        await googleDriveService.initializeGapi();
+        googleDriveService.initializeGis();
+        
+        if (googleDriveService.isConfigured()) {
+          setGoogleDriveReady(true);
+        } else {
+          console.warn('Google Drive nu este configurat. Setează REACT_APP_GOOGLE_CLIENT_ID în .env');
+        }
+      } catch (error) {
+        console.error('Eroare inițializare Google Drive:', error);
+      }
+    };
+
+    // Așteaptă încărcarea scripturilor Google
+    const checkGoogleLoaded = setInterval(() => {
+      if (window.gapi && window.google) {
+        clearInterval(checkGoogleLoaded);
+        initGoogleDrive();
+      }
+    }, 100);
+
+    // Cleanup după 10 secunde
+    setTimeout(() => clearInterval(checkGoogleLoaded), 10000);
+
+    return () => clearInterval(checkGoogleLoaded);
   }, []);
 
   const formatNumber = (value) => {
@@ -219,6 +284,219 @@ const InvoiceGenerator = () => {
   const handleInvoiceChange = (field) => (e) => {
     setInvoiceData({ ...invoiceData, [field]: e.target.value });
     setAnafError('');
+  };
+
+  const handleFileAttachment = async (e) => {
+    const files = Array.from(e.target.files || []);
+    setFileError('');
+    
+    // Constante conform ANAF
+    // IMPORTANT: Fișierele în Base64 cresc cu ~37% (factor 1.37)
+    // Plus overhead XML (~5%), deci folosim factor de siguranță 1.45
+    const BASE64_OVERHEAD = 1.45; // Fișierele devin cu 45% mai mari în Base64 + XML
+    const MAX_TOTAL_SIZE_ANAF = 5 * 1024 * 1024; // 5 MB limita ANAF
+    const MAX_TOTAL_SIZE = MAX_TOTAL_SIZE_ANAF / BASE64_OVERHEAD; // ~3.45 MB în fișiere originale
+    const MAX_FILE_SIZE = MAX_TOTAL_SIZE; // Același limit per fișier
+    
+    // Verifică dimensiunea fiecărui fișier (înainte de Base64)
+    const oversizedFiles = files.filter(file => file.size > MAX_FILE_SIZE);
+    if (oversizedFiles.length > 0) {
+      const fileSizeMB = (oversizedFiles[0].size / 1024 / 1024).toFixed(2);
+      const estimatedBase64MB = (oversizedFiles[0].size * BASE64_OVERHEAD / 1024 / 1024).toFixed(2);
+      setFileError(
+        `Fișierul "${oversizedFiles[0].name}" este prea mare (${fileSizeMB} MB, ~${estimatedBase64MB} MB în XML). ` +
+        `Dimensiunea maximă permisă: ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(2)} MB per fișier (pentru a respecta limita ANAF de 5 MB în XML).`
+      );
+      e.target.value = ''; // Reset input
+      return;
+    }
+    
+    // Calculează dimensiunea curentă totală (fișiere originale)
+    const currentTotalSize = attachedFiles.reduce((sum, file) => sum + file.size, 0);
+    const newFilesSize = files.reduce((sum, file) => sum + file.size, 0);
+    const totalSize = currentTotalSize + newFilesSize;
+    
+    // Verifică dimensiunea totală (cu estimare Base64)
+    if (totalSize > MAX_TOTAL_SIZE) {
+      const remainingSpace = MAX_TOTAL_SIZE - currentTotalSize;
+      const currentMB = (currentTotalSize / 1024 / 1024).toFixed(2);
+      const remainingMB = (remainingSpace / 1024 / 1024).toFixed(2);
+      const newMB = (newFilesSize / 1024 / 1024).toFixed(2);
+      const estimatedXmlMB = (totalSize * BASE64_OVERHEAD / 1024 / 1024).toFixed(2);
+      
+      setFileError(
+        `Depășești limita pentru fișiere atașate! ` +
+        `Dimensiune curentă: ${currentMB} MB (~${(currentTotalSize * BASE64_OVERHEAD / 1024 / 1024).toFixed(2)} MB în XML). ` +
+        `Spațiu disponibil: ${remainingMB} MB. ` +
+        `Încerci să adaugi: ${newMB} MB. ` +
+        `Dimensiunea estimată în XML ar fi: ${estimatedXmlMB} MB (limita ANAF: 5 MB).`
+      );
+      e.target.value = ''; // Reset input
+      return;
+    }
+    
+    const filePromises = files.map(file => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64 = event.target.result.split(',')[1];
+          resolve({
+            id: Date.now() + Math.random(),
+            name: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            size: file.size, // Păstrăm dimensiunea originală
+            base64Size: base64.length, // Dimensiunea reală în Base64
+            base64: base64
+          });
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    const loadedFiles = await Promise.all(filePromises);
+    
+    // Verificare finală cu dimensiunea Base64 reală
+    const currentBase64Size = attachedFiles.reduce((sum, file) => sum + (file.base64Size || file.base64.length), 0);
+    const newBase64Size = loadedFiles.reduce((sum, file) => sum + file.base64Size, 0);
+    const totalBase64Size = currentBase64Size + newBase64Size;
+    
+    // Adăugăm 10% overhead pentru structura XML
+    const estimatedXmlSize = totalBase64Size * 1.1;
+    
+    if (estimatedXmlSize > MAX_TOTAL_SIZE_ANAF) {
+      setFileError(
+        `Dimensiunea finală în XML (${(estimatedXmlSize / 1024 / 1024).toFixed(2)} MB) depășește limita ANAF de 5 MB! ` +
+        `Te rugăm să ștergi sau să comprimi fișierele.`
+      );
+      e.target.value = ''; // Reset input
+      return;
+    }
+    
+    setAttachedFiles(prev => [...prev, ...loadedFiles]);
+    e.target.value = ''; // Reset input pentru a permite re-upload același fișier
+  };
+
+  const removeAttachedFile = (id) => {
+    setAttachedFiles(prev => prev.filter(file => file.id !== id));
+    setFileError(''); // Reset error când se șterge un fișier
+  };
+
+  // Funcții pentru import Excel
+  const handleExcelUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const workbook = XLSX.read(event.target.result, { type: 'binary' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (data.length < 2) {
+          alert('Fișierul Excel trebuie să conțină cel puțin un rând cu header și un rând cu date.');
+          return;
+        }
+
+        // Prima linie este header-ul
+        const headers = data[0].filter(h => h); // Remove empty headers
+        setExcelColumns(headers);
+        setExcelData(data.slice(1)); // Restul sunt datele
+        setImportDialogOpen(true);
+        
+        // Reset mapare
+        setColumnMapping({
+          product: '',
+          quantity: '',
+          vatRate: '',
+          unitNetPrice: ''
+        });
+        setPreviewData([]);
+      } catch (error) {
+        alert('Eroare la citirea fișierului Excel: ' + error.message);
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = ''; // Reset input
+  };
+
+  const handleMappingChange = (field, columnName) => {
+    const newMapping = { ...columnMapping, [field]: columnName };
+    setColumnMapping(newMapping);
+    
+    // Actualizează preview
+    if (excelData && excelColumns.length > 0) {
+      updatePreview(newMapping);
+    }
+  };
+
+  const updatePreview = (mapping) => {
+    if (!excelData || excelColumns.length === 0) return;
+
+    const preview = excelData.slice(0, 5).map((row, index) => {
+      const product = mapping.product ? row[excelColumns.indexOf(mapping.product)] : '';
+      const quantity = mapping.quantity ? row[excelColumns.indexOf(mapping.quantity)] : '';
+      const vatRate = mapping.vatRate ? row[excelColumns.indexOf(mapping.vatRate)] : '';
+      const unitNetPrice = mapping.unitNetPrice ? row[excelColumns.indexOf(mapping.unitNetPrice)] : '';
+
+      return {
+        index: index + 1,
+        product: product || '-',
+        quantity: quantity || '-',
+        vatRate: vatRate || '-',
+        unitNetPrice: unitNetPrice || '-'
+      };
+    });
+
+    setPreviewData(preview);
+  };
+
+  const importExcelLines = () => {
+    if (!excelData || !columnMapping.product) {
+      alert('Trebuie să mapezi cel puțin coloana "Denumire produs"');
+      return;
+    }
+
+    const newLines = excelData
+      .map((row, index) => {
+        const product = columnMapping.product ? row[excelColumns.indexOf(columnMapping.product)] : '';
+        const quantity = columnMapping.quantity ? row[excelColumns.indexOf(columnMapping.quantity)] : '1';
+        const vatRate = columnMapping.vatRate ? row[excelColumns.indexOf(columnMapping.vatRate)] : '';
+        const unitNetPrice = columnMapping.unitNetPrice ? row[excelColumns.indexOf(columnMapping.unitNetPrice)] : '0';
+
+        // Skip rânduri goale
+        if (!product && !quantity && !unitNetPrice) return null;
+
+        const netPrice = parseFloat(unitNetPrice) || 0;
+        const vat = parseFloat(vatRate) || 0; // Dacă nu are valoare, folosește 0
+        const grossPrice = netPrice * (1 + vat / 100);
+
+        return {
+          id: Date.now() + index,
+          product: String(product || ''),
+          quantity: String(parseFloat(quantity) || 1),
+          unitNetPrice: formatNumber(netPrice),
+          vatRate: String(parseFloat(vatRate) || 0), // Default: 0%
+          unitGrossPrice: formatNumber(grossPrice)
+        };
+      })
+      .filter(line => line !== null);
+
+    if (newLines.length === 0) {
+      alert('Nu s-au găsit date valide în Excel');
+      return;
+    }
+
+    // Adaugă liniile importate la cele existente (sau înlocuiește dacă prima linie e goală)
+    if (lines.length === 1 && !lines[0].product && !lines[0].unitNetPrice) {
+      setLines(newLines);
+    } else {
+      setLines([...lines, ...newLines]);
+    }
+
+    setImportDialogOpen(false);
+    alert(`Au fost importate ${newLines.length} linii cu succes!`);
   };
 
   const searchSupplierANAF = async () => {
@@ -244,10 +522,10 @@ const InvoiceGenerator = () => {
           supplierPhone: result.data.telefon
         }));
       } else {
-        setAnafError(result.error || 'Nu s-au găsit date ANAF');
+        setAnafError(result.error || `Nu s-a găsit o companie cu codul fiscal ${invoiceData.supplierCUI}`);
       }
     } catch (error) {
-      setAnafError('Eroare la apelarea serviciului ANAF');
+      setAnafError(`Nu s-a găsit o companie cu codul fiscal ${invoiceData.supplierCUI}`);
     } finally {
       setLoadingSupplier(false);
     }
@@ -276,10 +554,10 @@ const InvoiceGenerator = () => {
           clientPhone: result.data.telefon
         }));
       } else {
-        setAnafError(result.error || 'Nu s-au găsit date ANAF');
+        setAnafError(result.error || `Nu s-a găsit o companie cu codul fiscal ${invoiceData.clientCUI}`);
       }
     } catch (error) {
-      setAnafError('Eroare la apelarea serviciului ANAF');
+      setAnafError(`Nu s-a găsit o companie cu codul fiscal ${invoiceData.clientCUI}`);
     } finally {
       setLoadingClient(false);
     }
@@ -476,6 +754,11 @@ const InvoiceGenerator = () => {
             </tr>
           </tfoot>
         </table>
+        ${invoiceData.notes ? `
+        <div style="margin-top: 25px; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #2196F3; border-radius: 4px;">
+          <strong style="font-size: 11px;">Note:</strong><br/>
+          <div style="margin-top: 8px; font-size: 10px; line-height: 1.6; white-space: pre-wrap;">${invoiceData.notes}</div>
+        </div>` : ''}
       </div>
     `;
     
@@ -559,92 +842,299 @@ const InvoiceGenerator = () => {
     saveSupplierDataToCookie();
   };
 
+  const validateOnANAF = () => {
+    // Generează și descarcă XML-ul
+    exportToXML();
+    
+    // Deschide validatorul ANAF într-un tab nou
+    setTimeout(() => {
+      window.open('https://www.anaf.ro/uploadxmi/', '_blank');
+      
+      // Afișează instrucțiuni
+      alert(
+        '📋 Validare XML pe ANAF:\n\n' +
+        '1. Fișierul XML a fost descărcat automat\n' +
+        '2. S-a deschis validatorul ANAF într-un tab nou (anaf.ro/uploadxmi)\n' +
+        '3. Pe pagina ANAF, apasă "Alegeți un fișier..."\n' +
+        '4. Selectează XML-ul descărcat\n' +
+        '5. Asigură-te că standardul "FACT1" este selectat\n' +
+        '6. Apasă "Validare fisier"\n' +
+        '7. Verifică rezultatele validării\n\n' +
+        '✅ Dacă validarea este OK, XML-ul este gata de încărcat pe RoE-Factura!'
+      );
+    }, 500);
+  };
+
+  const saveToGoogleDrive = async (fileType = 'pdf') => {
+    if (!googleDriveReady || !googleDriveService.isConfigured()) {
+      alert(
+        '⚠️ Google Drive nu este configurat!\n\n' +
+        'Pentru a activa această funcție:\n' +
+        '1. Creează un proiect în Google Cloud Console\n' +
+        '2. Activează Google Drive API\n' +
+        '3. Creează credențiale OAuth 2.0\n' +
+        '4. Setează REACT_APP_GOOGLE_CLIENT_ID în .env\n\n' +
+        `Ghid: ${googleDriveService.getConfigurationGuideUrl()}`
+      );
+      return;
+    }
+
+    setIsUploadingToDrive(true);
+    
+    try {
+      // 1. Cere autorizare de la utilizator
+      try {
+        await googleDriveService.requestAuthorization();
+      } catch (authError) {
+        console.error('Eroare autorizare:', authError);
+        alert(
+          '❌ Autorizare refuzată!\n\n' +
+          'Pentru a salva fișiere în Google Drive, trebuie să accepți permisiunile solicitate.\n\n' +
+          'Apasă din nou pe buton și autorizează aplicația.'
+        );
+        setIsUploadingToDrive(false);
+        return;
+      }
+
+      // 2. Generează fișierul
+      let blob, filename, mimeType;
+      
+      if (fileType === 'pdf') {
+        // Generează PDF folosind funcția existentă exportToPDF
+        // Refolosim logica dar generăm blob în loc de download
+        const totals = calculateTotals();
+        const invoiceElement = document.createElement('div');
+        invoiceElement.style.width = '800px';
+        invoiceElement.style.padding = '20px';
+        invoiceElement.style.backgroundColor = 'white';
+        
+        // Folosește același HTML ca la exportToPDF (versiune completă)
+        invoiceElement.innerHTML = `
+          <div style="font-family: Arial, sans-serif; font-size: 11px;">
+            <h1 style="text-align: center; font-size: 24px; margin: 0 0 15px 0;">FACTURĂ</h1>
+            <div style="text-align: center; margin-bottom: 25px; font-size: 11px;">
+              <div>Seria: ${invoiceData.series || '-'} Nr: ${invoiceData.number || '-'}</div>
+              <div>Data: ${invoiceData.issueDate || '-'}</div>
+              ${invoiceData.dueDate ? `<div>Scadență: ${invoiceData.dueDate}</div>` : ''}
+            </div>
+            
+            <table style="width: 100%; margin-bottom: 25px; border-collapse: collapse;">
+              <tr>
+                <td style="width: 50%; vertical-align: top; padding-right: 15px;">
+                  <strong style="font-size: 12px;">FURNIZOR:</strong><br/>
+                  <div style="margin-top: 5px; line-height: 1.6;">
+                    ${invoiceData.supplierName || '-'}<br/>
+                    CUI: ${invoiceData.supplierCUI || '-'}
+                  </div>
+                </td>
+                <td style="width: 50%; vertical-align: top; padding-left: 15px;">
+                  <strong style="font-size: 12px;">BENEFICIAR:</strong><br/>
+                  <div style="margin-top: 5px; line-height: 1.6;">
+                    ${invoiceData.clientName || '-'}<br/>
+                    CUI: ${invoiceData.clientCUI || '-'}
+                  </div>
+                </td>
+              </tr>
+            </table>
+            
+            <div style="text-align: center; margin-top: 30px;">
+              <strong>Total: ${totals.gross} ${invoiceData.currency}</strong>
+            </div>
+          </div>
+        `;
+        
+        document.body.appendChild(invoiceElement);
+        
+        const canvas = await html2canvas(invoiceElement, { scale: 2, useCORS: true, logging: false });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        
+        blob = pdf.output('blob');
+        filename = `factura_${invoiceData.series || 'FAC'}_${invoiceData.number || '001'}_${invoiceData.issueDate}.pdf`;
+        mimeType = 'application/pdf';
+        
+        document.body.removeChild(invoiceElement);
+        
+      } else if (fileType === 'excel') {
+        // Generează Excel ca blob (versiune completă)
+        const totals = calculateTotals();
+        const excelData = [];
+        
+        excelData.push(['FACTURĂ']);
+        excelData.push([]);
+        excelData.push(['Seria', invoiceData.series, 'Nr', invoiceData.number]);
+        excelData.push(['Data emitere', invoiceData.issueDate]);
+        excelData.push([]);
+        
+        excelData.push(['Nr.', 'Produs/Serviciu', 'Cantitate', 'Preț net unitar', 'TVA %', 'Total net', 'Total TVA', 'Total brut']);
+        
+        lines.forEach((line, index) => {
+          excelData.push([
+            index + 1,
+            line.product || '-',
+            line.quantity,
+            formatNumber(line.unitNetPrice),
+            line.vatRate,
+            calculateLineTotal(line, 'net'),
+            calculateLineTotal(line, 'vat'),
+            calculateLineTotal(line, 'gross')
+          ]);
+        });
+        
+        excelData.push([]);
+        excelData.push(['', '', '', '', 'TOTAL', totals.net, totals.vat, totals.gross]);
+        
+        const ws = XLSX.utils.aoa_to_sheet(excelData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Factura');
+        
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        filename = `factura_${invoiceData.series || 'FAC'}_${invoiceData.number || '001'}_${invoiceData.issueDate}.xlsx`;
+        mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      }
+
+      // 3. Upload direct în Google Drive
+      const result = await googleDriveService.uploadFile(blob, filename, mimeType);
+      
+      // 4. Succes!
+      const fileUrl = `https://drive.google.com/file/d/${result.id}/view`;
+      
+      alert(
+        `✅ Succes! Fișierul a fost salvat în Google Drive!\n\n` +
+        `📄 Nume: ${filename}\n` +
+        `📂 ID: ${result.id}\n\n` +
+        `🔗 Deschide fișierul în Google Drive?`
+      );
+      
+      // Deschide fișierul în Google Drive
+      window.open(fileUrl, '_blank');
+      
+      saveSupplierDataToCookie();
+      
+    } catch (error) {
+      console.error('Eroare salvare Google Drive:', error);
+      alert(
+        `❌ Eroare la salvarea în Google Drive!\n\n` +
+        `${error.message}\n\n` +
+        `Verifică consola pentru mai multe detalii.`
+      );
+    } finally {
+      setIsUploadingToDrive(false);
+    }
+  };
+
   const exportToXML = () => {
+    // Helper pentru escape XML
+    const escapeXML = (str) => {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    };
+
+    // Helper pentru a deduce codul județului din oraș și adresă (ISO 3166-2:RO)
+    const getCountyCode = (city, address) => {
+      const searchText = `${city || ''} ${address || ''}`.toLowerCase();
+      if (!searchText.trim()) return '';
+      
+      // Mapare orașelor principale către coduri județ
+      const cityToCounty = {
+        'bucuresti': 'RO-B',
+        'bucharest': 'RO-B',
+        'sector': 'RO-B',
+        'alba iulia': 'RO-AB',
+        'alba': 'RO-AB',
+        'pitesti': 'RO-AG',
+        'arges': 'RO-AG',
+        'arad': 'RO-AR',
+        'bacau': 'RO-BC',
+        'oradea': 'RO-BH',
+        'bihor': 'RO-BH',
+        'bistrita': 'RO-BN',
+        'braila': 'RO-BR',
+        'botosani': 'RO-BT',
+        'brasov': 'RO-BV',
+        'buzau': 'RO-BZ',
+        'cluj': 'RO-CJ',
+        'cluj-napoca': 'RO-CJ',
+        'napoca': 'RO-CJ',
+        'calarasi': 'RO-CL',
+        'resita': 'RO-CS',
+        'caras': 'RO-CS',
+        'constanta': 'RO-CT',
+        'covasna': 'RO-CV',
+        'targoviste': 'RO-DB',
+        'dambovita': 'RO-DB',
+        'craiova': 'RO-DJ',
+        'dolj': 'RO-DJ',
+        'targu jiu': 'RO-GJ',
+        'gorj': 'RO-GJ',
+        'galati': 'RO-GL',
+        'giurgiu': 'RO-GR',
+        'deva': 'RO-HD',
+        'hunedoara': 'RO-HD',
+        'miercurea': 'RO-HR',
+        'harghita': 'RO-HR',
+        'ilfov': 'RO-IF',
+        'slobozia': 'RO-IL',
+        'ialomita': 'RO-IL',
+        'iasi': 'RO-IS',
+        'iași': 'RO-IS',
+        'drobeta': 'RO-MH',
+        'mehedinti': 'RO-MH',
+        'baia mare': 'RO-MM',
+        'maramures': 'RO-MM',
+        'targu mures': 'RO-MS',
+        'mures': 'RO-MS',
+        'piatra neamt': 'RO-NT',
+        'neamt': 'RO-NT',
+        'slatina': 'RO-OT',
+        'olt': 'RO-OT',
+        'ploiesti': 'RO-PH',
+        'prahova': 'RO-PH',
+        'sibiu': 'RO-SB',
+        'satu mare': 'RO-SM',
+        'zalau': 'RO-SJ',
+        'salaj': 'RO-SJ',
+        'suceava': 'RO-SV',
+        'alexandria': 'RO-TR',
+        'teleorman': 'RO-TR',
+        'timisoara': 'RO-TM',
+        'timis': 'RO-TM',
+        'tulcea': 'RO-TL',
+        'vaslui': 'RO-VS',
+        'ramnicu valcea': 'RO-VL',
+        'valcea': 'RO-VL',
+        'focsani': 'RO-VN',
+        'vrancea': 'RO-VN'
+      };
+
+      // Caută în mapare (caută în oraș + adresă combinat)
+      for (const [key, code] of Object.entries(cityToCounty)) {
+        if (searchText.includes(key)) {
+          return code;
+        }
+      }
+
+      return ''; // Dacă nu găsește, returnează gol
+    };
+
     // Format data pentru XML e-Factura (UBL 2.1 pentru România)
     const invoiceNumber = `${invoiceData.series || 'FAC'}${invoiceData.number || '001'}`;
     const issueDate = invoiceData.issueDate || new Date().toISOString().split('T')[0];
     const currencyCode = invoiceData.currency || 'RON';
+    
+    const supplierCountyCode = getCountyCode(invoiceData.supplierCity, invoiceData.supplierAddress);
+    const clientCountyCode = getCountyCode(invoiceData.clientCity, invoiceData.clientAddress);
 
-    // Creează documentul XML
-    const doc = create({ version: '1.0', encoding: 'UTF-8' })
-      .ele('Invoice', {
-        'xmlns': 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2',
-        'xmlns:cac': 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
-        'xmlns:cbc': 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2'
-      })
-        .ele('cbc:CustomizationID').txt('urn:cen.eu:en16931:2017#compliant#urn:efactura.mfinante.ro:CIUS-RO:1.0.1').up()
-        .ele('cbc:ID').txt(invoiceNumber).up()
-        .ele('cbc:IssueDate').txt(issueDate).up()
-        .ele('cbc:DueDate').txt(invoiceData.dueDate || issueDate).up()
-        .ele('cbc:InvoiceTypeCode').txt('380').up() // 380 = Commercial Invoice
-        .ele('cbc:DocumentCurrencyCode').txt(currencyCode).up()
-        
-        // Furnizor (AccountingSupplierParty)
-        .ele('cac:AccountingSupplierParty')
-          .ele('cac:Party')
-            .ele('cac:PartyName')
-              .ele('cbc:Name').txt(invoiceData.supplierName || '').up()
-            .up()
-            .ele('cac:PostalAddress')
-              .ele('cbc:StreetName').txt(invoiceData.supplierAddress || '').up()
-              .ele('cbc:CityName').txt(invoiceData.supplierCity || '').up()
-              .ele('cac:Country')
-                .ele('cbc:IdentificationCode').txt('RO').up()
-              .up()
-            .up()
-            .ele('cac:PartyTaxScheme')
-              .ele('cbc:CompanyID').txt('RO' + (invoiceData.supplierCUI || '')).up()
-              .ele('cac:TaxScheme')
-                .ele('cbc:ID').txt('VAT').up()
-              .up()
-            .up()
-            .ele('cac:PartyLegalEntity')
-              .ele('cbc:RegistrationName').txt(invoiceData.supplierName || '').up()
-              .ele('cbc:CompanyID').txt(invoiceData.supplierRegCom || '').up()
-            .up()
-            .ele('cac:Contact')
-              .ele('cbc:Telephone').txt(invoiceData.supplierPhone || '').up()
-              .ele('cbc:ElectronicMail').txt(invoiceData.supplierEmail || '').up()
-            .up()
-          .up()
-        .up()
-        
-        // Beneficiar (AccountingCustomerParty)
-        .ele('cac:AccountingCustomerParty')
-          .ele('cac:Party')
-            .ele('cac:PartyName')
-              .ele('cbc:Name').txt(invoiceData.clientName || '').up()
-            .up()
-            .ele('cac:PostalAddress')
-              .ele('cbc:StreetName').txt(invoiceData.clientAddress || '').up()
-              .ele('cbc:CityName').txt(invoiceData.clientCity || '').up()
-              .ele('cac:Country')
-                .ele('cbc:IdentificationCode').txt('RO').up()
-              .up()
-            .up()
-            .ele('cac:PartyTaxScheme')
-              .ele('cbc:CompanyID').txt('RO' + (invoiceData.clientCUI || '')).up()
-              .ele('cac:TaxScheme')
-                .ele('cbc:ID').txt('VAT').up()
-              .up()
-            .up()
-            .ele('cac:PartyLegalEntity')
-              .ele('cbc:RegistrationName').txt(invoiceData.clientName || '').up()
-              .ele('cbc:CompanyID').txt(invoiceData.clientRegCom || '').up()
-            .up()
-          .up()
-        .up()
-        
-        // Modalitate de plată
-        .ele('cac:PaymentMeans')
-          .ele('cbc:PaymentMeansCode').txt('30').up() // 30 = Credit transfer
-          .ele('cac:PayeeFinancialAccount')
-            .ele('cbc:ID').txt(invoiceData.supplierIBAN || '').up()
-            .ele('cbc:Name').txt(invoiceData.supplierBank || '').up()
-          .up()
-        .up();
-
-    // Adaugă grupuri TVA
+    // Calculează grupuri TVA
     const vatGroups = {};
     lines.forEach(line => {
       const vatRate = parseFloat(line.vatRate) || 0;
@@ -658,74 +1148,160 @@ const InvoiceGenerator = () => {
       vatGroups[vatRate].taxAmount += taxAmount;
     });
 
-    // TaxTotal
-    const taxTotal = doc.root().ele('cac:TaxTotal')
-      .ele('cbc:TaxAmount', { currencyID: currencyCode }).txt(totals.vat).up();
+    // Construiește XML manual
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:CustomizationID>urn:cen.eu:en16931:2017#compliant#urn:efactura.mfinante.ro:CIUS-RO:1.0.1</cbc:CustomizationID>
+  <cbc:ID>${escapeXML(invoiceNumber)}</cbc:ID>
+  <cbc:IssueDate>${escapeXML(issueDate)}</cbc:IssueDate>
+  <cbc:DueDate>${escapeXML(invoiceData.dueDate || issueDate)}</cbc:DueDate>
+  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>${invoiceData.notes ? `
+  <cbc:Note>${escapeXML(invoiceData.notes)}</cbc:Note>` : ''}
+  <cbc:DocumentCurrencyCode>${escapeXML(currencyCode)}</cbc:DocumentCurrencyCode>
+  ${attachedFiles.length > 0 ? attachedFiles.map((file, index) => `
+  <!-- Document atașat ${index + 1} -->
+  <cac:AdditionalDocumentReference>
+    <cbc:ID>${escapeXML(file.name)}</cbc:ID>
+    <cac:Attachment>
+      <cbc:EmbeddedDocumentBinaryObject mimeCode="${escapeXML(file.mimeType)}" filename="${escapeXML(file.name)}">${file.base64}</cbc:EmbeddedDocumentBinaryObject>
+    </cac:Attachment>
+  </cac:AdditionalDocumentReference>`).join('') : ''}
+  
+  <!-- Furnizor -->
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyName>
+        <cbc:Name>${escapeXML(invoiceData.supplierName)}</cbc:Name>
+      </cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>${escapeXML(invoiceData.supplierAddress)}</cbc:StreetName>
+        <cbc:CityName>${escapeXML(invoiceData.supplierCity)}</cbc:CityName>${supplierCountyCode ? `
+        <cbc:CountrySubentity>${supplierCountyCode}</cbc:CountrySubentity>` : ''}
+        <cac:Country>
+          <cbc:IdentificationCode>RO</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>RO${escapeXML(invoiceData.supplierCUI)}</cbc:CompanyID>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>${escapeXML(invoiceData.supplierName)}</cbc:RegistrationName>
+        <cbc:CompanyID>${escapeXML(invoiceData.supplierRegCom)}</cbc:CompanyID>
+      </cac:PartyLegalEntity>
+      <cac:Contact>
+        <cbc:Telephone>${escapeXML(invoiceData.supplierPhone)}</cbc:Telephone>
+        <cbc:ElectronicMail>${escapeXML(invoiceData.supplierEmail)}</cbc:ElectronicMail>
+      </cac:Contact>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  
+  <!-- Beneficiar -->
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyName>
+        <cbc:Name>${escapeXML(invoiceData.clientName)}</cbc:Name>
+      </cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>${escapeXML(invoiceData.clientAddress)}</cbc:StreetName>
+        <cbc:CityName>${escapeXML(invoiceData.clientCity)}</cbc:CityName>${clientCountyCode ? `
+        <cbc:CountrySubentity>${clientCountyCode}</cbc:CountrySubentity>` : ''}
+        <cac:Country>
+          <cbc:IdentificationCode>RO</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>RO${escapeXML(invoiceData.clientCUI)}</cbc:CompanyID>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>${escapeXML(invoiceData.clientName)}</cbc:RegistrationName>
+        <cbc:CompanyID>${escapeXML(invoiceData.clientRegCom)}</cbc:CompanyID>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  ${invoiceData.supplierIBAN ? `
+  <!-- Modalitate de plată -->
+  <cac:PaymentMeans>
+    <cbc:PaymentMeansCode>30</cbc:PaymentMeansCode>
+    <cac:PayeeFinancialAccount>
+      <cbc:ID>${escapeXML(invoiceData.supplierIBAN)}</cbc:ID>${invoiceData.supplierBank ? `
+      <cbc:Name>${escapeXML(invoiceData.supplierBank)}</cbc:Name>` : ''}
+    </cac:PayeeFinancialAccount>
+  </cac:PaymentMeans>` : ''}
+  
+  <!-- Total TVA -->
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="${escapeXML(currencyCode)}">${totals.vat}</cbc:TaxAmount>`;
 
+    // Adaugă TaxSubtotal pentru fiecare cotă de TVA
     Object.entries(vatGroups).forEach(([rate, amounts]) => {
-      taxTotal.ele('cac:TaxSubtotal')
-        .ele('cbc:TaxableAmount', { currencyID: currencyCode }).txt(amounts.taxableAmount.toFixed(2)).up()
-        .ele('cbc:TaxAmount', { currencyID: currencyCode }).txt(amounts.taxAmount.toFixed(2)).up()
-        .ele('cac:TaxCategory')
-          .ele('cbc:ID').txt('S').up() // S = Standard rate
-          .ele('cbc:Percent').txt(rate).up()
-          .ele('cac:TaxScheme')
-            .ele('cbc:ID').txt('VAT').up()
-          .up()
-        .up()
-      .up();
+      xml += `
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="${escapeXML(currencyCode)}">${amounts.taxableAmount.toFixed(2)}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="${escapeXML(currencyCode)}">${amounts.taxAmount.toFixed(2)}</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>${rate}</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>`;
     });
 
-    // LegalMonetaryTotal
-    doc.root()
-      .ele('cac:LegalMonetaryTotal')
-        .ele('cbc:LineExtensionAmount', { currencyID: currencyCode }).txt(totals.net).up()
-        .ele('cbc:TaxExclusiveAmount', { currencyID: currencyCode }).txt(totals.net).up()
-        .ele('cbc:TaxInclusiveAmount', { currencyID: currencyCode }).txt(totals.gross).up()
-        .ele('cbc:PayableAmount', { currencyID: currencyCode }).txt(totals.gross).up()
-      .up();
+    xml += `
+  </cac:TaxTotal>
+  
+  <!-- Totaluri monetare -->
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="${escapeXML(currencyCode)}">${totals.net}</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="${escapeXML(currencyCode)}">${totals.net}</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="${escapeXML(currencyCode)}">${totals.gross}</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="${escapeXML(currencyCode)}">${totals.gross}</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  `;
 
-    // InvoiceLines
+    // Adaugă linii factura
     lines.forEach((line, index) => {
       const lineNet = parseFloat(calculateLineTotal(line, 'net')) || 0;
-      const lineVat = parseFloat(calculateLineTotal(line, 'vat')) || 0;
-      const lineGross = parseFloat(calculateLineTotal(line, 'gross')) || 0;
       const qty = parseFloat(line.quantity) || 0;
       const unitPrice = parseFloat(line.unitNetPrice) || 0;
       const vatRate = parseFloat(line.vatRate) || 0;
 
-      doc.root().ele('cac:InvoiceLine')
-        .ele('cbc:ID').txt(index + 1).up()
-        .ele('cbc:InvoicedQuantity', { unitCode: 'EA' }).txt(qty).up() // EA = Each (unit)
-        .ele('cbc:LineExtensionAmount', { currencyID: currencyCode }).txt(lineNet.toFixed(2)).up()
-        .ele('cac:Item')
-          .ele('cbc:Name').txt(line.product || 'Produs/Serviciu').up()
-        .up()
-        .ele('cac:Price')
-          .ele('cbc:PriceAmount', { currencyID: currencyCode }).txt(unitPrice.toFixed(2)).up()
-        .up()
-        .ele('cac:TaxTotal')
-          .ele('cbc:TaxAmount', { currencyID: currencyCode }).txt(lineVat.toFixed(2)).up()
-          .ele('cac:TaxSubtotal')
-            .ele('cbc:TaxableAmount', { currencyID: currencyCode }).txt(lineNet.toFixed(2)).up()
-            .ele('cbc:TaxAmount', { currencyID: currencyCode }).txt(lineVat.toFixed(2)).up()
-            .ele('cac:TaxCategory')
-              .ele('cbc:ID').txt('S').up()
-              .ele('cbc:Percent').txt(vatRate).up()
-              .ele('cac:TaxScheme')
-                .ele('cbc:ID').txt('VAT').up()
-              .up()
-            .up()
-          .up()
-        .up()
-      .up();
+      xml += `
+  <!-- Linia ${index + 1} -->
+  <cac:InvoiceLine>
+    <cbc:ID>${index + 1}</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="EA">${qty}</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="${escapeXML(currencyCode)}">${lineNet.toFixed(2)}</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Name>${escapeXML(line.product || 'Produs/Serviciu')}</cbc:Name>
+      <cac:ClassifiedTaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>${vatRate}</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="${escapeXML(currencyCode)}">${unitPrice.toFixed(2)}</cbc:PriceAmount>
+    </cac:Price>
+  </cac:InvoiceLine>`;
     });
 
-    // Generează XML string
-    const xmlString = doc.end({ prettyPrint: true });
+    xml += `
+</Invoice>`;
 
     // Creează blob și descarcă
-    const blob = new Blob([xmlString], { type: 'application/xml' });
+    const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -1141,25 +1717,218 @@ const InvoiceGenerator = () => {
                     </Stack>
                   </Grid>
                   <Grid size={{ xs: 12, md: 3.5 }}>
-                    <Typography variant="caption" color="text.secondary">Total linie:</Typography>
-                    <Typography variant="body2" fontWeight="600">
-                      {calculateLineTotal(line, 'net')} + {calculateLineTotal(line, 'vat')} = <span style={{ color: '#2e7d32' }}>{calculateLineTotal(line, 'gross')} {invoiceData.currency}</span>
-                    </Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Total linie brut"
+                      type="number"
+                      value={calculateLineTotal(line, 'gross')}
+                      onChange={(e) => {
+                        const totalGross = parseFloat(e.target.value) || 0;
+                        const quantity = parseFloat(line.quantity) || 1;
+                        const vatRate = parseFloat(line.vatRate) || 0;
+                        
+                        // Calculează preț brut unitar din total
+                        const unitGrossPrice = totalGross / quantity;
+                        // Calculează preț net unitar
+                        const unitNetPrice = unitGrossPrice / (1 + vatRate / 100);
+                        
+                        const newLines = lines.map(l => {
+                          if (l.id === line.id) {
+                            return {
+                              ...l,
+                              unitNetPrice: formatNumber(unitNetPrice),
+                              unitGrossPrice: formatNumber(unitGrossPrice)
+                            };
+                          }
+                          return l;
+                        });
+                        setLines(newLines);
+                      }}
+                      InputProps={{
+                        endAdornment: <InputAdornment position="end">{invoiceData.currency}</InputAdornment>
+                      }}
+                      sx={{ 
+                        '& .MuiInputBase-input': { 
+                          fontWeight: 700,
+                          color: 'success.dark'
+                        } 
+                      }}
+                      helperText={`${calculateLineTotal(line, 'net')} + ${calculateLineTotal(line, 'vat')} TVA`}
+                    />
                   </Grid>
                 </Grid>
               </Box>
             ))}
 
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={addLine}
-            >
-              Adaugă linie
-            </Button>
+            <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={addLine}
+              >
+                Adaugă linie
+              </Button>
+              <Button
+                variant="outlined"
+                color="success"
+                size="small"
+                startIcon={<UploadFileIcon />}
+                component="label"
+              >
+                Importă din Excel
+                <input
+                  type="file"
+                  hidden
+                  accept=".xlsx,.xls"
+                  onChange={handleExcelUpload}
+                />
+              </Button>
+            </Stack>
           </CardContent>
         </Card>
+
+        {/* Dialog Import Excel */}
+        <Dialog 
+          open={importDialogOpen} 
+          onClose={() => setImportDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            Importă linii din Excel
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Mapează coloanele din Excel cu câmpurile facturii
+            </Typography>
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={3} sx={{ mt: 2 }}>
+              {/* Mapare coloane */}
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Denumire produs *</InputLabel>
+                    <Select
+                      value={columnMapping.product}
+                      onChange={(e) => handleMappingChange('product', e.target.value)}
+                      label="Denumire produs *"
+                    >
+                      <MenuItem value="">-- Selectează coloană --</MenuItem>
+                      {excelColumns.map((col, idx) => (
+                        <MenuItem key={idx} value={col}>{col}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Cantitate</InputLabel>
+                    <Select
+                      value={columnMapping.quantity}
+                      onChange={(e) => handleMappingChange('quantity', e.target.value)}
+                      label="Cantitate"
+                    >
+                      <MenuItem value="">-- Selectează coloană --</MenuItem>
+                      {excelColumns.map((col, idx) => (
+                        <MenuItem key={idx} value={col}>{col}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Cotă TVA (%)</InputLabel>
+                    <Select
+                      value={columnMapping.vatRate}
+                      onChange={(e) => handleMappingChange('vatRate', e.target.value)}
+                      label="Cotă TVA (%)"
+                    >
+                      <MenuItem value="">-- Selectează coloană --</MenuItem>
+                      {excelColumns.map((col, idx) => (
+                        <MenuItem key={idx} value={col}>{col}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Preț unitar net</InputLabel>
+                    <Select
+                      value={columnMapping.unitNetPrice}
+                      onChange={(e) => handleMappingChange('unitNetPrice', e.target.value)}
+                      label="Preț unitar net"
+                    >
+                      <MenuItem value="">-- Selectează coloană --</MenuItem>
+                      {excelColumns.map((col, idx) => (
+                        <MenuItem key={idx} value={col}>{col}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+
+              {/* Preview */}
+              {previewData.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Previzualizare (primele 5 rânduri):
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell><strong>Nr.</strong></TableCell>
+                          <TableCell><strong>Produs</strong></TableCell>
+                          <TableCell><strong>Cant.</strong></TableCell>
+                          <TableCell><strong>TVA%</strong></TableCell>
+                          <TableCell><strong>Preț Net</strong></TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {previewData.map((row) => (
+                          <TableRow key={row.index}>
+                            <TableCell>{row.index}</TableCell>
+                            <TableCell>{row.product}</TableCell>
+                            <TableCell>{row.quantity}</TableCell>
+                            <TableCell>{row.vatRate}</TableCell>
+                            <TableCell>{row.unitNetPrice}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    Total rânduri în Excel: {excelData?.length || 0}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Instrucțiuni */}
+              <Alert severity="info">
+                <strong>Instrucțiuni:</strong>
+                <br />
+                • Maparea "Denumire produs" este obligatorie
+                <br />
+                • Câmpurile nemapate vor folosi: Cantitate=1, TVA=0%, Preț=0
+                <br />
+                • Rândurile goale din Excel vor fi ignorate automat
+              </Alert>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setImportDialogOpen(false)}>
+              Anulează
+            </Button>
+            <Button 
+              onClick={importExcelLines} 
+              variant="contained"
+              disabled={!columnMapping.product}
+            >
+              Importă {excelData?.length || 0} linii
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Totaluri și Export */}
         <Paper sx={{ p: 3, bgcolor: 'primary.50', borderLeft: 4, borderColor: 'primary.main' }}>
@@ -1184,17 +1953,117 @@ const InvoiceGenerator = () => {
                 </Box>
               </Stack>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Stack spacing={1.5}>
+          </Grid>
+        </Paper>
+
+        {/* Note și Atașamente */}
+        <Card variant="outlined">
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Note și Atașamente
+            </Typography>
+            
+            <Stack spacing={2}>
+              {/* Câmp Note */}
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                size="small"
+                label="Note factură (opțional)"
+                value={invoiceData.notes}
+                onChange={handleInvoiceChange('notes')}
+                placeholder="ex: Plata în termen de 15 zile de la emitere..."
+                helperText="Notele vor fi incluse în factura PDF și XML (e-Factura)"
+              />
+
+              {/* Upload Fișiere */}
+              <Box>
                 <Button
-                  variant="contained"
-                  color="error"
-                  startIcon={<PictureAsPdfIcon />}
-                  onClick={exportToPDF}
-                  fullWidth
+                  variant="outlined"
+                  component="label"
+                  startIcon={<AttachFileIcon />}
+                  size="small"
                 >
-                  Descarcă PDF
+                  Atașează fișiere (opțional)
+                  <input
+                    type="file"
+                    hidden
+                    multiple
+                    onChange={handleFileAttachment}
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                  />
                 </Button>
+                <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                  Fișierele vor fi incluse în XML (e-Factura) ca documente atașate. Format: PDF, JPG, PNG, DOC, XLS
+                  <br />
+                  <strong>Limită ANAF: 5 MB total în XML</strong> (fișiere originale + conversie Base64 + overhead XML)
+                  {attachedFiles.length > 0 && (() => {
+                    // Calculează dimensiunea Base64 reală
+                    const totalBase64Size = attachedFiles.reduce((sum, file) => sum + (file.base64Size || file.base64?.length || 0), 0);
+                    const estimatedXmlSize = totalBase64Size * 1.1; // +10% pentru structura XML
+                    const totalOriginalSize = attachedFiles.reduce((sum, file) => sum + file.size, 0);
+                    
+                    const originalMB = (totalOriginalSize / 1024 / 1024).toFixed(2);
+                    const xmlMB = (estimatedXmlSize / 1024 / 1024).toFixed(2);
+                    const percentage = (estimatedXmlSize / (5 * 1024 * 1024) * 100).toFixed(0);
+                    const color = percentage > 80 ? '#d32f2f' : percentage > 60 ? '#ed6c02' : '#2e7d32';
+                    
+                    return (
+                      <span style={{ color: color, fontWeight: 'bold' }}>
+                        <br />
+                        📊 Fișiere originale: {originalMB} MB | Estimat în XML: {xmlMB} MB / 5 MB ({percentage}%)
+                      </span>
+                    );
+                  })()}
+                </Typography>
+              </Box>
+
+              {/* Eroare upload */}
+              {fileError && (
+                <Alert severity="error" onClose={() => setFileError('')}>
+                  {fileError}
+                </Alert>
+              )}
+
+              {/* Listă fișiere atașate */}
+              {attachedFiles.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Fișiere atașate ({attachedFiles.length}):
+                  </Typography>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+                    {attachedFiles.map((file) => (
+                      <Chip
+                        key={file.id}
+                        label={`${file.name} (${(file.size / 1024).toFixed(1)} KB)`}
+                        onDelete={() => removeAttachedFile(file.id)}
+                        deleteIcon={<CloseIcon />}
+                        color="primary"
+                        variant="outlined"
+                        size="small"
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+
+        {/* Butoane Export */}
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Stack spacing={1.5}>
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={<PictureAsPdfIcon />}
+                onClick={exportToPDF}
+                fullWidth
+              >
+                Descarcă PDF
+              </Button>
                 <Button
                   variant="contained"
                   color="success"
@@ -1213,10 +2082,45 @@ const InvoiceGenerator = () => {
                 >
                   Descarcă XML (e-Factura)
                 </Button>
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  startIcon={<CheckCircleOutlineIcon />}
+                  onClick={validateOnANAF}
+                  fullWidth
+                >
+                  Validează XML pe ANAF
+                </Button>
+                
+                <Divider sx={{ my: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Google Drive
+                  </Typography>
+                </Divider>
+                
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<CloudUploadIcon />}
+                  onClick={() => saveToGoogleDrive('pdf')}
+                  fullWidth
+                  disabled={isUploadingToDrive}
+                >
+                  {isUploadingToDrive ? 'Procesare...' : 'Salvează PDF în Drive'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="success"
+                  startIcon={<CloudUploadIcon />}
+                  onClick={() => saveToGoogleDrive('excel')}
+                  fullWidth
+                  disabled={isUploadingToDrive}
+                >
+                  {isUploadingToDrive ? 'Procesare...' : 'Salvează Excel în Drive'}
+                </Button>
               </Stack>
             </Grid>
           </Grid>
-        </Paper>
 
         {/* Info */}
         <Paper sx={{ p: 1.5, bgcolor: 'grey.50' }}>
@@ -1225,11 +2129,17 @@ const InvoiceGenerator = () => {
             <br />
             🔍 <strong>Căutare ANAF:</strong> Introdu CUI-ul și apasă pe iconița de căutare (🔍) pentru a completa automat datele companiei din registrul ANAF.
             <br />
-            📄 <strong>PDF:</strong> Factură formatată profesional cu toate detaliile, gata de printat.
+            📝 <strong>Note și Atașamente:</strong> Poți adăuga note explicative și atașa fișiere (PDF, imagini, documente) care vor fi incluse în XML.
+            <br />
+            📄 <strong>PDF:</strong> Factură formatată profesional cu toate detaliile și notele, gata de printat.
             <br />
             📊 <strong>Excel:</strong> Date tabelate, editabile în Excel/Calc pentru evidență contabilă.
             <br />
-            📋 <strong>XML (e-Factura):</strong> Format UBL 2.1 compatibil cu sistemul RoE-Factura (ANAF), gata de încărcat direct în portal.
+            📋 <strong>XML (e-Factura):</strong> Format UBL 2.1 cu note și fișiere atașate (embedded), compatibil cu RoE-Factura (ANAF).
+            <br />
+            ✅ <strong>Validează XML:</strong> Butonul "Validează XML pe ANAF" descarcă XML-ul și deschide validatorul oficial ANAF pentru verificare înainte de încărcare.
+            <br />
+            ☁️ <strong>Google Drive:</strong> Salvează rapid fișierele (PDF/Excel) în Google Drive - descarcă automat și deschide Drive pentru upload.
           </Typography>
         </Paper>
       </Stack>

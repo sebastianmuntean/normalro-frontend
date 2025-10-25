@@ -42,6 +42,7 @@ import TransformGenerator from './TransformGenerator';
 import FilterGenerator from './FilterGenerator';
 import InvoiceCalculator from './InvoiceCalculator';
 import InvoiceGenerator from './InvoiceGenerator';
+import ProformaInvoiceGenerator from './ProformaInvoiceGenerator';
 
 export const toolComponents = {
   'base64-converter': Base64Converter,
@@ -87,7 +88,8 @@ export const toolComponents = {
   'transform-generator': TransformGenerator,
   'filter-generator': FilterGenerator,
   'invoice-calculator': InvoiceCalculator,
-  'invoice-generator': InvoiceGenerator
+  'invoice-generator': InvoiceGenerator,
+  'proforma-invoice-generator': ProformaInvoiceGenerator
 };
 
 export default toolComponents;

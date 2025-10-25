@@ -51,16 +51,17 @@ export const getCompanyDataByCUI = async (cui, date = null) => {
         }
       };
     } else {
+      // Backend-ul returnează deja mesaje user-friendly
       return {
         success: false,
-        error: data.error || 'Nu s-au găsit date pentru acest CUI'
+        error: data.error || `Nu s-a găsit o companie cu codul fiscal ${cleanCUI}`
       };
     }
   } catch (error) {
     console.error('Eroare ANAF API:', error);
     return {
       success: false,
-      error: error.message || 'Eroare la apelarea serviciului ANAF'
+      error: `Nu s-a găsit o companie cu codul fiscal ${cleanCUI}`
     };
   }
 };
