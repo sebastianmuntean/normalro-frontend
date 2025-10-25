@@ -815,15 +815,16 @@
       "description": "Emite facturi cu date furnizor și beneficiar complete. Include integrare ANAF pentru auto-completare, calcul automat TVA, export PDF, Excel și XML (e-Factura).",
       "featured": {
         "title": "Generator Facturi",
-        "subtitle": "Sculă rapidă pentru generarea facturilor din România",
+        "subtitle": "Cel mai complet generator de facturi gratuit pentru România",
         "features": {
-          "xml": "📋 Generare XML (e-Factura) – gata de încărcare pe portal RoE-Factura (ANAF)",
-          "anaf": "🔍 Integrare ANAF – completare automată date companii după CUI",
-          "calc": "📊 Calcul automat TVA, prețuri nete și brute pe linii și total",
-          "auto": "🔢 Auto-incrementare număr factură și salvare date furnizor",
-          "multi": "💱 Suport multiple monede (RON, EUR, USD, GBP, CHF, JPY)",
-          "export": "📄 Export profesional în PDF și Excel pentru arhivare și contabilitate",
-          "secure": "🔒 Salvare securizată (criptată) a datelor în browser"
+          "xml": "📋 Export XML (e-Factura) pentru RoE-Factura (ANAF) + PDF & Excel",
+          "anaf": "🔍 Integrare ANAF – auto-completare date companii după CUI",
+          "sheets": "☁️ Backup Google Sheets – salvare automată în cloud (date, template-uri, istoric)",
+          "templates": "⚡ Template-uri produse/clienți – completare rapidă facturi",
+          "saga": "💼 Export SAGA – import direct în software contabilitate",
+          "calc": "📊 Calcul automat TVA + Multi-monedă (RON, EUR, USD, GBP, CHF, JPY)",
+          "history": "📄 Istoric facturi – căutare, editare, re-export",
+          "secure": "🔒 100% gratuit, fără tracking, date rămân la tine (browser sau Google Sheets personal)"
         },
         "cta": "Începe să emiţi facturi →"
       }

@@ -32,17 +32,17 @@ const Home = () => {
     <Box>
       <Box
         sx={{
-          py: { xs: 8, md: 12 },
+          py: { xs: 6, md: 8 },
           bgcolor: 'linear-gradient(135deg, rgba(25,118,210,0.08), rgba(255,255,255,1))'
         }}
       >
         <Container maxWidth="md">
-          <Stack spacing={3} alignItems="center" textAlign="center">
-            <AutoAwesomeIcon color="primary" sx={{ fontSize: 48 }} />
-            <Typography variant="h2" component="h1" sx={{ fontWeight: 600 }}>
+          <Stack spacing={2} alignItems="center" textAlign="center">
+            <AutoAwesomeIcon color="primary" sx={{ fontSize: 40 }} />
+            <Typography variant="h2" component="h1" sx={{ fontWeight: 600, fontSize: { xs: '2rem', md: '2.5rem' } }}>
               {t('home.title')}
             </Typography>
-            <Typography variant="h6" color="text.secondary" maxWidth={640}>
+            <Typography variant="body1" color="text.secondary" maxWidth={620} fontSize={{ xs: '0.95rem', md: '1.1rem' }}>
               {t('home.subtitle')}
             </Typography>
           </Stack>
@@ -50,18 +50,18 @@ const Home = () => {
       </Box>
 
       {/* Featured Tool - Invoice Generator */}
-      <Container sx={{ py: { xs: 6, md: 8 } }}>
+      <Container sx={{ py: { xs: 4, md: 6 } }}>
         <Paper
           elevation={0}
           sx={{
             position: 'relative',
             overflow: 'hidden',
-            borderRadius: 4,
+            borderRadius: 3,
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             boxShadow: '0 20px 60px rgba(102, 126, 234, 0.3)',
             transition: 'transform 0.3s ease, box-shadow 0.3s ease',
             '&:hover': {
-              transform: 'translateY(-8px)',
+              transform: 'translateY(-4px)',
               boxShadow: '0 30px 80px rgba(102, 126, 234, 0.4)'
             }
           }}
@@ -71,22 +71,22 @@ const Home = () => {
             sx={{
               position: 'absolute',
               inset: 0,
-              opacity: 0.1,
+              opacity: 0.08,
               background: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.08) 35px, rgba(255,255,255,.08) 70px)',
               pointerEvents: 'none'
             }}
           />
           
-          <Box sx={{ position: 'relative', p: { xs: 3, sm: 4, md: 5 } }}>
-            <Grid container spacing={4} alignItems="center">
-              {/* Left side - Icon and title */}
-              <Grid item xs={12} md={5}>
+          <Box sx={{ position: 'relative', p: { xs: 2, sm: 3, md: 4 } }}>
+            <Grid container spacing={3} alignItems="center">
+              {/* Left side - Icon, title and CTA */}
+              <Grid item xs={12} md={4}>
                 <Stack spacing={2}>
                   <Box
                     sx={{
-                      width: 80,
-                      height: 80,
-                      borderRadius: 3,
+                      width: 64,
+                      height: 64,
+                      borderRadius: 2,
                       bgcolor: 'rgba(255, 255, 255, 0.2)',
                       backdropFilter: 'blur(10px)',
                       display: 'flex',
@@ -95,27 +95,27 @@ const Home = () => {
                       boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
                     }}
                   >
-                    <ReceiptLongIcon sx={{ fontSize: 48, color: 'white' }} />
+                    <ReceiptLongIcon sx={{ fontSize: 40, color: 'white' }} />
                   </Box>
                   
                   <Typography
-                    variant="h3"
+                    variant="h4"
                     component="h2"
                     sx={{
                       fontWeight: 700,
                       color: 'white',
-                      fontSize: { xs: '1.75rem', sm: '2.25rem', md: '2.5rem' }
+                      fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' }
                     }}
                   >
                     {t('tools.invoiceGenerator.featured.title')}
                   </Typography>
                   
                   <Typography
-                    variant="h6"
+                    variant="body2"
                     sx={{
-                      color: 'rgba(255, 255, 255, 0.9)',
-                      fontWeight: 400,
-                      fontSize: { xs: '1rem', sm: '1.1rem' }
+                      color: 'rgba(255, 255, 255, 0.95)',
+                      fontWeight: 500,
+                      fontSize: { xs: '0.9rem', sm: '0.95rem' }
                     }}
                   >
                     {t('tools.invoiceGenerator.featured.subtitle')}
@@ -127,13 +127,13 @@ const Home = () => {
                     variant="contained"
                     size="large"
                     sx={{
-                      mt: 2,
+                      mt: 1,
                       bgcolor: 'white',
                       color: '#667eea',
                       fontWeight: 600,
-                      fontSize: '1.1rem',
-                      py: 1.5,
-                      px: 4,
+                      fontSize: '1rem',
+                      py: 1.2,
+                      px: 3,
                       borderRadius: 2,
                       boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
                       alignSelf: 'flex-start',
@@ -149,51 +149,54 @@ const Home = () => {
                 </Stack>
               </Grid>
 
-              {/* Right side - Features list */}
-              <Grid item xs={12} md={7}>
-                <Stack spacing={2}>
+              {/* Right side - Features grid (2 columns) */}
+              <Grid item xs={12} md={8}>
+                <Grid container spacing={1.5}>
                   {Object.values(t('tools.invoiceGenerator.featured.features', { returnObjects: true })).map(
                     (feature, index) => (
-                      <Box
-                        key={index}
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: 2,
-                          p: 2,
-                          borderRadius: 2,
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          backdropFilter: 'blur(10px)',
-                          border: '1px solid rgba(255, 255, 255, 0.2)',
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            bgcolor: 'rgba(255, 255, 255, 0.15)',
-                            transform: 'translateX(8px)'
-                          }
-                        }}
-                      >
-                        <CheckCircleIcon
+                      <Grid item xs={12} sm={6} key={index}>
+                        <Box
                           sx={{
-                            fontSize: 24,
-                            color: '#4ade80',
-                            flexShrink: 0,
-                            mt: 0.3
-                          }}
-                        />
-                        <Typography
-                          variant="body1"
-                          sx={{
-                            color: 'white',
-                            fontSize: { xs: '0.95rem', sm: '1rem' },
-                            lineHeight: 1.6
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 1.5,
+                            p: 1.5,
+                            borderRadius: 2,
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                            backdropFilter: 'blur(10px)',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            transition: 'all 0.2s ease',
+                            minHeight: 70,
+                            '&:hover': {
+                              bgcolor: 'rgba(255, 255, 255, 0.15)',
+                              transform: 'translateX(4px)',
+                              borderColor: 'rgba(255, 255, 255, 0.3)'
+                            }
                           }}
                         >
-                          {feature}
-                        </Typography>
-                      </Box>
+                          <CheckCircleIcon
+                            sx={{
+                              fontSize: 20,
+                              color: '#4ade80',
+                              flexShrink: 0,
+                              mt: 0.2
+                            }}
+                          />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: 'white',
+                              fontSize: { xs: '0.85rem', sm: '0.9rem' },
+                              lineHeight: 1.5
+                            }}
+                          >
+                            {feature}
+                          </Typography>
+                        </Box>
+                      </Grid>
                     )
                   )}
-                </Stack>
+                </Grid>
               </Grid>
             </Grid>
           </Box>
@@ -205,13 +208,13 @@ const Home = () => {
         <AdSenseAd />
       </Container>
 
-      <Container sx={{ py: { xs: 6, md: 10 } }}>
-        <Stack spacing={1} mb={4} alignItems="center" textAlign="center">
-          <BuildCircleIcon color="primary" sx={{ fontSize: 36 }} />
-          <Typography variant="h4" component="h2" sx={{ fontWeight: 600 }}>
+      <Container sx={{ py: { xs: 4, md: 6 } }}>
+        <Stack spacing={1} mb={3} alignItems="center" textAlign="center">
+          <BuildCircleIcon color="primary" sx={{ fontSize: 32 }} />
+          <Typography variant="h4" component="h2" sx={{ fontWeight: 600, fontSize: { xs: '1.5rem', md: '2rem' } }}>
             {t('home.toolsTitle')}
           </Typography>
-          <Typography variant="body1" color="text.secondary" maxWidth={620}>
+          <Typography variant="body2" color="text.secondary" maxWidth={580} fontSize={{ xs: '0.9rem', md: '0.95rem' }}>
             {t('home.toolsSubtitle')}
           </Typography>
         </Stack>
@@ -219,20 +222,20 @@ const Home = () => {
         <Box
           sx={{
             position: 'relative',
-            borderRadius: 5,
-            p: { xs: 1.5, sm: 3 },
+            borderRadius: 4,
+            p: { xs: 1.5, sm: 2 },
             backgroundColor: theme.palette.background.paper,
-            boxShadow: '0 24px 40px rgba(15, 23, 42, 0.12)'
+            boxShadow: '0 20px 35px rgba(15, 23, 42, 0.1)'
           }}
         >
           <Box
             sx={{
               columnCount: { xs: 1, sm: 2, md: 3, lg: 4 },
-              columnGap: { xs: 2, sm: 3 }
+              columnGap: { xs: 2, sm: 2.5 }
             }}
           >
             {preparedTools.map((tool, index) => {
-              const heightPalette = [220, 280, 200, 260, 240, 310];
+              const heightPalette = [180, 220, 160, 200, 190, 240];
               const gradientPalette = [
                 ['#dfe7fd', '#f7f1ff'],
                 ['#fde2e4', '#fff1d0'],
@@ -252,19 +255,19 @@ const Home = () => {
                   sx={{
                     display: 'inline-block',
                     width: '100%',
-                    mb: { xs: 2, sm: 3 },
-                    borderRadius: 5,
+                    mb: { xs: 2, sm: 2.5 },
+                    borderRadius: 4,
                     overflow: 'hidden',
                     textDecoration: 'none',
                     position: 'relative',
                     height: heightPalette[index % heightPalette.length],
                     backgroundImage: `linear-gradient(135deg, ${pair[0]}, ${pair[1]})`,
-                    boxShadow: '0 18px 32px rgba(15, 23, 42, 0.12)',
+                    boxShadow: '0 16px 28px rgba(15, 23, 42, 0.1)',
                     transition: 'transform 200ms ease, box-shadow 200ms ease',
                     color: theme.palette.common.white,
                     '&:hover': {
-                      transform: 'translateY(-6px)',
-                      boxShadow: '0 24px 40px rgba(15, 23, 42, 0.2)'
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 20px 35px rgba(15, 23, 42, 0.16)'
                     }
                   }}
                 >
