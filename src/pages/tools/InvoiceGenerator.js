@@ -26,6 +26,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon from '@mui/icons-material/Description';
+import CodeIcon from '@mui/icons-material/Code';
 import ToolLayout from '../../components/ToolLayout';
 import { getCompanyDataByCUI } from '../../services/anafService';
 import * as XLSX from 'xlsx';
@@ -33,6 +34,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import CryptoJS from 'crypto-js';
+import { create } from 'xmlbuilder2';
 
 const InvoiceGenerator = () => {
   const [loadingSupplier, setLoadingSupplier] = useState(false);
@@ -557,6 +559,186 @@ const InvoiceGenerator = () => {
     saveSupplierDataToCookie();
   };
 
+  const exportToXML = () => {
+    // Format data pentru XML e-Factura (UBL 2.1 pentru România)
+    const invoiceNumber = `${invoiceData.series || 'FAC'}${invoiceData.number || '001'}`;
+    const issueDate = invoiceData.issueDate || new Date().toISOString().split('T')[0];
+    const currencyCode = invoiceData.currency || 'RON';
+
+    // Creează documentul XML
+    const doc = create({ version: '1.0', encoding: 'UTF-8' })
+      .ele('Invoice', {
+        'xmlns': 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2',
+        'xmlns:cac': 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
+        'xmlns:cbc': 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2'
+      })
+        .ele('cbc:CustomizationID').txt('urn:cen.eu:en16931:2017#compliant#urn:efactura.mfinante.ro:CIUS-RO:1.0.1').up()
+        .ele('cbc:ID').txt(invoiceNumber).up()
+        .ele('cbc:IssueDate').txt(issueDate).up()
+        .ele('cbc:DueDate').txt(invoiceData.dueDate || issueDate).up()
+        .ele('cbc:InvoiceTypeCode').txt('380').up() // 380 = Commercial Invoice
+        .ele('cbc:DocumentCurrencyCode').txt(currencyCode).up()
+        
+        // Furnizor (AccountingSupplierParty)
+        .ele('cac:AccountingSupplierParty')
+          .ele('cac:Party')
+            .ele('cac:PartyName')
+              .ele('cbc:Name').txt(invoiceData.supplierName || '').up()
+            .up()
+            .ele('cac:PostalAddress')
+              .ele('cbc:StreetName').txt(invoiceData.supplierAddress || '').up()
+              .ele('cbc:CityName').txt(invoiceData.supplierCity || '').up()
+              .ele('cac:Country')
+                .ele('cbc:IdentificationCode').txt('RO').up()
+              .up()
+            .up()
+            .ele('cac:PartyTaxScheme')
+              .ele('cbc:CompanyID').txt('RO' + (invoiceData.supplierCUI || '')).up()
+              .ele('cac:TaxScheme')
+                .ele('cbc:ID').txt('VAT').up()
+              .up()
+            .up()
+            .ele('cac:PartyLegalEntity')
+              .ele('cbc:RegistrationName').txt(invoiceData.supplierName || '').up()
+              .ele('cbc:CompanyID').txt(invoiceData.supplierRegCom || '').up()
+            .up()
+            .ele('cac:Contact')
+              .ele('cbc:Telephone').txt(invoiceData.supplierPhone || '').up()
+              .ele('cbc:ElectronicMail').txt(invoiceData.supplierEmail || '').up()
+            .up()
+          .up()
+        .up()
+        
+        // Beneficiar (AccountingCustomerParty)
+        .ele('cac:AccountingCustomerParty')
+          .ele('cac:Party')
+            .ele('cac:PartyName')
+              .ele('cbc:Name').txt(invoiceData.clientName || '').up()
+            .up()
+            .ele('cac:PostalAddress')
+              .ele('cbc:StreetName').txt(invoiceData.clientAddress || '').up()
+              .ele('cbc:CityName').txt(invoiceData.clientCity || '').up()
+              .ele('cac:Country')
+                .ele('cbc:IdentificationCode').txt('RO').up()
+              .up()
+            .up()
+            .ele('cac:PartyTaxScheme')
+              .ele('cbc:CompanyID').txt('RO' + (invoiceData.clientCUI || '')).up()
+              .ele('cac:TaxScheme')
+                .ele('cbc:ID').txt('VAT').up()
+              .up()
+            .up()
+            .ele('cac:PartyLegalEntity')
+              .ele('cbc:RegistrationName').txt(invoiceData.clientName || '').up()
+              .ele('cbc:CompanyID').txt(invoiceData.clientRegCom || '').up()
+            .up()
+          .up()
+        .up()
+        
+        // Modalitate de plată
+        .ele('cac:PaymentMeans')
+          .ele('cbc:PaymentMeansCode').txt('30').up() // 30 = Credit transfer
+          .ele('cac:PayeeFinancialAccount')
+            .ele('cbc:ID').txt(invoiceData.supplierIBAN || '').up()
+            .ele('cbc:Name').txt(invoiceData.supplierBank || '').up()
+          .up()
+        .up();
+
+    // Adaugă grupuri TVA
+    const vatGroups = {};
+    lines.forEach(line => {
+      const vatRate = parseFloat(line.vatRate) || 0;
+      const taxableAmount = parseFloat(calculateLineTotal(line, 'net')) || 0;
+      const taxAmount = parseFloat(calculateLineTotal(line, 'vat')) || 0;
+      
+      if (!vatGroups[vatRate]) {
+        vatGroups[vatRate] = { taxableAmount: 0, taxAmount: 0 };
+      }
+      vatGroups[vatRate].taxableAmount += taxableAmount;
+      vatGroups[vatRate].taxAmount += taxAmount;
+    });
+
+    // TaxTotal
+    const taxTotal = doc.root().ele('cac:TaxTotal')
+      .ele('cbc:TaxAmount', { currencyID: currencyCode }).txt(totals.vat).up();
+
+    Object.entries(vatGroups).forEach(([rate, amounts]) => {
+      taxTotal.ele('cac:TaxSubtotal')
+        .ele('cbc:TaxableAmount', { currencyID: currencyCode }).txt(amounts.taxableAmount.toFixed(2)).up()
+        .ele('cbc:TaxAmount', { currencyID: currencyCode }).txt(amounts.taxAmount.toFixed(2)).up()
+        .ele('cac:TaxCategory')
+          .ele('cbc:ID').txt('S').up() // S = Standard rate
+          .ele('cbc:Percent').txt(rate).up()
+          .ele('cac:TaxScheme')
+            .ele('cbc:ID').txt('VAT').up()
+          .up()
+        .up()
+      .up();
+    });
+
+    // LegalMonetaryTotal
+    doc.root()
+      .ele('cac:LegalMonetaryTotal')
+        .ele('cbc:LineExtensionAmount', { currencyID: currencyCode }).txt(totals.net).up()
+        .ele('cbc:TaxExclusiveAmount', { currencyID: currencyCode }).txt(totals.net).up()
+        .ele('cbc:TaxInclusiveAmount', { currencyID: currencyCode }).txt(totals.gross).up()
+        .ele('cbc:PayableAmount', { currencyID: currencyCode }).txt(totals.gross).up()
+      .up();
+
+    // InvoiceLines
+    lines.forEach((line, index) => {
+      const lineNet = parseFloat(calculateLineTotal(line, 'net')) || 0;
+      const lineVat = parseFloat(calculateLineTotal(line, 'vat')) || 0;
+      const lineGross = parseFloat(calculateLineTotal(line, 'gross')) || 0;
+      const qty = parseFloat(line.quantity) || 0;
+      const unitPrice = parseFloat(line.unitNetPrice) || 0;
+      const vatRate = parseFloat(line.vatRate) || 0;
+
+      doc.root().ele('cac:InvoiceLine')
+        .ele('cbc:ID').txt(index + 1).up()
+        .ele('cbc:InvoicedQuantity', { unitCode: 'EA' }).txt(qty).up() // EA = Each (unit)
+        .ele('cbc:LineExtensionAmount', { currencyID: currencyCode }).txt(lineNet.toFixed(2)).up()
+        .ele('cac:Item')
+          .ele('cbc:Name').txt(line.product || 'Produs/Serviciu').up()
+        .up()
+        .ele('cac:Price')
+          .ele('cbc:PriceAmount', { currencyID: currencyCode }).txt(unitPrice.toFixed(2)).up()
+        .up()
+        .ele('cac:TaxTotal')
+          .ele('cbc:TaxAmount', { currencyID: currencyCode }).txt(lineVat.toFixed(2)).up()
+          .ele('cac:TaxSubtotal')
+            .ele('cbc:TaxableAmount', { currencyID: currencyCode }).txt(lineNet.toFixed(2)).up()
+            .ele('cbc:TaxAmount', { currencyID: currencyCode }).txt(lineVat.toFixed(2)).up()
+            .ele('cac:TaxCategory')
+              .ele('cbc:ID').txt('S').up()
+              .ele('cbc:Percent').txt(vatRate).up()
+              .ele('cac:TaxScheme')
+                .ele('cbc:ID').txt('VAT').up()
+              .up()
+            .up()
+          .up()
+        .up()
+      .up();
+    });
+
+    // Generează XML string
+    const xmlString = doc.end({ prettyPrint: true });
+
+    // Creează blob și descarcă
+    const blob = new Blob([xmlString], { type: 'application/xml' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `efactura_${invoiceData.series || 'FAC'}_${invoiceData.number || '001'}_${issueDate}.xml`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    // Salvează datele în cookie dacă este consimțământ
+    saveSupplierDataToCookie();
+  };
+
   return (
     <ToolLayout
       title="Generator Factură Completă"
@@ -1022,6 +1204,15 @@ const InvoiceGenerator = () => {
                 >
                   Descarcă Excel
                 </Button>
+                <Button
+                  variant="contained"
+                  color="info"
+                  startIcon={<CodeIcon />}
+                  onClick={exportToXML}
+                  fullWidth
+                >
+                  Descarcă XML (e-Factura)
+                </Button>
               </Stack>
             </Grid>
           </Grid>
@@ -1037,6 +1228,8 @@ const InvoiceGenerator = () => {
             📄 <strong>PDF:</strong> Factură formatată profesional cu toate detaliile, gata de printat.
             <br />
             📊 <strong>Excel:</strong> Date tabelate, editabile în Excel/Calc pentru evidență contabilă.
+            <br />
+            📋 <strong>XML (e-Factura):</strong> Format UBL 2.1 compatibil cu sistemul RoE-Factura (ANAF), gata de încărcat direct în portal.
           </Typography>
         </Paper>
       </Stack>

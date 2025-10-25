@@ -811,7 +811,22 @@
       "title": "Invoice VAT calculator"
     },
     "invoiceGenerator": {
-      "title": "Complete invoice generator"
+      "title": "Complete invoice generator",
+      "description": "Create professional invoices with complete supplier and customer data. Includes ANAF integration for auto-complete, automatic VAT calculation, PDF, Excel and XML (e-Invoice) export.",
+      "featured": {
+        "title": "🧾 Professional Invoice Generator",
+        "subtitle": "Fast tool for generating invoices in Romania",
+        "features": {
+          "xml": "📋 XML (e-Invoice) generation – ready to upload to RoE-Invoice portal (ANAF)",
+          "anaf": "🔍 ANAF Integration – automatic company data completion by CUI",
+          "calc": "📊 Automatic VAT, net and gross price calculation on lines and totals",
+          "auto": "🔢 Auto-increment invoice number and supplier data saving",
+          "multi": "💱 Multiple currency support (RON, EUR, USD, GBP, CHF, JPY)",
+          "export": "📄 Professional PDF and Excel export for archiving and accounting",
+          "secure": "🔒 Secure (encrypted) data storage in browser"
+        },
+        "cta": "Start creating invoices →"
+      }
     }
   },
   "common": {

@@ -1,10 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Box, Container, Paper, Stack, Typography } from '@mui/material';
+import { Box, Button, Container, Paper, Stack, Typography } from '@mui/material';
+import Grid from '@mui/material/Grid';
 import { alpha, useTheme } from '@mui/material/styles';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import BuildCircleIcon from '@mui/icons-material/BuildCircle';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { tools as catalog } from '../data/tools';
 import '../App.css';
 
@@ -15,10 +18,12 @@ const Home = () => {
 
   const preparedTools = useMemo(
     () =>
-      tools.map((tool) => ({
-        ...tool,
-        route: tool.route || `/tools/${tool.slug}`
-      })),
+      tools
+        .filter((tool) => tool.slug !== 'invoice-generator') // Exclude featured tool
+        .map((tool) => ({
+          ...tool,
+          route: tool.route || `/tools/${tool.slug}`
+        })),
     [tools]
   );
 
@@ -42,6 +47,157 @@ const Home = () => {
           </Stack>
         </Container>
       </Box>
+
+      {/* Featured Tool - Invoice Generator */}
+      <Container sx={{ py: { xs: 6, md: 8 } }}>
+        <Paper
+          elevation={0}
+          sx={{
+            position: 'relative',
+            overflow: 'hidden',
+            borderRadius: 4,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            boxShadow: '0 20px 60px rgba(102, 126, 234, 0.3)',
+            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-8px)',
+              boxShadow: '0 30px 80px rgba(102, 126, 234, 0.4)'
+            }
+          }}
+        >
+          {/* Decorative background pattern */}
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              opacity: 0.1,
+              background: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.08) 35px, rgba(255,255,255,.08) 70px)',
+              pointerEvents: 'none'
+            }}
+          />
+          
+          <Box sx={{ position: 'relative', p: { xs: 3, sm: 4, md: 5 } }}>
+            <Grid container spacing={4} alignItems="center">
+              {/* Left side - Icon and title */}
+              <Grid item xs={12} md={5}>
+                <Stack spacing={2}>
+                  <Box
+                    sx={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: 3,
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      backdropFilter: 'blur(10px)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+                    }}
+                  >
+                    <ReceiptLongIcon sx={{ fontSize: 48, color: 'white' }} />
+                  </Box>
+                  
+                  <Typography
+                    variant="h3"
+                    component="h2"
+                    sx={{
+                      fontWeight: 700,
+                      color: 'white',
+                      fontSize: { xs: '1.75rem', sm: '2.25rem', md: '2.5rem' }
+                    }}
+                  >
+                    {t('tools.invoiceGenerator.featured.title')}
+                  </Typography>
+                  
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      color: 'rgba(255, 255, 255, 0.9)',
+                      fontWeight: 400,
+                      fontSize: { xs: '1rem', sm: '1.1rem' }
+                    }}
+                  >
+                    {t('tools.invoiceGenerator.featured.subtitle')}
+                  </Typography>
+
+                  <Button
+                    component={Link}
+                    to="/tools/invoice-generator"
+                    variant="contained"
+                    size="large"
+                    sx={{
+                      mt: 2,
+                      bgcolor: 'white',
+                      color: '#667eea',
+                      fontWeight: 600,
+                      fontSize: '1.1rem',
+                      py: 1.5,
+                      px: 4,
+                      borderRadius: 2,
+                      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+                      alignSelf: 'flex-start',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 255, 255, 0.95)',
+                        transform: 'scale(1.05)',
+                        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.2)'
+                      }
+                    }}
+                  >
+                    {t('tools.invoiceGenerator.featured.cta')}
+                  </Button>
+                </Stack>
+              </Grid>
+
+              {/* Right side - Features list */}
+              <Grid item xs={12} md={7}>
+                <Stack spacing={2}>
+                  {Object.values(t('tools.invoiceGenerator.featured.features', { returnObjects: true })).map(
+                    (feature, index) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 2,
+                          p: 2,
+                          borderRadius: 2,
+                          bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          backdropFilter: 'blur(10px)',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            bgcolor: 'rgba(255, 255, 255, 0.15)',
+                            transform: 'translateX(8px)'
+                          }
+                        }}
+                      >
+                        <CheckCircleIcon
+                          sx={{
+                            fontSize: 24,
+                            color: '#4ade80',
+                            flexShrink: 0,
+                            mt: 0.3
+                          }}
+                        />
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            color: 'white',
+                            fontSize: { xs: '0.95rem', sm: '1rem' },
+                            lineHeight: 1.6
+                          }}
+                        >
+                          {feature}
+                        </Typography>
+                      </Box>
+                    )
+                  )}
+                </Stack>
+              </Grid>
+            </Grid>
+          </Box>
+        </Paper>
+      </Container>
 
       <Container sx={{ py: { xs: 6, md: 10 } }}>
         <Stack spacing={1} mb={4} alignItems="center" textAlign="center">
