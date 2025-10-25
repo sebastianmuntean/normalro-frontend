@@ -23,14 +23,17 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
 const InvoiceCalculator = () => {
+  // Citește cota TVA implicită din .env (default: 21)
+  const DEFAULT_VAT_RATE = process.env.REACT_APP_DEFAULT_TVA || '21';
+  
   const [lines, setLines] = useState([
     { 
       id: 1, 
       product: '', 
       quantity: '1',
       unitNetPrice: '100.00', 
-      vatRate: '21', 
-      unitGrossPrice: '121.00' 
+      vatRate: DEFAULT_VAT_RATE, 
+      unitGrossPrice: (100 * (1 + parseFloat(process.env.REACT_APP_DEFAULT_TVA || '21') / 100)).toFixed(2)
     }
   ]);
   const [editingTotal, setEditingTotal] = useState(false);
@@ -48,7 +51,7 @@ const InvoiceCalculator = () => {
       product: '',
       quantity: '1',
       unitNetPrice: '0.00', 
-      vatRate: '21', 
+      vatRate: DEFAULT_VAT_RATE, 
       unitGrossPrice: '0.00' 
     }]);
   };

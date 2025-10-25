@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Button,
@@ -43,9 +46,24 @@ import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import HistoryIcon from '@mui/icons-material/History';
+import StarIcon from '@mui/icons-material/Star';
+import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ToolLayout from '../../components/ToolLayout';
+import InvoiceHistoryDialog from '../../components/InvoiceHistoryDialog';
+import ProductTemplateDialog from '../../components/ProductTemplateDialog';
+import ClientTemplateDialog from '../../components/ClientTemplateDialog';
+import CompanyForm from '../../components/CompanyForm';
+import GoogleSheetsSidebar from '../../components/GoogleSheetsSidebar';
+import GoogleSheetsPromptDialog from '../../components/GoogleSheetsPromptDialog';
+import ClearDataConfirmDialog from '../../components/ClearDataConfirmDialog';
 import { getCompanyDataByCUI } from '../../services/anafService';
 import googleDriveService from '../../services/googleDriveService';
+import googleSheetsService from '../../services/googleSheetsService';
+import invoiceHistoryService from '../../services/invoiceHistoryService';
+import templateService from '../../services/templateService';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
@@ -53,12 +71,26 @@ import html2canvas from 'html2canvas';
 import CryptoJS from 'crypto-js';
 
 const InvoiceGenerator = () => {
+  // Citește cota TVA implicită din .env (default: 21)
+  const DEFAULT_VAT_RATE = process.env.REACT_APP_DEFAULT_TVA || '21';
+  
   const [loadingSupplier, setLoadingSupplier] = useState(false);
   const [loadingClient, setLoadingClient] = useState(false);
   const [anafError, setAnafError] = useState('');
-  const [saveDataConsent, setSaveDataConsent] = useState(false);
+  const [saveDataConsent, setSaveDataConsent] = useState(true);
+  const [clearDataDialogOpen, setClearDataDialogOpen] = useState(false);
+  const [dataSummary, setDataSummary] = useState({});
+  
+  // State pentru Accordion-uri Sidebar
+  const [expandedAccordion, setExpandedAccordion] = useState('why-sheets'); // Prima secțiune deschisă
+  
+  // State pentru popup sugestie Google Sheets
+  const [showSheetsPrompt, setShowSheetsPrompt] = useState(false);
   
   const [invoiceData, setInvoiceData] = useState({
+    // Identificare unică
+    guid: '',
+    
     // Date factură
     series: '',
     number: '',
@@ -73,10 +105,12 @@ const InvoiceGenerator = () => {
     supplierRegCom: '',
     supplierAddress: '',
     supplierCity: '',
+    supplierCounty: '',
+    supplierCountry: 'Romania',
     supplierPhone: '',
     supplierEmail: '',
-    supplierBank: '',
-    supplierIBAN: '',
+    supplierBankAccounts: [{ bank: '', iban: '' }],
+    supplierVatPrefix: '-',
     
     // Beneficiar
     clientName: '',
@@ -84,8 +118,12 @@ const InvoiceGenerator = () => {
     clientRegCom: '',
     clientAddress: '',
     clientCity: '',
+    clientCounty: '',
+    clientCountry: 'Romania',
     clientPhone: '',
-    clientEmail: ''
+    clientEmail: '',
+    clientBankAccounts: [{ bank: '', iban: '' }],
+    clientVatPrefix: '-'
   });
 
   const [attachedFiles, setAttachedFiles] = useState([]);
@@ -94,6 +132,22 @@ const InvoiceGenerator = () => {
   // State pentru Google Drive
   const [googleDriveReady, setGoogleDriveReady] = useState(false);
   const [isUploadingToDrive, setIsUploadingToDrive] = useState(false);
+
+  // State pentru Google Sheets
+  const [googleSheetsReady, setGoogleSheetsReady] = useState(false);
+  const [googleSheetsConnected, setGoogleSheetsConnected] = useState(false);
+  const [googleSheetsId, setGoogleSheetsId] = useState('');
+  const [sheetsDialogOpen, setSheetsDialogOpen] = useState(false);
+  const [isSyncingToSheets, setIsSyncingToSheets] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('');
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+
+  // State pentru istoric facturi
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+
+  // State pentru template-uri
+  const [productTemplateDialogOpen, setProductTemplateDialogOpen] = useState(false);
+  const [clientTemplateDialogOpen, setClientTemplateDialogOpen] = useState(false);
 
   // State pentru import Excel
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -113,7 +167,7 @@ const InvoiceGenerator = () => {
       product: '',
       quantity: '1',
       unitNetPrice: '0.00',
-      vatRate: '21',
+      vatRate: DEFAULT_VAT_RATE,
       unitGrossPrice: '0.00'
     }
   ]);
@@ -158,27 +212,38 @@ const InvoiceGenerator = () => {
   const saveSupplierDataToCookie = () => {
     if (!saveDataConsent) return;
 
-    // Extrage cota de TVA din prima linie (dacă există)
-    const defaultVatRate = lines.length > 0 ? lines[0].vatRate : '21';
+    // Extrage cota de TVA din prima linie (dacă există, altfel folosește .env)
+    const defaultVatRate = lines.length > 0 ? lines[0].vatRate : DEFAULT_VAT_RATE;
 
+    // Salvează toate datele curente ale furnizorului + setări factură
     const dataToSave = {
+      // Setări factură
       series: invoiceData.series,
       number: invoiceData.number,
       currency: invoiceData.currency,
       defaultVatRate: defaultVatRate,
+      
+      // Date furnizor (complete)
       supplierName: invoiceData.supplierName,
       supplierCUI: invoiceData.supplierCUI,
       supplierRegCom: invoiceData.supplierRegCom,
       supplierAddress: invoiceData.supplierAddress,
       supplierCity: invoiceData.supplierCity,
+      supplierCounty: invoiceData.supplierCounty,
+      supplierCountry: invoiceData.supplierCountry,
       supplierPhone: invoiceData.supplierPhone,
       supplierEmail: invoiceData.supplierEmail,
-      supplierBank: invoiceData.supplierBank,
-      supplierIBAN: invoiceData.supplierIBAN
+      supplierVatPrefix: invoiceData.supplierVatPrefix,
+      supplierBankAccounts: invoiceData.supplierBankAccounts,
+      
+      // Timestamp pentru urmărire
+      lastSaved: new Date().toISOString()
     };
 
     const encryptedData = encryptData(dataToSave);
-    setCookie(COOKIE_NAME, encryptedData, 90); // 90 zile
+    setCookie(COOKIE_NAME, encryptedData, 90); // Resetează la 90 zile de fiecare dată
+    
+    console.log('✅ Date furnizor salvate în cookie (expirare resetată la 90 zile)');
   };
 
   const incrementInvoiceNumber = (numberStr) => {
@@ -214,22 +279,32 @@ const InvoiceGenerator = () => {
     if (data) {
       setInvoiceData(prev => ({
         ...prev,
+        // Setări factură
         series: data.series || '',
         number: incrementInvoiceNumber(data.number), // Incrementează numărul automat
         currency: data.currency || 'RON',
+        
+        // Date furnizor (complete)
         supplierName: data.supplierName || '',
         supplierCUI: data.supplierCUI || '',
         supplierRegCom: data.supplierRegCom || '',
         supplierAddress: data.supplierAddress || '',
         supplierCity: data.supplierCity || '',
+        supplierCounty: data.supplierCounty || '',
+        supplierCountry: data.supplierCountry || 'Romania',
         supplierPhone: data.supplierPhone || '',
         supplierEmail: data.supplierEmail || '',
-        supplierBank: data.supplierBank || '',
-        supplierIBAN: data.supplierIBAN || ''
+        supplierVatPrefix: data.supplierVatPrefix || '-',
+        supplierBankAccounts: data.supplierBankAccounts || [{ bank: '', iban: '' }]
       }));
       
-      // Restaurează cota de TVA din cookie
-      const savedVatRate = data.defaultVatRate || '21';
+      // Log pentru debugging
+      if (data.lastSaved) {
+        console.log(`✅ Date furnizor încărcate din cookie (ultima salvare: ${new Date(data.lastSaved).toLocaleDateString('ro-RO')})`);
+      }
+      
+      // Restaurează cota de TVA din cookie (fallback la .env)
+      const savedVatRate = data.defaultVatRate || DEFAULT_VAT_RATE;
       setLines(prevLines => 
         prevLines.map((line, index) => 
           index === 0 
@@ -262,11 +337,39 @@ const InvoiceGenerator = () => {
       }
     };
 
+    // Inițializează Google Sheets API
+    const initGoogleSheets = async () => {
+      try {
+        await googleSheetsService.initializeGapi();
+        googleSheetsService.initializeGis();
+        
+        if (googleSheetsService.isConfigured()) {
+          setGoogleSheetsReady(true);
+          
+          // Încarcă Spreadsheet ID salvat
+          const savedId = googleSheetsService.loadSpreadsheetId();
+          if (savedId) {
+            setGoogleSheetsId(savedId);
+            setGoogleSheetsConnected(true);
+            console.log('✅ Google Sheets conectat:', savedId);
+            
+            // Sincronizare automată în background (fără UI blocking)
+            syncInBackground();
+          }
+        } else {
+          console.warn('Google Sheets nu este configurat. Setează REACT_APP_GOOGLE_CLIENT_ID și REACT_APP_GOOGLE_API_KEY în .env');
+        }
+      } catch (error) {
+        console.error('Eroare inițializare Google Sheets:', error);
+      }
+    };
+
     // Așteaptă încărcarea scripturilor Google
     const checkGoogleLoaded = setInterval(() => {
       if (window.gapi && window.google) {
         clearInterval(checkGoogleLoaded);
         initGoogleDrive();
+        initGoogleSheets();
       }
     }, 100);
 
@@ -276,6 +379,46 @@ const InvoiceGenerator = () => {
     return () => clearInterval(checkGoogleLoaded);
   }, []);
 
+  // Sincronizare periodică în background (la fiecare 5 minute)
+  useEffect(() => {
+    if (!googleSheetsConnected) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        console.log('⏰ Sincronizare periodică în background...');
+        await syncInBackground();
+        setLastSyncTime(new Date().toLocaleTimeString('ro-RO'));
+      } catch (error) {
+        console.log('ℹ️ Sincronizare periodică eșuată:', error.message);
+      }
+    }, 5 * 60 * 1000); // 5 minute
+
+    return () => clearInterval(intervalId);
+  }, [googleSheetsConnected]);
+
+  // Verifică dacă să afișeze popup-ul de sugestie Google Sheets
+  useEffect(() => {
+    // Așteaptă să se inițializeze Google Sheets API
+    if (!googleSheetsReady) return;
+
+    // Verifică cookie-ul "nu îmi mai aminti"
+    const dontShowAgain = getCookie('normalro_dont_show_sheets_prompt');
+    if (dontShowAgain === 'true') {
+      console.log('⏭️ Nu afișez popup Google Sheets (utilizatorul a ales "Nu îmi mai aminti")');
+      return;
+    }
+
+    // Dacă nu e conectat la Google Sheets, afișează popup-ul după 2 secunde
+    if (!googleSheetsConnected) {
+      const timer = setTimeout(() => {
+        setShowSheetsPrompt(true);
+        console.log('💡 Afișez popup sugestie Google Sheets');
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [googleSheetsReady, googleSheetsConnected]);
+
   const formatNumber = (value) => {
     const num = parseFloat(value);
     return isNaN(num) ? '0.00' : num.toFixed(2);
@@ -284,6 +427,56 @@ const InvoiceGenerator = () => {
   const handleInvoiceChange = (field) => (e) => {
     setInvoiceData({ ...invoiceData, [field]: e.target.value });
     setAnafError('');
+  };
+
+  // Handlers pentru conturi bancare Furnizor
+  const handleAddSupplierBankAccount = () => {
+    setInvoiceData({
+      ...invoiceData,
+      supplierBankAccounts: [...invoiceData.supplierBankAccounts, { bank: '', iban: '' }]
+    });
+  };
+
+  const handleRemoveSupplierBankAccount = (index) => {
+    const updatedAccounts = invoiceData.supplierBankAccounts.filter((_, i) => i !== index);
+    setInvoiceData({
+      ...invoiceData,
+      supplierBankAccounts: updatedAccounts.length > 0 ? updatedAccounts : [{ bank: '', iban: '' }]
+    });
+  };
+
+  const handleSupplierBankAccountChange = (index, field, value) => {
+    const updatedAccounts = [...invoiceData.supplierBankAccounts];
+    updatedAccounts[index][field] = value;
+    setInvoiceData({
+      ...invoiceData,
+      supplierBankAccounts: updatedAccounts
+    });
+  };
+
+  // Handlers pentru conturi bancare Client
+  const handleAddClientBankAccount = () => {
+    setInvoiceData({
+      ...invoiceData,
+      clientBankAccounts: [...invoiceData.clientBankAccounts, { bank: '', iban: '' }]
+    });
+  };
+
+  const handleRemoveClientBankAccount = (index) => {
+    const updatedAccounts = invoiceData.clientBankAccounts.filter((_, i) => i !== index);
+    setInvoiceData({
+      ...invoiceData,
+      clientBankAccounts: updatedAccounts.length > 0 ? updatedAccounts : [{ bank: '', iban: '' }]
+    });
+  };
+
+  const handleClientBankAccountChange = (index, field, value) => {
+    const updatedAccounts = [...invoiceData.clientBankAccounts];
+    updatedAccounts[index][field] = value;
+    setInvoiceData({
+      ...invoiceData,
+      clientBankAccounts: updatedAccounts
+    });
   };
 
   const handleFileAttachment = async (e) => {
@@ -469,7 +662,7 @@ const InvoiceGenerator = () => {
         if (!product && !quantity && !unitNetPrice) return null;
 
         const netPrice = parseFloat(unitNetPrice) || 0;
-        const vat = parseFloat(vatRate) || 0; // Dacă nu are valoare, folosește 0
+        const vat = parseFloat(vatRate) || parseFloat(DEFAULT_VAT_RATE); // Fallback la .env
         const grossPrice = netPrice * (1 + vat / 100);
 
         return {
@@ -477,7 +670,7 @@ const InvoiceGenerator = () => {
           product: String(product || ''),
           quantity: String(parseFloat(quantity) || 1),
           unitNetPrice: formatNumber(netPrice),
-          vatRate: String(parseFloat(vatRate) || 0), // Default: 0%
+          vatRate: String(parseFloat(vatRate) || parseFloat(DEFAULT_VAT_RATE)), // Fallback la .env
           unitGrossPrice: formatNumber(grossPrice)
         };
       })
@@ -512,6 +705,9 @@ const InvoiceGenerator = () => {
       const result = await getCompanyDataByCUI(invoiceData.supplierCUI);
 
       if (result.success) {
+        // Verifică dacă compania este plătitoare de TVA
+        const isVatPayer = result.data.platitorTVA === true || result.data.platitorTVA === 'true';
+        
         setInvoiceData(prev => ({
           ...prev,
           supplierName: result.data.denumire,
@@ -519,7 +715,9 @@ const InvoiceGenerator = () => {
           supplierRegCom: result.data.nrRegCom,
           supplierAddress: result.data.adresaCompleta,
           supplierCity: result.data.oras,
-          supplierPhone: result.data.telefon
+          supplierCounty: result.data.judet || '',
+          supplierPhone: result.data.telefon,
+          supplierVatPrefix: isVatPayer ? 'RO' : '-'
         }));
       } else {
         setAnafError(result.error || `Nu s-a găsit o companie cu codul fiscal ${invoiceData.supplierCUI}`);
@@ -544,6 +742,9 @@ const InvoiceGenerator = () => {
       const result = await getCompanyDataByCUI(invoiceData.clientCUI);
 
       if (result.success) {
+        // Verifică dacă compania este plătitoare de TVA
+        const isVatPayer = result.data.platitorTVA === true || result.data.platitorTVA === 'true';
+        
         setInvoiceData(prev => ({
           ...prev,
           clientName: result.data.denumire,
@@ -551,7 +752,9 @@ const InvoiceGenerator = () => {
           clientRegCom: result.data.nrRegCom,
           clientAddress: result.data.adresaCompleta,
           clientCity: result.data.oras,
-          clientPhone: result.data.telefon
+          clientCounty: result.data.judet || '',
+          clientPhone: result.data.telefon,
+          clientVatPrefix: isVatPayer ? 'RO' : '-'
         }));
       } else {
         setAnafError(result.error || `Nu s-a găsit o companie cu codul fiscal ${invoiceData.clientCUI}`);
@@ -570,7 +773,7 @@ const InvoiceGenerator = () => {
       product: '',
       quantity: '1',
       unitNetPrice: '0.00',
-      vatRate: '21',
+      vatRate: DEFAULT_VAT_RATE,
       unitGrossPrice: '0.00'
     }]);
   };
@@ -647,6 +850,633 @@ const InvoiceGenerator = () => {
       return (gross * qty).toFixed(2);
     }
     return '0.00';
+  };
+
+  // Selectează un produs din template și adaugă-l ca linie nouă
+  const selectProductFromTemplate = (product) => {
+    const newLine = {
+      id: Date.now(),
+      product: product.product || '',
+      quantity: product.quantity || '1',
+      unitNetPrice: product.unitNetPrice || '0.00',
+      vatRate: product.vatRate || DEFAULT_VAT_RATE,
+      unitGrossPrice: product.unitGrossPrice || '0.00'
+    };
+    
+    setLines([...lines, newLine]);
+  };
+
+  // Selectează un client din template și completează datele
+  const selectClientFromTemplate = (client) => {
+    setInvoiceData({
+      ...invoiceData,
+      clientName: client.clientName || '',
+      clientCUI: client.clientCUI || '',
+      clientRegCom: client.clientRegCom || '',
+      clientAddress: client.clientAddress || '',
+      clientCity: client.clientCity || '',
+      clientCounty: client.clientCounty || '',
+      clientCountry: client.clientCountry || 'Romania',
+      clientPhone: client.clientPhone || '',
+      clientEmail: client.clientEmail || '',
+      clientVatPrefix: client.clientVatPrefix || 'RO'
+    });
+  };
+
+  // Salvează clientul curent ca template
+  const saveCurrentClientAsTemplate = () => {
+    if (!invoiceData.clientName) {
+      alert('Introdu mai întâi numele clientului!');
+      return;
+    }
+
+    templateService.saveClientTemplate({
+      name: invoiceData.clientName,
+      cui: invoiceData.clientCUI,
+      regCom: invoiceData.clientRegCom,
+      address: invoiceData.clientAddress,
+      city: invoiceData.clientCity,
+      county: invoiceData.clientCounty,
+      country: invoiceData.clientCountry,
+      phone: invoiceData.clientPhone,
+      email: invoiceData.clientEmail,
+      vatPrefix: invoiceData.clientVatPrefix
+    });
+
+    alert(`✅ Client "${invoiceData.clientName}" salvat în template-uri!`);
+  };
+
+  // Încarcă o factură din istoric în formular
+  const loadInvoiceFromHistory = (invoice) => {
+    // Încarcă date factură
+    setInvoiceData({
+      series: invoice.series || '',
+      number: invoice.number || '',
+      issueDate: invoice.issueDate || new Date().toISOString().split('T')[0],
+      dueDate: invoice.dueDate || '',
+      currency: invoice.currency || 'RON',
+      notes: invoice.notes || '',
+      
+      // Furnizor
+      supplierName: invoice.supplier.name || '',
+      supplierCUI: invoice.supplier.cui || '',
+      supplierRegCom: invoice.supplier.regCom || '',
+      supplierAddress: invoice.supplier.address || '',
+      supplierCity: invoice.supplier.city || '',
+      supplierCounty: invoice.supplier.county || '',
+      supplierCountry: invoice.supplier.country || 'Romania',
+      supplierPhone: invoice.supplier.phone || '',
+      supplierEmail: invoice.supplier.email || '',
+      supplierBank: invoice.supplier.bank || '',
+      supplierIBAN: invoice.supplier.iban || '',
+      supplierVatPrefix: invoice.supplier.vatPrefix || 'RO',
+      
+      // Client
+      clientName: invoice.client.name || '',
+      clientCUI: invoice.client.cui || '',
+      clientRegCom: invoice.client.regCom || '',
+      clientAddress: invoice.client.address || '',
+      clientCity: invoice.client.city || '',
+      clientCounty: invoice.client.county || '',
+      clientCountry: invoice.client.country || 'Romania',
+      clientPhone: invoice.client.phone || '',
+      clientEmail: invoice.client.email || '',
+      clientVatPrefix: invoice.client.vatPrefix || 'RO'
+    });
+
+    // Încarcă linii produse
+    if (invoice.lines && invoice.lines.length > 0) {
+      setLines(invoice.lines.map((line, index) => ({
+        id: Date.now() + index,
+        product: line.product || '',
+        quantity: line.quantity || '1',
+        unitNetPrice: line.unitNetPrice || '0.00',
+        vatRate: line.vatRate || '0',
+        unitGrossPrice: line.unitGrossPrice || '0.00'
+      })));
+    }
+
+    // Scroll la top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // ===== Funcții Popup Sugestie Google Sheets =====
+  
+  /**
+   * Gestionează "Mai târziu" - închide popup-ul
+   */
+  const handleSheetsPromptLater = () => {
+    setShowSheetsPrompt(false);
+    console.log('⏰ Utilizatorul a ales "Mai târziu"');
+  };
+
+  /**
+   * Gestionează "Conectează-te acum" - deschide creare spreadsheet
+   */
+  const handleSheetsPromptConnect = async () => {
+    setShowSheetsPrompt(false);
+    console.log('✅ Utilizatorul a ales "Conectează-te acum"');
+    await createNewSpreadsheet();
+  };
+
+  /**
+   * Gestionează "Nu îmi mai aminti" - salvează cookie și închide
+   */
+  const handleSheetsPromptNever = () => {
+    // Salvează cookie pentru 365 zile
+    const expires = new Date();
+    expires.setDate(expires.getDate() + 365);
+    document.cookie = `normalro_dont_show_sheets_prompt=true; expires=${expires.toUTCString()}; path=/`;
+    
+    setShowSheetsPrompt(false);
+    console.log('🚫 Utilizatorul a ales "Nu îmi mai aminti" - cookie salvat');
+  };
+
+  // ===== Funcții Gestionare Date Salvate =====
+  
+  /**
+   * Calculează sumarul datelor salvate în localStorage și cookie
+   */
+  const calculateDataSummary = () => {
+    const summary = {
+      cookie: {
+        hasData: false,
+        supplierName: '',
+        series: '',
+        number: '',
+        savedDate: ''
+      },
+      templates: {
+        products: 0,
+        clients: 0
+      },
+      invoices: 0,
+      googleSheets: {
+        connected: googleSheetsConnected,
+        spreadsheetId: googleSheetsId
+      }
+    };
+
+    // Verifică cookie
+    const cookieData = document.cookie.split('; ').find(row => row.startsWith('normalro_supplier_data='));
+    if (cookieData) {
+      try {
+        const data = JSON.parse(decodeURIComponent(cookieData.split('=')[1]));
+        summary.cookie.hasData = true;
+        summary.cookie.supplierName = data.supplierName || '';
+        summary.cookie.series = data.series || '';
+        summary.cookie.number = data.number || '';
+        summary.cookie.savedDate = data.savedDate || '';
+      } catch (e) {
+        console.error('Eroare citire cookie:', e);
+      }
+    }
+
+    // Verifică template-uri
+    summary.templates.products = templateService.getProductTemplates().length;
+    summary.templates.clients = templateService.getClientTemplates().length;
+
+    // Verifică istoric facturi
+    summary.invoices = invoiceHistoryService.getAllInvoices().length;
+
+    return summary;
+  };
+
+  /**
+   * Gestionează modificarea checkbox-ului de salvare date
+   */
+  const handleSaveDataConsentChange = (event) => {
+    const newValue = event.target.checked;
+
+    // Dacă utilizatorul debifează checkbox-ul
+    if (!newValue && saveDataConsent) {
+      // Calculează sumarul datelor
+      const summary = calculateDataSummary();
+      setDataSummary(summary);
+      
+      // Afișează dialogul de confirmare
+      setClearDataDialogOpen(true);
+    } else {
+      // Dacă utilizatorul bifează checkbox-ul, permite direct
+      setSaveDataConsent(newValue);
+    }
+  };
+
+  /**
+   * Confirmă și șterge toate datele salvate
+   */
+  const confirmClearData = () => {
+    try {
+      // Șterge cookie
+      document.cookie = 'normalro_supplier_data=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      console.log('🗑️ Cookie șters');
+
+      // Șterge template-uri
+      templateService.clearAllTemplates();
+      console.log('🗑️ Template-uri șterse');
+
+      // Șterge istoric facturi
+      invoiceHistoryService.clearAllInvoices();
+      console.log('🗑️ Istoric facturi șters');
+
+      // Actualizează state
+      setSaveDataConsent(false);
+      setClearDataDialogOpen(false);
+
+      alert(
+        '✅ Toate datele au fost șterse cu succes!\n\n' +
+        '• Cookie-ul cu datele furnizorului a fost șters\n' +
+        '• Template-urile de produse au fost șterse\n' +
+        '• Template-urile de clienți au fost șterse\n' +
+        '• Istoricul facturilor a fost șters\n\n' +
+        'Datele din Google Sheets rămân neschimbate.'
+      );
+
+    } catch (error) {
+      console.error('Eroare ștergere date:', error);
+      alert(
+        '❌ Eroare la ștergerea datelor!\n\n' +
+        error.message
+      );
+    }
+  };
+
+  /**
+   * Anulează ștergerea datelor
+   */
+  const cancelClearData = () => {
+    setClearDataDialogOpen(false);
+    // Checkbox-ul rămâne bifat
+  };
+
+  // ===== Funcții Google Sheets =====
+  
+  /**
+   * Sincronizare automată în background (fără UI blocking)
+   */
+  const syncInBackground = async () => {
+    try {
+      console.log('🔄 Sincronizare automată în background...');
+      
+      // Verifică dacă există token valid (fără să forțeze autorizarea)
+      const token = window.gapi.client.getToken();
+      if (!token || !token.access_token) {
+        console.log('⏭️ Nu există token valid, sări peste sincronizare automată');
+        return;
+      }
+      
+      // Sincronizează doar date furnizor (nu toate datele pentru a fi mai rapid)
+      await saveSupplierDataToSheets();
+      console.log('✅ Sincronizare automată completă (date furnizor)');
+      
+    } catch (error) {
+      // Nu afișa erori pentru sincronizarea automată (nu vrem să deranjăm utilizatorul)
+      console.log('ℹ️ Sincronizare automată eșuată (normal dacă nu e autorizat):', error.message);
+    }
+  };
+  
+  /**
+   * Creează un nou Google Spreadsheet pentru Invoice Generator
+   */
+  const createNewSpreadsheet = async () => {
+    if (!googleSheetsReady) {
+      alert('Google Sheets API nu este inițializat încă. Te rugăm să aștepți câteva secunde.');
+      return;
+    }
+
+    setIsSyncingToSheets(true);
+    setSyncStatus('Creare spreadsheet nou...');
+
+    try {
+      // Solicită autorizare
+      await googleSheetsService.requestAuthorization();
+      
+      // Creează spreadsheet-ul
+      const result = await googleSheetsService.createInvoiceSpreadsheet();
+      
+      setGoogleSheetsId(result.id);
+      setGoogleSheetsConnected(true);
+      setSyncStatus('');
+      
+      alert(
+        `✅ Spreadsheet creat cu succes!\n\n` +
+        `📄 ID: ${result.id}\n\n` +
+        `Spreadsheet-ul a fost creat cu 4 sheet-uri:\n` +
+        `• Date Furnizor\n` +
+        `• Template Produse\n` +
+        `• Template Clienți\n` +
+        `• Istoric Facturi\n\n` +
+        `Vrei să deschizi spreadsheet-ul în Google Sheets?`
+      );
+      
+      window.open(result.url, '_blank');
+      
+    } catch (error) {
+      console.error('Eroare creare spreadsheet:', error);
+      setSyncStatus('');
+      alert(
+        `❌ Eroare la crearea spreadsheet-ului!\n\n` +
+        `${error.message}\n\n` +
+        `Verifică dacă ai autorizat aplicația.`
+      );
+    } finally {
+      setIsSyncingToSheets(false);
+    }
+  };
+
+  /**
+   * Conectează un spreadsheet existent
+   */
+  const connectExistingSpreadsheet = async (spreadsheetId) => {
+    if (!googleSheetsReady) {
+      alert('Google Sheets API nu este inițializat încă.');
+      return;
+    }
+
+    setIsSyncingToSheets(true);
+    setSyncStatus('Verificare spreadsheet...');
+
+    try {
+      // Solicită autorizare
+      await googleSheetsService.requestAuthorization();
+      
+      // Validează spreadsheet-ul
+      const isValid = await googleSheetsService.validateSpreadsheet(spreadsheetId);
+      
+      if (!isValid) {
+        throw new Error('Spreadsheet-ul nu este valid sau nu ai acces la el.');
+      }
+      
+      googleSheetsService.setSpreadsheetId(spreadsheetId);
+      setGoogleSheetsId(spreadsheetId);
+      setGoogleSheetsConnected(true);
+      setSyncStatus('');
+      
+      alert(
+        `✅ Conectat cu succes!\n\n` +
+        `📄 Spreadsheet ID: ${spreadsheetId}\n\n` +
+        `Acum poți sincroniza datele cu acest spreadsheet.`
+      );
+      
+    } catch (error) {
+      console.error('Eroare conectare spreadsheet:', error);
+      setSyncStatus('');
+      alert(
+        `❌ Eroare la conectare!\n\n` +
+        `${error.message}`
+      );
+    } finally {
+      setIsSyncingToSheets(false);
+    }
+  };
+
+  /**
+   * Deconectează spreadsheet-ul
+   */
+  const disconnectSpreadsheet = () => {
+    googleSheetsService.setSpreadsheetId(null);
+    localStorage.removeItem('normalro_sheets_id');
+    setGoogleSheetsId('');
+    setGoogleSheetsConnected(false);
+    alert('✅ Spreadsheet deconectat!');
+  };
+
+  /**
+   * Salvează datele furnizorului în Google Sheets
+   */
+  const saveSupplierDataToSheets = async () => {
+    if (!googleSheetsConnected) return;
+
+    try {
+      await googleSheetsService.requestAuthorization();
+      
+      const dataToSave = {
+        guid: invoiceData.guid, // Include GUID existent dacă există
+        series: invoiceData.series,
+        number: invoiceData.number,
+        currency: invoiceData.currency,
+        defaultVatRate: lines.length > 0 ? lines[0].vatRate : DEFAULT_VAT_RATE,
+        supplierName: invoiceData.supplierName,
+        supplierCUI: invoiceData.supplierCUI,
+        supplierRegCom: invoiceData.supplierRegCom,
+        supplierAddress: invoiceData.supplierAddress,
+        supplierCity: invoiceData.supplierCity,
+        supplierCounty: invoiceData.supplierCounty,
+        supplierCountry: invoiceData.supplierCountry,
+        supplierPhone: invoiceData.supplierPhone,
+        supplierEmail: invoiceData.supplierEmail,
+        supplierVatPrefix: invoiceData.supplierVatPrefix,
+        supplierBankAccounts: invoiceData.supplierBankAccounts
+      };
+
+      const savedGuid = await googleSheetsService.saveSupplierData(dataToSave);
+      
+      // Salvează GUID-ul în invoiceData pentru următoarele salvari
+      if (savedGuid && !invoiceData.guid) {
+        setInvoiceData(prev => ({ ...prev, guid: savedGuid }));
+        console.log('🆔 GUID salvat în invoiceData:', savedGuid);
+      }
+      
+      console.log('✅ Date furnizor salvate în Google Sheets');
+      
+    } catch (error) {
+      console.error('Eroare salvare date furnizor în Sheets:', error);
+    }
+  };
+
+  /**
+   * Încarcă datele furnizorului din Google Sheets
+   */
+  const loadSupplierDataFromSheets = async () => {
+    if (!googleSheetsConnected) return;
+
+    try {
+      await googleSheetsService.requestAuthorization();
+      
+      const data = await googleSheetsService.loadSupplierData();
+      
+      if (data) {
+        setInvoiceData(prev => ({
+          ...prev,
+          guid: data.guid || '', // Încarcă GUID-ul
+          series: data.series || '',
+          number: incrementInvoiceNumber(data.number),
+          currency: data.currency || 'RON',
+          supplierName: data.supplierName || '',
+          supplierCUI: data.supplierCUI || '',
+          supplierRegCom: data.supplierRegCom || '',
+          supplierAddress: data.supplierAddress || '',
+          supplierCity: data.supplierCity || '',
+          supplierCounty: data.supplierCounty || '',
+          supplierCountry: data.supplierCountry || 'Romania',
+          supplierPhone: data.supplierPhone || '',
+          supplierEmail: data.supplierEmail || '',
+          supplierVatPrefix: data.supplierVatPrefix || 'RO',
+          supplierBankAccounts: data.supplierBankAccounts || [{ bank: '', iban: '' }]
+        }));
+
+        const savedVatRate = data.defaultVatRate || DEFAULT_VAT_RATE;
+        setLines(prevLines => 
+          prevLines.map((line, index) => 
+            index === 0 
+              ? { ...line, vatRate: savedVatRate }
+              : line
+          )
+        );
+
+        console.log('✅ Date furnizor încărcate din Google Sheets');
+      }
+    } catch (error) {
+      console.error('Eroare încărcare date furnizor din Sheets:', error);
+    }
+  };
+
+  /**
+   * Sincronizează manual toate datele din localStorage către Google Sheets
+   */
+  const syncAllDataToSheets = async () => {
+    if (!googleSheetsConnected) {
+      alert('Nu ești conectat la niciun spreadsheet Google Sheets!');
+      return;
+    }
+
+    setIsSyncingToSheets(true);
+    setSyncStatus('Sincronizare date...');
+    console.log('🔄 Începe sincronizarea...');
+
+    try {
+      console.log('🔑 Solicit autorizare...');
+      await googleSheetsService.requestAuthorization();
+      console.log('✅ Autorizare obținută');
+      
+      let stats = {
+        supplier: false,
+        products: 0,
+        clients: 0,
+        invoices: 0
+      };
+      
+      // 1. Salvează date furnizor
+      console.log('💾 Salvez date furnizor...');
+      setSyncStatus('Salvare date furnizor...');
+      await saveSupplierDataToSheets();
+      stats.supplier = true;
+      console.log('✅ Date furnizor salvate');
+      
+      // 2. Sincronizează template-uri produse
+      console.log('📦 Sincronizare template-uri produse...');
+      setSyncStatus('Sincronizare template-uri produse...');
+      const products = templateService.getProductTemplates();
+      console.log(`📦 Am găsit ${products.length} produse în localStorage`);
+      
+      for (const product of products) {
+        console.log(`📦 Salvez produs: ${product.name || product.product}`);
+        const savedGuid = await googleSheetsService.saveProductTemplate(product);
+        
+        // Salvează GUID-ul înapoi în localStorage
+        if (savedGuid && !product.guid) {
+          templateService.updateProductGuid(product.id, savedGuid);
+          console.log(`🆔 GUID salvat în localStorage pentru produs ${product.id}: ${savedGuid}`);
+        }
+        
+        stats.products++;
+      }
+      console.log(`✅ ${stats.products} produse salvate`);
+      
+      // 3. Sincronizează template-uri clienți
+      console.log('👥 Sincronizare template-uri clienți...');
+      setSyncStatus('Sincronizare template-uri clienți...');
+      const clients = templateService.getClientTemplates();
+      console.log(`👥 Am găsit ${clients.length} clienți în localStorage`);
+      
+      for (const client of clients) {
+        console.log(`👥 Salvez client: ${client.clientName || client.name}`);
+        const savedGuid = await googleSheetsService.saveClientTemplate(client);
+        
+        // Salvează GUID-ul înapoi în localStorage
+        if (savedGuid && !client.guid) {
+          templateService.updateClientGuid(client.id, savedGuid);
+          console.log(`🆔 GUID salvat în localStorage pentru client ${client.id}: ${savedGuid}`);
+        }
+        
+        stats.clients++;
+      }
+      console.log(`✅ ${stats.clients} clienți salvați`);
+      
+      // 4. Sincronizează istoric facturi
+      console.log('📄 Sincronizare istoric facturi...');
+      setSyncStatus('Sincronizare istoric facturi...');
+      const invoices = invoiceHistoryService.getAllInvoices();
+      console.log(`📄 Am găsit ${invoices.length} facturi în localStorage`);
+      
+      for (const invoice of invoices) {
+        console.log(`📄 Salvez factură: ${invoice.series} ${invoice.number}`);
+        
+        // Convertește formatul din localStorage la formatul Google Sheets
+        const invoiceForSheets = {
+          guid: invoice.guid, // Include GUID-ul existent
+          series: invoice.series,
+          number: invoice.number,
+          issueDate: invoice.issueDate,
+          dueDate: invoice.dueDate,
+          currency: invoice.currency,
+          supplierName: invoice.supplier?.name || '',
+          supplierCUI: invoice.supplier?.cui || '',
+          clientName: invoice.client?.name || '',
+          clientCUI: invoice.client?.cui || ''
+        };
+        
+        const totalsForSheets = {
+          net: invoice.totals?.net || '0.00',
+          vat: invoice.totals?.vat || '0.00',
+          gross: invoice.totals?.gross || '0.00'
+        };
+        
+        const savedGuid = await googleSheetsService.saveInvoiceToHistory(
+          invoiceForSheets, 
+          invoice.lines || [], 
+          totalsForSheets, 
+          invoice.notes || '', 
+          []
+        );
+        
+        // Salvează GUID-ul înapoi în localStorage
+        if (savedGuid && !invoice.guid) {
+          invoiceHistoryService.updateInvoiceGuid(invoice.id, savedGuid);
+          console.log(`🆔 GUID salvat în localStorage pentru factură ${invoice.id}: ${savedGuid}`);
+        }
+        
+        stats.invoices++;
+      }
+      console.log(`✅ ${stats.invoices} facturi salvate`);
+      
+           setSyncStatus('');
+           setLastSyncTime(new Date().toLocaleTimeString('ro-RO'));
+           console.log('🎉 Sincronizare completă!', stats);
+           
+           alert(
+             `✅ Sincronizare completă!\n\n` +
+             `• Date furnizor: ${stats.supplier ? 'salvate ✓' : 'nesalvate ✗'}\n` +
+             `• Template produse: ${stats.products} salvate\n` +
+             `• Template clienți: ${stats.clients} salvate\n` +
+             `• Istoric facturi: ${stats.invoices} salvate\n\n` +
+             `Toate datele au fost sincronizate cu Google Sheets.\n` +
+             `Deschide spreadsheet-ul pentru a verifica!`
+           );
+      
+    } catch (error) {
+      console.error('❌ Eroare sincronizare:', error);
+      console.error('Error details:', error);
+      setSyncStatus('');
+      alert(
+        `❌ Eroare la sincronizare!\n\n` +
+        `${error.message}\n\n` +
+        `Verifică consola browser-ului pentru detalii.`
+      );
+    } finally {
+      setIsSyncingToSheets(false);
+      console.log('🏁 Sincronizare finalizată (finally)');
+    }
   };
 
   const calculateTotals = () => {
@@ -794,6 +1624,21 @@ const InvoiceGenerator = () => {
       // Salvează datele în cookie dacă este consimțământ
       saveSupplierDataToCookie();
       
+      // Salvează în Google Sheets dacă este conectat
+      if (googleSheetsConnected) {
+        saveSupplierDataToSheets();
+        try {
+          await googleSheetsService.requestAuthorization();
+          await googleSheetsService.saveInvoiceToHistory(invoiceData, lines, totals, invoiceData.notes, attachedFiles);
+        } catch (err) {
+          console.error('Eroare salvare factură în Sheets:', err);
+        }
+      }
+      
+      // Salvează în istoric
+      invoiceHistoryService.setType('invoice');
+      invoiceHistoryService.saveInvoice(invoiceData, lines, totals, invoiceData.notes, attachedFiles);
+      
     } finally {
       // Șterge elementul temporar
       document.body.removeChild(invoiceElement);
@@ -801,45 +1646,119 @@ const InvoiceGenerator = () => {
   };
 
   const exportToExcel = () => {
-    const data = lines.map((line, index) => ({
-      'Nr.': index + 1,
-      'Produs/Serviciu': line.product || '-',
-      'Cantitate': line.quantity,
-      'Preț net unitar': line.unitNetPrice,
-      'TVA %': line.vatRate,
-      'Suma TVA': calculateLineVat(line),
-      'Preț brut unitar': line.unitGrossPrice,
-      'Total net': calculateLineTotal(line, 'net'),
-      'Total TVA': calculateLineTotal(line, 'vat'),
-      'Total brut': calculateLineTotal(line, 'gross')
-    }));
-
-    data.push({
-      'Nr.': '',
-      'Produs/Serviciu': 'TOTAL FACTURĂ',
-      'Cantitate': '',
-      'Preț net unitar': '',
-      'TVA %': '',
-      'Suma TVA': '',
-      'Preț brut unitar': '',
-      'Total net': totals.net,
-      'Total TVA': totals.vat,
-      'Total brut': totals.gross
+    const excelData = [];
+    
+    // Header factură
+    excelData.push(['FACTURĂ']);
+    excelData.push([]);
+    excelData.push(['Serie', invoiceData.series || '-', '', 'Număr', invoiceData.number || '-']);
+    excelData.push(['Data emitere', invoiceData.issueDate || '-', '', 'Data scadență', invoiceData.dueDate || '-']);
+    excelData.push(['Monedă', invoiceData.currency || 'RON']);
+    excelData.push([]);
+    
+    // Date furnizor
+    excelData.push(['FURNIZOR']);
+    excelData.push(['Nume', invoiceData.supplierName || '-']);
+    excelData.push(['CUI', invoiceData.supplierCUI || '-']);
+    excelData.push(['Reg Com', invoiceData.supplierRegCom || '-']);
+    excelData.push(['Adresă', invoiceData.supplierAddress || '-']);
+    excelData.push(['Oraș', invoiceData.supplierCity || '-']);
+    excelData.push(['Telefon', invoiceData.supplierPhone || '-']);
+    excelData.push(['Email', invoiceData.supplierEmail || '-']);
+    excelData.push(['Bancă', invoiceData.supplierBank || '-']);
+    excelData.push(['IBAN', invoiceData.supplierIBAN || '-']);
+    excelData.push([]);
+    
+    // Date client
+    excelData.push(['BENEFICIAR']);
+    excelData.push(['Nume', invoiceData.clientName || '-']);
+    excelData.push(['CUI', invoiceData.clientCUI || '-']);
+    excelData.push(['Reg Com', invoiceData.clientRegCom || '-']);
+    excelData.push(['Adresă', invoiceData.clientAddress || '-']);
+    excelData.push(['Oraș', invoiceData.clientCity || '-']);
+    excelData.push(['Telefon', invoiceData.clientPhone || '-']);
+    excelData.push(['Email', invoiceData.clientEmail || '-']);
+    excelData.push([]);
+    
+    // Linii produse - Header
+    excelData.push(['PRODUSE ȘI SERVICII']);
+    excelData.push(['Nr.', 'Denumire produs/serviciu', 'Cantitate', 'Preț net unitar', 'TVA %', 'Suma TVA', 'Preț brut unitar', 'Total net', 'Total TVA', 'Total brut']);
+    
+    // Linii produse - Date
+    lines.forEach((line, index) => {
+      excelData.push([
+        index + 1,
+        line.product || '-',
+        line.quantity,
+        formatNumber(line.unitNetPrice),
+        line.vatRate,
+        calculateLineVat(line),
+        formatNumber(line.unitGrossPrice),
+        calculateLineTotal(line, 'net'),
+        calculateLineTotal(line, 'vat'),
+        calculateLineTotal(line, 'gross')
+      ]);
     });
-
-    const worksheet = XLSX.utils.json_to_sheet(data);
+    
+    // Totaluri
+    excelData.push([]);
+    excelData.push(['', 'TOTAL FACTURĂ', '', '', '', '', '', totals.net, totals.vat, totals.gross]);
+    excelData.push([]);
+    
+    // Note (dacă există)
+    if (invoiceData.notes) {
+      excelData.push(['NOTE']);
+      excelData.push([invoiceData.notes]);
+      excelData.push([]);
+    }
+    
+    // Fișiere atașate (dacă există)
+    if (attachedFiles.length > 0) {
+      excelData.push(['FIȘIERE ATAȘATE']);
+      attachedFiles.forEach((file, index) => {
+        excelData.push([
+          `${index + 1}. ${file.name}`,
+          `${(file.size / 1024).toFixed(2)} KB`,
+          file.mimeType
+        ]);
+      });
+    }
+    
+    // Creează worksheet
+    const worksheet = XLSX.utils.aoa_to_sheet(excelData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Factură');
 
+    // Setează lățimi coloane
     worksheet['!cols'] = [
-      { wch: 5 }, { wch: 30 }, { wch: 10 }, { wch: 15 }, { wch: 8 },
-      { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
+      { wch: 8 },   // Nr.
+      { wch: 35 },  // Produs/Serviciu
+      { wch: 10 },  // Cantitate
+      { wch: 15 },  // Preț net unitar
+      { wch: 8 },   // TVA %
+      { wch: 12 },  // Suma TVA
+      { wch: 15 },  // Preț brut unitar
+      { wch: 15 },  // Total net
+      { wch: 15 },  // Total TVA
+      { wch: 15 }   // Total brut
     ];
 
-    XLSX.writeFile(workbook, `factura_${invoiceData.series || 'X'}_${invoiceData.number || '000'}_${invoiceData.issueDate}.xlsx`);
+    XLSX.writeFile(workbook, `factura_${invoiceData.series || 'FAC'}_${invoiceData.number || '001'}_${invoiceData.issueDate}.xlsx`);
     
     // Salvează datele în cookie dacă este consimțământ
     saveSupplierDataToCookie();
+    
+    // Salvează în Google Sheets dacă este conectat
+    if (googleSheetsConnected) {
+      saveSupplierDataToSheets();
+      googleSheetsService.requestAuthorization()
+        .then(() => googleSheetsService.saveInvoiceToHistory(invoiceData, lines, totals, invoiceData.notes, attachedFiles))
+        .catch(err => console.error('Eroare salvare factură în Sheets:', err));
+    }
+    
+    // Salvează în istoric
+    invoiceHistoryService.setType('invoice');
+    invoiceHistoryService.saveInvoice(invoiceData, lines, totals, invoiceData.notes, attachedFiles);
   };
 
   const validateOnANAF = () => {
@@ -1226,13 +2145,13 @@ const InvoiceGenerator = () => {
       </cac:PartyLegalEntity>
     </cac:Party>
   </cac:AccountingCustomerParty>
-  ${invoiceData.supplierIBAN ? `
+  ${invoiceData.supplierBankAccounts[0]?.iban ? `
   <!-- Modalitate de plată -->
   <cac:PaymentMeans>
     <cbc:PaymentMeansCode>30</cbc:PaymentMeansCode>
     <cac:PayeeFinancialAccount>
-      <cbc:ID>${escapeXML(invoiceData.supplierIBAN)}</cbc:ID>${invoiceData.supplierBank ? `
-      <cbc:Name>${escapeXML(invoiceData.supplierBank)}</cbc:Name>` : ''}
+      <cbc:ID>${escapeXML(invoiceData.supplierBankAccounts[0]?.iban || '')}</cbc:ID>${invoiceData.supplierBankAccounts[0]?.bank ? `
+      <cbc:Name>${escapeXML(invoiceData.supplierBankAccounts[0].bank)}</cbc:Name>` : ''}
     </cac:PayeeFinancialAccount>
   </cac:PaymentMeans>` : ''}
   
@@ -1313,6 +2232,22 @@ const InvoiceGenerator = () => {
 
     // Salvează datele în cookie dacă este consimțământ
     saveSupplierDataToCookie();
+    
+    // Salvează în Google Sheets dacă este conectat
+    if (googleSheetsConnected) {
+      saveSupplierDataToSheets();
+      googleSheetsService.requestAuthorization()
+        .then(() => googleSheetsService.saveInvoiceToHistory(invoiceData, lines, totals, invoiceData.notes, attachedFiles))
+        .catch(err => console.error('Eroare salvare factură în Sheets:', err));
+    }
+    
+    // Salvează în istoric
+    invoiceHistoryService.setType('invoice');
+    invoiceHistoryService.saveInvoice(invoiceData, lines, totals, invoiceData.notes, attachedFiles);
+  };
+
+  const handleAccordionChange = (panel) => (event, isExpanded) => {
+    setExpandedAccordion(isExpanded ? panel : false);
   };
 
   return (
@@ -1322,36 +2257,35 @@ const InvoiceGenerator = () => {
       maxWidth="xl"
       seoSlug="invoice-generator"
     >
+      {/* Eroare ANAF */}
+      {anafError && (
+        <Alert severity="error" onClose={() => setAnafError('')} sx={{ mb: 3 }}>
+          {anafError}
+        </Alert>
+      )}
+
+      {/* Sidebar Fixed Menu - Floating pe dreapta */}
+      <GoogleSheetsSidebar
+        googleSheetsReady={googleSheetsReady}
+        googleSheetsConnected={googleSheetsConnected}
+        googleSheetsId={googleSheetsId}
+        isSyncingToSheets={isSyncingToSheets}
+        syncStatus={syncStatus}
+        lastSyncTime={lastSyncTime}
+        expandedAccordion={expandedAccordion}
+        saveDataConsent={saveDataConsent}
+        onAccordionChange={handleAccordionChange}
+        onCreateSpreadsheet={createNewSpreadsheet}
+        onConnectSpreadsheet={() => setSheetsDialogOpen(true)}
+        onSyncManual={syncAllDataToSheets}
+        onDisconnect={disconnectSpreadsheet}
+        onOpenSpreadsheet={() => window.open(`https://docs.google.com/spreadsheets/d/${googleSheetsId}/edit`, '_blank')}
+        onOpenHistory={() => setHistoryDialogOpen(true)}
+        onSaveDataConsentChange={handleSaveDataConsentChange}
+      />
+
+      {/* Main Content - Full width */}
       <Stack spacing={3}>
-        {/* Eroare ANAF */}
-        {anafError && (
-          <Alert severity="error" onClose={() => setAnafError('')}>
-            {anafError}
-          </Alert>
-        )}
-
-        {/* Checkbox pentru salvarea datelor */}
-        <Paper sx={{ p: 2, bgcolor: 'info.50', borderLeft: 4, borderColor: 'info.main' }}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={saveDataConsent}
-                onChange={(e) => setSaveDataConsent(e.target.checked)}
-                color="primary"
-              />
-            }
-            label={
-              <Typography variant="body2">
-                🔒 <strong>Sunt de acord cu salvarea datelor mele într-un cookie criptat, pentru folosire ulterioară.</strong>
-                <br />
-                <Typography component="span" variant="caption" color="text.secondary" fontSize="0.75rem">
-                  Dacă bifezi această opțiune, datele furnizorului (nume, CUI, adresă, etc.), seria, numărul, moneda și cota de TVA vor fi salvate automat în browser-ul tău (criptate) pentru 90 de zile, la apăsarea butonului de descărcare. La următoarea vizită, acestea vor fi pre-completate automat, iar numărul facturii va fi incrementat automat.
-                </Typography>
-              </Typography>
-            }
-          />
-        </Paper>
-
         {/* Date factură */}
         <Card variant="outlined">
           <CardContent>
@@ -1426,203 +2360,35 @@ const InvoiceGenerator = () => {
         <Grid container spacing={2}>
           {/* Furnizor */}
           <Grid size={{ xs: 12, md: 6 }}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="h6" gutterBottom color="primary">
-                  Furnizor
-                </Typography>
-                <Paper sx={{ p: 1, mb: 2, bgcolor: 'info.50', borderLeft: 3, borderColor: 'info.main' }}>
-                  <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
-                    🔍 <strong>Auto-completare ANAF:</strong> Introdu CUI-ul și apasă pe 🔍 pentru a prelua automat datele companiei din registrul ANAF.
-                  </Typography>
-                </Paper>
-                <Stack spacing={1.5}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Nume companie *"
-                    value={invoiceData.supplierName}
-                    onChange={handleInvoiceChange('supplierName')}
-                  />
-                  <Grid container spacing={1}>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="CUI *"
-                        value={invoiceData.supplierCUI}
-                        onChange={handleInvoiceChange('supplierCUI')}
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton
-                                size="small"
-                                onClick={searchSupplierANAF}
-                                disabled={loadingSupplier}
-                                title="Caută în ANAF"
-                              >
-                                {loadingSupplier ? <CircularProgress size={20} /> : <SearchIcon />}
-                              </IconButton>
-                            </InputAdornment>
-                          )
-                        }}
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Reg. Com."
-                        value={invoiceData.supplierRegCom}
-                        onChange={handleInvoiceChange('supplierRegCom')}
-                      />
-                    </Grid>
-                  </Grid>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Adresă"
-                    value={invoiceData.supplierAddress}
-                    onChange={handleInvoiceChange('supplierAddress')}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Oraș"
-                    value={invoiceData.supplierCity}
-                    onChange={handleInvoiceChange('supplierCity')}
-                  />
-                  <Grid container spacing={1}>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Telefon"
-                        value={invoiceData.supplierPhone}
-                        onChange={handleInvoiceChange('supplierPhone')}
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Email"
-                        value={invoiceData.supplierEmail}
-                        onChange={handleInvoiceChange('supplierEmail')}
-                      />
-                    </Grid>
-                  </Grid>
-                  <Divider sx={{ my: 1 }} />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Bancă"
-                    value={invoiceData.supplierBank}
-                    onChange={handleInvoiceChange('supplierBank')}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="IBAN"
-                    value={invoiceData.supplierIBAN}
-                    onChange={handleInvoiceChange('supplierIBAN')}
-                  />
-                </Stack>
-              </CardContent>
-            </Card>
+            <CompanyForm
+              data={invoiceData}
+              onChange={handleInvoiceChange}
+              onSearch={searchSupplierANAF}
+              loading={loadingSupplier}
+              type="supplier"
+              showBankDetails={true}
+              onAddBankAccount={handleAddSupplierBankAccount}
+              onRemoveBankAccount={handleRemoveSupplierBankAccount}
+              onBankAccountChange={handleSupplierBankAccountChange}
+            />
           </Grid>
 
           {/* Beneficiar */}
           <Grid size={{ xs: 12, md: 6 }}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="h6" gutterBottom color="secondary">
-                  Beneficiar
-                </Typography>
-                <Paper sx={{ p: 1, mb: 2, bgcolor: 'secondary.50', borderLeft: 3, borderColor: 'secondary.main' }}>
-                  <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
-                    🔍 <strong>Auto-completare ANAF:</strong> Introdu CUI-ul și apasă pe 🔍 pentru date automate.
-                  </Typography>
-                </Paper>
-                <Stack spacing={1.5}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Nume companie / Persoană *"
-                    value={invoiceData.clientName}
-                    onChange={handleInvoiceChange('clientName')}
-                  />
-                  <Grid container spacing={1}>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="CUI / CNP"
-                        value={invoiceData.clientCUI}
-                        onChange={handleInvoiceChange('clientCUI')}
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton
-                                size="small"
-                                onClick={searchClientANAF}
-                                disabled={loadingClient}
-                                title="Caută în ANAF"
-                              >
-                                {loadingClient ? <CircularProgress size={20} /> : <SearchIcon />}
-                              </IconButton>
-                            </InputAdornment>
-                          )
-                        }}
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Reg. Com."
-                        value={invoiceData.clientRegCom}
-                        onChange={handleInvoiceChange('clientRegCom')}
-                      />
-                    </Grid>
-                  </Grid>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Adresă"
-                    value={invoiceData.clientAddress}
-                    onChange={handleInvoiceChange('clientAddress')}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Oraș"
-                    value={invoiceData.clientCity}
-                    onChange={handleInvoiceChange('clientCity')}
-                  />
-                  <Grid container spacing={1}>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Telefon"
-                        value={invoiceData.clientPhone}
-                        onChange={handleInvoiceChange('clientPhone')}
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Email"
-                        value={invoiceData.clientEmail}
-                        onChange={handleInvoiceChange('clientEmail')}
-                      />
-                    </Grid>
-                  </Grid>
-                </Stack>
-              </CardContent>
-            </Card>
+            <CompanyForm
+              data={invoiceData}
+              onChange={handleInvoiceChange}
+              onSearch={searchClientANAF}
+              loading={loadingClient}
+              type="client"
+              showBankDetails={true}
+              showTemplateButtons={true}
+              onTemplateSelect={() => setClientTemplateDialogOpen(true)}
+              onTemplateSave={saveCurrentClientAsTemplate}
+              onAddBankAccount={handleAddClientBankAccount}
+              onRemoveBankAccount={handleRemoveClientBankAccount}
+              onBankAccountChange={handleClientBankAccountChange}
+            />
           </Grid>
         </Grid>
 
@@ -1784,6 +2550,15 @@ const InvoiceGenerator = () => {
                   accept=".xlsx,.xls"
                   onChange={handleExcelUpload}
                 />
+              </Button>
+              <Button
+                variant="outlined"
+                color="secondary"
+                size="small"
+                startIcon={<StarIcon />}
+                onClick={() => setProductTemplateDialogOpen(true)}
+              >
+                Produse
               </Button>
             </Stack>
           </CardContent>
@@ -2140,8 +2915,120 @@ const InvoiceGenerator = () => {
             ✅ <strong>Validează XML:</strong> Butonul "Validează XML pe ANAF" descarcă XML-ul și deschide validatorul oficial ANAF pentru verificare înainte de încărcare.
             <br />
             ☁️ <strong>Google Drive:</strong> Salvează rapid fișierele (PDF/Excel) în Google Drive - descarcă automat și deschide Drive pentru upload.
+            <br />
+            📊 <strong>Google Sheets:</strong> Conectează-te la Google Sheets pentru sincronizare automată în cloud! Datele furnizorului, template-urile produse/clienți și istoricul facturilor sunt salvate automat în spreadsheet la fiecare export. Poți crea un spreadsheet nou sau conecta unul existent.
+            <br />
+            📚 <strong>Istoric:</strong> Toate facturile exportate sunt salvate automat în browser (localStorage) și opțional în Google Sheets. Click pe "Istoric Facturi" pentru a vedea, căuta și încărca facturi anterioare.
+            <br />
+            ⭐ <strong>Template-uri:</strong> Salvează produse și clienți frecvenți pentru completare rapidă. Click pe "Produse" pentru template-uri produse sau "Beneficiari" pentru clienți salvați. Template-urile sunt sincronizate automat cu Google Sheets dacă ești conectat.
+            <br />
+            🏢 <strong>Export SAGA:</strong> Din "Istoric Facturi" poți exporta facturi în formatul XML compatibil cu software-ul contabil SAGA. Filtrează facturile după interval de date sau serie/număr, apoi generează XML-ul pentru import în SAGA.
           </Typography>
         </Paper>
+
+        {/* Dialog Istoric Facturi */}
+        <InvoiceHistoryDialog
+          open={historyDialogOpen}
+          onClose={() => setHistoryDialogOpen(false)}
+          onLoadInvoice={loadInvoiceFromHistory}
+          type="invoice"
+        />
+
+        {/* Dialog Template-uri Produse */}
+        <ProductTemplateDialog
+          open={productTemplateDialogOpen}
+          onClose={() => setProductTemplateDialogOpen(false)}
+          onSelectProduct={selectProductFromTemplate}
+        />
+
+        {/* Dialog Template-uri Clienți */}
+        <ClientTemplateDialog
+          open={clientTemplateDialogOpen}
+          onClose={() => setClientTemplateDialogOpen(false)}
+          onSelectClient={selectClientFromTemplate}
+        />
+
+        {/* Dialog Conectare Google Sheets */}
+        <Dialog
+          open={sheetsDialogOpen}
+          onClose={() => setSheetsDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>
+            Conectează Spreadsheet Existent
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Ai deja un spreadsheet Google Sheets creat manual? Conectează-l aici.
+            </Typography>
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 2 }}>
+              <Alert severity="warning">
+                <strong>⚠️ Această opțiune este pentru spreadsheet-uri create manual</strong>
+                <br />
+                <br />
+                Dacă vrei să creezi un spreadsheet NOU automat cu toate sheet-urile necesare, 
+                închide acest dialog și apasă butonul <strong>"+ CREAZĂ"</strong>.
+              </Alert>
+
+              <TextField
+                fullWidth
+                label="Spreadsheet ID"
+                placeholder="ex: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+                value={googleSheetsId}
+                onChange={(e) => setGoogleSheetsId(e.target.value)}
+                helperText="Găsești ID-ul în URL-ul spreadsheet-ului: docs.google.com/spreadsheets/d/[ID]/edit"
+              />
+              <Alert severity="info">
+                <strong>Cum găsești Spreadsheet ID?</strong>
+                <br />
+                1. Deschide spreadsheet-ul în Google Sheets
+                <br />
+                2. Copiază ID-ul din URL (partea dintre /d/ și /edit)
+                <br />
+                3. Lipește ID-ul în câmpul de mai sus
+                <br />
+                <br />
+                <strong>Exemplu URL:</strong>
+                <br />
+                <code style={{ fontSize: '0.75rem' }}>
+                  https://docs.google.com/spreadsheets/d/<strong>[ID]</strong>/edit
+                </code>
+              </Alert>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setSheetsDialogOpen(false)}>
+              Anulează
+            </Button>
+            <Button
+              onClick={() => {
+                connectExistingSpreadsheet(googleSheetsId);
+                setSheetsDialogOpen(false);
+              }}
+              variant="contained"
+              disabled={!googleSheetsId || isSyncingToSheets}
+            >
+              Conectează
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog Confirmare Ștergere Date */}
+        <ClearDataConfirmDialog
+          open={clearDataDialogOpen}
+          onClose={cancelClearData}
+          onConfirm={confirmClearData}
+          dataSummary={dataSummary}
+        />
+
+        {/* Dialog Sugestie Google Sheets */}
+        <GoogleSheetsPromptDialog
+          open={showSheetsPrompt}
+          onClose={handleSheetsPromptLater}
+          onConnect={handleSheetsPromptConnect}
+          onNever={handleSheetsPromptNever}
+        />
       </Stack>
     </ToolLayout>
   );

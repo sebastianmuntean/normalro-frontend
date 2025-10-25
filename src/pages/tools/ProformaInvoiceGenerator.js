@@ -38,9 +38,18 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon from '@mui/icons-material/Description';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import HistoryIcon from '@mui/icons-material/History';
+import StarIcon from '@mui/icons-material/Star';
+import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd';
 import ToolLayout from '../../components/ToolLayout';
+import InvoiceHistoryDialog from '../../components/InvoiceHistoryDialog';
+import ProductTemplateDialog from '../../components/ProductTemplateDialog';
+import ClientTemplateDialog from '../../components/ClientTemplateDialog';
+import CompanyForm from '../../components/CompanyForm';
 import { getCompanyDataByCUI } from '../../services/anafService';
 import googleDriveService from '../../services/googleDriveService';
+import invoiceHistoryService from '../../services/invoiceHistoryService';
+import templateService from '../../services/templateService';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
@@ -48,6 +57,9 @@ import html2canvas from 'html2canvas';
 import CryptoJS from 'crypto-js';
 
 const ProformaInvoiceGenerator = () => {
+  // Citește cota TVA implicită din .env (default: 21)
+  const DEFAULT_VAT_RATE = process.env.REACT_APP_DEFAULT_TVA || '21';
+  
   const [loadingSupplier, setLoadingSupplier] = useState(false);
   const [loadingClient, setLoadingClient] = useState(false);
   const [anafError, setAnafError] = useState('');
@@ -68,10 +80,12 @@ const ProformaInvoiceGenerator = () => {
     supplierRegCom: '',
     supplierAddress: '',
     supplierCity: '',
+    supplierCounty: '',
+    supplierCountry: 'Romania',
     supplierPhone: '',
     supplierEmail: '',
-    supplierBank: '',
-    supplierIBAN: '',
+    supplierBankAccounts: [{ bank: '', iban: '' }],
+    supplierVatPrefix: '-',
     
     // Client
     clientName: '',
@@ -79,8 +93,12 @@ const ProformaInvoiceGenerator = () => {
     clientRegCom: '',
     clientAddress: '',
     clientCity: '',
+    clientCounty: '',
+    clientCountry: 'Romania',
     clientPhone: '',
-    clientEmail: ''
+    clientEmail: '',
+    clientBankAccounts: [{ bank: '', iban: '' }],
+    clientVatPrefix: '-'
   });
 
   const [lines, setLines] = useState([
@@ -89,7 +107,7 @@ const ProformaInvoiceGenerator = () => {
       product: '',
       quantity: '1',
       unitNetPrice: '0.00',
-      vatRate: '19',
+      vatRate: DEFAULT_VAT_RATE,
       unitGrossPrice: '0.00'
     }
   ]);
@@ -97,6 +115,13 @@ const ProformaInvoiceGenerator = () => {
   // State pentru Google Drive
   const [googleDriveReady, setGoogleDriveReady] = useState(false);
   const [isUploadingToDrive, setIsUploadingToDrive] = useState(false);
+
+  // State pentru istoric facturi
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+
+  // State pentru template-uri
+  const [productTemplateDialogOpen, setProductTemplateDialogOpen] = useState(false);
+  const [clientTemplateDialogOpen, setClientTemplateDialogOpen] = useState(false);
 
   // State pentru import Excel
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -147,24 +172,35 @@ const ProformaInvoiceGenerator = () => {
   const saveSupplierDataToCookie = () => {
     if (!saveDataConsent) return;
 
+    // Salvează toate datele curente ale furnizorului + setări proforma
     const dataToSave = {
+      // Setări factură proforma
       series: invoiceData.series,
       number: invoiceData.number,
       currency: invoiceData.currency,
+      defaultVatRate: lines[0]?.vatRate || DEFAULT_VAT_RATE,
+      
+      // Date furnizor (complete)
       supplierName: invoiceData.supplierName,
       supplierCUI: invoiceData.supplierCUI,
       supplierRegCom: invoiceData.supplierRegCom,
       supplierAddress: invoiceData.supplierAddress,
       supplierCity: invoiceData.supplierCity,
+      supplierCounty: invoiceData.supplierCounty,
+      supplierCountry: invoiceData.supplierCountry,
       supplierPhone: invoiceData.supplierPhone,
       supplierEmail: invoiceData.supplierEmail,
-      supplierBank: invoiceData.supplierBank,
-      supplierIBAN: invoiceData.supplierIBAN,
-      defaultVatRate: lines[0]?.vatRate || '19'
+      supplierVatPrefix: invoiceData.supplierVatPrefix,
+      supplierBankAccounts: invoiceData.supplierBankAccounts,
+      
+      // Timestamp pentru urmărire
+      lastSaved: new Date().toISOString()
     };
 
     const encrypted = encryptData(dataToSave);
-    setCookie(COOKIE_NAME, encrypted, 90);
+    setCookie(COOKIE_NAME, encrypted, 90); // Resetează la 90 zile de fiecare dată
+    
+    console.log('✅ Date furnizor salvate în cookie (expirare resetată la 90 zile)');
   };
 
   const incrementInvoiceNumber = (currentNumber) => {
@@ -193,19 +229,29 @@ const ProformaInvoiceGenerator = () => {
     
     setInvoiceData(prev => ({
       ...prev,
+      // Setări factură proforma
       series: savedData.series || 'PF',
       number: newNumber,
       currency: savedData.currency || 'RON',
+      
+      // Date furnizor (complete)
       supplierName: savedData.supplierName || '',
       supplierCUI: savedData.supplierCUI || '',
       supplierRegCom: savedData.supplierRegCom || '',
       supplierAddress: savedData.supplierAddress || '',
       supplierCity: savedData.supplierCity || '',
+      supplierCounty: savedData.supplierCounty || '',
+      supplierCountry: savedData.supplierCountry || 'Romania',
       supplierPhone: savedData.supplierPhone || '',
       supplierEmail: savedData.supplierEmail || '',
-      supplierBank: savedData.supplierBank || '',
-      supplierIBAN: savedData.supplierIBAN || ''
+      supplierVatPrefix: savedData.supplierVatPrefix || '-',
+      supplierBankAccounts: savedData.supplierBankAccounts || [{ bank: '', iban: '' }]
     }));
+    
+    // Log pentru debugging
+    if (savedData.lastSaved) {
+      console.log(`✅ Date furnizor încărcate din cookie (ultima salvare: ${new Date(savedData.lastSaved).toLocaleDateString('ro-RO')})`);
+    }
 
     if (savedData.defaultVatRate && lines[0]) {
       setLines(prevLines => {
@@ -261,6 +307,56 @@ const ProformaInvoiceGenerator = () => {
     setAnafError('');
   };
 
+  // Handlers pentru conturi bancare Furnizor
+  const handleAddSupplierBankAccount = () => {
+    setInvoiceData({
+      ...invoiceData,
+      supplierBankAccounts: [...invoiceData.supplierBankAccounts, { bank: '', iban: '' }]
+    });
+  };
+
+  const handleRemoveSupplierBankAccount = (index) => {
+    const updatedAccounts = invoiceData.supplierBankAccounts.filter((_, i) => i !== index);
+    setInvoiceData({
+      ...invoiceData,
+      supplierBankAccounts: updatedAccounts.length > 0 ? updatedAccounts : [{ bank: '', iban: '' }]
+    });
+  };
+
+  const handleSupplierBankAccountChange = (index, field, value) => {
+    const updatedAccounts = [...invoiceData.supplierBankAccounts];
+    updatedAccounts[index][field] = value;
+    setInvoiceData({
+      ...invoiceData,
+      supplierBankAccounts: updatedAccounts
+    });
+  };
+
+  // Handlers pentru conturi bancare Client
+  const handleAddClientBankAccount = () => {
+    setInvoiceData({
+      ...invoiceData,
+      clientBankAccounts: [...invoiceData.clientBankAccounts, { bank: '', iban: '' }]
+    });
+  };
+
+  const handleRemoveClientBankAccount = (index) => {
+    const updatedAccounts = invoiceData.clientBankAccounts.filter((_, i) => i !== index);
+    setInvoiceData({
+      ...invoiceData,
+      clientBankAccounts: updatedAccounts.length > 0 ? updatedAccounts : [{ bank: '', iban: '' }]
+    });
+  };
+
+  const handleClientBankAccountChange = (index, field, value) => {
+    const updatedAccounts = [...invoiceData.clientBankAccounts];
+    updatedAccounts[index][field] = value;
+    setInvoiceData({
+      ...invoiceData,
+      clientBankAccounts: updatedAccounts
+    });
+  };
+
   const searchSupplierANAF = async () => {
     if (!invoiceData.supplierCUI) {
       setAnafError('Introduceți CUI-ul furnizorului');
@@ -274,13 +370,19 @@ const ProformaInvoiceGenerator = () => {
       const result = await getCompanyDataByCUI(invoiceData.supplierCUI);
       
       if (result.success && result.data) {
+        // Verifică dacă compania este plătitoare de TVA
+        const isVatPayer = result.data.platitorTVA === true || result.data.platitorTVA === 'true';
+        
         setInvoiceData({
           ...invoiceData,
-          supplierName: result.data.name || '',
+          supplierName: result.data.denumire || '',
           supplierCUI: result.data.cui || invoiceData.supplierCUI,
-          supplierRegCom: result.data.regCom || '',
-          supplierAddress: result.data.address || '',
-          supplierCity: result.data.city || ''
+          supplierRegCom: result.data.nrRegCom || '',
+          supplierAddress: result.data.adresaCompleta || '',
+          supplierCity: result.data.oras || '',
+          supplierCounty: result.data.judet || '',
+          supplierPhone: result.data.telefon || '',
+          supplierVatPrefix: isVatPayer ? 'RO' : '-'
         });
       } else {
         setAnafError(result.error || 'Nu s-au găsit date');
@@ -305,13 +407,19 @@ const ProformaInvoiceGenerator = () => {
       const result = await getCompanyDataByCUI(invoiceData.clientCUI);
       
       if (result.success && result.data) {
+        // Verifică dacă compania este plătitoare de TVA
+        const isVatPayer = result.data.platitorTVA === true || result.data.platitorTVA === 'true';
+        
         setInvoiceData({
           ...invoiceData,
-          clientName: result.data.name || '',
+          clientName: result.data.denumire || '',
           clientCUI: result.data.cui || invoiceData.clientCUI,
-          clientRegCom: result.data.regCom || '',
-          clientAddress: result.data.address || '',
-          clientCity: result.data.city || ''
+          clientRegCom: result.data.nrRegCom || '',
+          clientAddress: result.data.adresaCompleta || '',
+          clientCity: result.data.oras || '',
+          clientCounty: result.data.judet || '',
+          clientPhone: result.data.telefon || '',
+          clientVatPrefix: isVatPayer ? 'RO' : '-'
         });
       } else {
         setAnafError(result.error || 'Nu s-au găsit date');
@@ -361,7 +469,7 @@ const ProformaInvoiceGenerator = () => {
       product: '',
       quantity: '1',
       unitNetPrice: '0.00',
-      vatRate: lines.length > 0 ? lines[0].vatRate : '19',
+      vatRate: lines.length > 0 ? lines[0].vatRate : DEFAULT_VAT_RATE,
       unitGrossPrice: '0.00'
     };
     setLines([...lines, newLine]);
@@ -393,6 +501,114 @@ const ProformaInvoiceGenerator = () => {
       return line;
     });
     setLines(newLines);
+  };
+
+  // Selectează un produs din template și adaugă-l ca linie nouă
+  const selectProductFromTemplate = (product) => {
+    const newLine = {
+      id: Date.now(),
+      product: product.product || '',
+      quantity: product.quantity || '1',
+      unitNetPrice: product.unitNetPrice || '0.00',
+      vatRate: product.vatRate || DEFAULT_VAT_RATE,
+      unitGrossPrice: product.unitGrossPrice || '0.00'
+    };
+    
+    setLines([...lines, newLine]);
+  };
+
+  // Selectează un client din template și completează datele
+  const selectClientFromTemplate = (client) => {
+    setInvoiceData({
+      ...invoiceData,
+      clientName: client.clientName || '',
+      clientCUI: client.clientCUI || '',
+      clientRegCom: client.clientRegCom || '',
+      clientAddress: client.clientAddress || '',
+      clientCity: client.clientCity || '',
+      clientCounty: client.clientCounty || '',
+      clientCountry: client.clientCountry || 'Romania',
+      clientPhone: client.clientPhone || '',
+      clientEmail: client.clientEmail || '',
+      clientVatPrefix: client.clientVatPrefix || 'RO'
+    });
+  };
+
+  // Salvează clientul curent ca template
+  const saveCurrentClientAsTemplate = () => {
+    if (!invoiceData.clientName) {
+      alert('Introdu mai întâi numele clientului!');
+      return;
+    }
+
+    templateService.saveClientTemplate({
+      name: invoiceData.clientName,
+      cui: invoiceData.clientCUI,
+      regCom: invoiceData.clientRegCom,
+      address: invoiceData.clientAddress,
+      city: invoiceData.clientCity,
+      county: invoiceData.clientCounty,
+      country: invoiceData.clientCountry,
+      phone: invoiceData.clientPhone,
+      email: invoiceData.clientEmail,
+      vatPrefix: invoiceData.clientVatPrefix
+    });
+
+    alert(`✅ Client "${invoiceData.clientName}" salvat în template-uri!`);
+  };
+
+  // Încarcă o factură din istoric în formular
+  const loadInvoiceFromHistory = (invoice) => {
+    // Încarcă date factură
+    setInvoiceData({
+      series: invoice.series || '',
+      number: invoice.number || '',
+      issueDate: invoice.issueDate || new Date().toISOString().split('T')[0],
+      validUntil: invoice.dueDate || '',
+      currency: invoice.currency || 'RON',
+      notes: invoice.notes || '',
+      
+      // Furnizor
+      supplierName: invoice.supplier.name || '',
+      supplierCUI: invoice.supplier.cui || '',
+      supplierRegCom: invoice.supplier.regCom || '',
+      supplierAddress: invoice.supplier.address || '',
+      supplierCity: invoice.supplier.city || '',
+      supplierCounty: invoice.supplier.county || '',
+      supplierCountry: invoice.supplier.country || 'Romania',
+      supplierPhone: invoice.supplier.phone || '',
+      supplierEmail: invoice.supplier.email || '',
+      supplierBank: invoice.supplier.bank || '',
+      supplierIBAN: invoice.supplier.iban || '',
+      supplierVatPrefix: invoice.supplier.vatPrefix || 'RO',
+      
+      // Client
+      clientName: invoice.client.name || '',
+      clientCUI: invoice.client.cui || '',
+      clientRegCom: invoice.client.regCom || '',
+      clientAddress: invoice.client.address || '',
+      clientCity: invoice.client.city || '',
+      clientCounty: invoice.client.county || '',
+      clientCountry: invoice.client.country || 'Romania',
+      clientPhone: invoice.client.phone || '',
+      clientEmail: invoice.client.email || '',
+      clientVatPrefix: invoice.client.vatPrefix || 'RO'
+    });
+
+    // Încarcă linii produse
+    if (invoice.lines && invoice.lines.length > 0) {
+      setLines(invoice.lines.map((line, index) => ({
+        id: Date.now() + index,
+        product: line.product || '',
+        quantity: line.quantity || '1',
+        unitNetPrice: line.unitNetPrice || '0.00',
+        vatRate: line.vatRate || '0',
+        unitGrossPrice: line.unitGrossPrice || '0.00'
+      })));
+    }
+
+    // Scroll la top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Funcții pentru import Excel
@@ -776,6 +992,10 @@ const ProformaInvoiceGenerator = () => {
       pdf.save(`factura_proforma_${invoiceData.series || 'PF'}_${invoiceData.number || '001'}_${invoiceData.issueDate}.pdf`);
       
       saveSupplierDataToCookie();
+      
+      // Salvează în istoric
+      invoiceHistoryService.setType('proforma');
+      invoiceHistoryService.saveInvoice(invoiceData, lines, totals, invoiceData.notes, []);
     } catch (error) {
       console.error('Eroare generare PDF:', error);
       alert('Eroare la generarea PDF-ului');
@@ -789,34 +1009,44 @@ const ProformaInvoiceGenerator = () => {
     
     const excelData = [];
     
+    // Header factură proforma
     excelData.push(['FACTURĂ PROFORMA']);
     excelData.push(['Document informativ, fără valoare fiscală']);
     excelData.push([]);
-    excelData.push(['Seria', invoiceData.series, 'Nr', invoiceData.number]);
-    excelData.push(['Data emitere', invoiceData.issueDate]);
-    if (invoiceData.validUntil) {
-      excelData.push(['Valabil până', invoiceData.validUntil]);
-    }
+    excelData.push(['Serie', invoiceData.series || '-', '', 'Număr', invoiceData.number || '-']);
+    excelData.push(['Data emitere', invoiceData.issueDate || '-', '', 'Valabil până', invoiceData.validUntil || '-']);
+    excelData.push(['Monedă', invoiceData.currency || 'RON']);
     excelData.push([]);
     
+    // Date furnizor complete
     excelData.push(['FURNIZOR']);
-    excelData.push(['Nume', invoiceData.supplierName]);
-    excelData.push(['CUI', invoiceData.supplierCUI]);
-    excelData.push(['Reg Com', invoiceData.supplierRegCom]);
-    excelData.push(['Adresă', invoiceData.supplierAddress]);
-    excelData.push(['Oraș', invoiceData.supplierCity]);
+    excelData.push(['Nume', invoiceData.supplierName || '-']);
+    excelData.push(['CUI', invoiceData.supplierCUI || '-']);
+    excelData.push(['Reg Com', invoiceData.supplierRegCom || '-']);
+    excelData.push(['Adresă', invoiceData.supplierAddress || '-']);
+    excelData.push(['Oraș', invoiceData.supplierCity || '-']);
+    excelData.push(['Telefon', invoiceData.supplierPhone || '-']);
+    excelData.push(['Email', invoiceData.supplierEmail || '-']);
+    excelData.push(['Bancă', invoiceData.supplierBank || '-']);
+    excelData.push(['IBAN', invoiceData.supplierIBAN || '-']);
     excelData.push([]);
     
+    // Date client complete
     excelData.push(['CLIENT']);
-    excelData.push(['Nume', invoiceData.clientName]);
-    excelData.push(['CUI', invoiceData.clientCUI]);
-    excelData.push(['Reg Com', invoiceData.clientRegCom]);
-    excelData.push(['Adresă', invoiceData.clientAddress]);
-    excelData.push(['Oraș', invoiceData.clientCity]);
+    excelData.push(['Nume', invoiceData.clientName || '-']);
+    excelData.push(['CUI', invoiceData.clientCUI || '-']);
+    excelData.push(['Reg Com', invoiceData.clientRegCom || '-']);
+    excelData.push(['Adresă', invoiceData.clientAddress || '-']);
+    excelData.push(['Oraș', invoiceData.clientCity || '-']);
+    excelData.push(['Telefon', invoiceData.clientPhone || '-']);
+    excelData.push(['Email', invoiceData.clientEmail || '-']);
     excelData.push([]);
     
-    excelData.push(['Nr.', 'Produs/Serviciu', 'Cantitate', 'Preț net unitar', 'TVA %', 'Total net', 'Total TVA', 'Total brut']);
+    // Linii produse - Header complet
+    excelData.push(['PRODUSE ȘI SERVICII']);
+    excelData.push(['Nr.', 'Denumire produs/serviciu', 'Cantitate', 'Preț net unitar', 'TVA %', 'Preț brut unitar', 'Total net', 'Total TVA', 'Total brut']);
     
+    // Linii produse - Date
     lines.forEach((line, index) => {
       excelData.push([
         index + 1,
@@ -824,22 +1054,50 @@ const ProformaInvoiceGenerator = () => {
         line.quantity,
         formatNumber(line.unitNetPrice),
         line.vatRate,
+        formatNumber(line.unitGrossPrice),
         calculateLineTotal(line, 'net'),
         calculateLineTotal(line, 'vat'),
         calculateLineTotal(line, 'gross')
       ]);
     });
     
+    // Totaluri
     excelData.push([]);
-    excelData.push(['', '', '', '', 'TOTAL', totals.net, totals.vat, totals.gross]);
+    excelData.push(['', 'TOTAL PROFORMA', '', '', '', '', totals.net, totals.vat, totals.gross]);
+    excelData.push([]);
     
+    // Note (dacă există)
+    if (invoiceData.notes) {
+      excelData.push(['NOTE']);
+      excelData.push([invoiceData.notes]);
+      excelData.push([]);
+    }
+    
+    // Creează worksheet
     const ws = XLSX.utils.aoa_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Factură Proforma');
     
+    // Setează lățimi coloane
+    ws['!cols'] = [
+      { wch: 8 },   // Nr.
+      { wch: 35 },  // Produs/Serviciu
+      { wch: 10 },  // Cantitate
+      { wch: 15 },  // Preț net unitar
+      { wch: 8 },   // TVA %
+      { wch: 15 },  // Preț brut unitar
+      { wch: 15 },  // Total net
+      { wch: 15 },  // Total TVA
+      { wch: 15 }   // Total brut
+    ];
+    
     XLSX.writeFile(wb, `factura_proforma_${invoiceData.series || 'PF'}_${invoiceData.number || '001'}_${invoiceData.issueDate}.xlsx`);
     
     saveSupplierDataToCookie();
+    
+    // Salvează în istoric
+    invoiceHistoryService.setType('proforma');
+    invoiceHistoryService.saveInvoice(invoiceData, lines, totals, invoiceData.notes, []);
   };
 
   const totals = calculateTotals();
@@ -850,23 +1108,44 @@ const ProformaInvoiceGenerator = () => {
       description="Creează facturi proforma profesionale pentru oferte și estimări de preț"
     >
       <Stack spacing={3}>
-        {/* Consimțământ salvare date */}
-        <Paper sx={{ p: 2, bgcolor: 'info.lighter', border: '1px solid', borderColor: 'info.main' }}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={saveDataConsent}
-                onChange={(e) => setSaveDataConsent(e.target.checked)}
-                color="primary"
+        {/* Consimțământ și buton istoric */}
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 9 }}>
+            <Paper sx={{ p: 2, bgcolor: 'info.lighter', border: '1px solid', borderColor: 'info.main', height: '100%' }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={saveDataConsent}
+                    onChange={(e) => setSaveDataConsent(e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Typography variant="body2">
+                    <strong>Salvează datele furnizorului</strong> (criptat în browser) pentru completare automată ulterioară
+                  </Typography>
+                }
               />
-            }
-            label={
-              <Typography variant="body2">
-                <strong>Salvează datele furnizorului</strong> (criptat în browser) pentru completare automată ulterioară
-              </Typography>
-            }
-          />
-        </Paper>
+            </Paper>
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<HistoryIcon />}
+              onClick={() => setHistoryDialogOpen(true)}
+              fullWidth
+              sx={{ height: '100%', minHeight: 60 }}
+            >
+              <Stack alignItems="center" spacing={0.5}>
+                <Typography variant="button">Istoric Proforma</Typography>
+                <Typography variant="caption">
+                  Salvate local în browser
+                </Typography>
+              </Stack>
+            </Button>
+          </Grid>
+        </Grid>
 
         {anafError && (
           <Alert severity="error" onClose={() => setAnafError('')}>
@@ -947,144 +1226,35 @@ const ProformaInvoiceGenerator = () => {
         <Grid container spacing={2}>
           {/* Furnizor */}
           <Grid size={{ xs: 12, md: 6 }}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="h6" gutterBottom color="primary">
-                  Furnizor
-                </Typography>
-                <Stack spacing={2}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="CUI"
-                    value={invoiceData.supplierCUI}
-                    onChange={handleInvoiceChange('supplierCUI')}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton onClick={searchSupplierANAF} disabled={loadingSupplier} size="small">
-                            {loadingSupplier ? <CircularProgress size={20} /> : <SearchIcon />}
-                          </IconButton>
-                        </InputAdornment>
-                      )
-                    }}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Nume companie"
-                    value={invoiceData.supplierName}
-                    onChange={handleInvoiceChange('supplierName')}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Reg Com (opțional)"
-                    value={invoiceData.supplierRegCom}
-                    onChange={handleInvoiceChange('supplierRegCom')}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Adresă"
-                    value={invoiceData.supplierAddress}
-                    onChange={handleInvoiceChange('supplierAddress')}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Oraș"
-                    value={invoiceData.supplierCity}
-                    onChange={handleInvoiceChange('supplierCity')}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Telefon (opțional)"
-                    value={invoiceData.supplierPhone}
-                    onChange={handleInvoiceChange('supplierPhone')}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Email (opțional)"
-                    value={invoiceData.supplierEmail}
-                    onChange={handleInvoiceChange('supplierEmail')}
-                  />
-                </Stack>
-              </CardContent>
-            </Card>
+            <CompanyForm
+              data={invoiceData}
+              onChange={handleInvoiceChange}
+              onSearch={searchSupplierANAF}
+              loading={loadingSupplier}
+              type="supplier"
+              showBankDetails={true}
+              onAddBankAccount={handleAddSupplierBankAccount}
+              onRemoveBankAccount={handleRemoveSupplierBankAccount}
+              onBankAccountChange={handleSupplierBankAccountChange}
+            />
           </Grid>
 
           {/* Client */}
           <Grid size={{ xs: 12, md: 6 }}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="h6" gutterBottom color="secondary">
-                  Client
-                </Typography>
-                <Stack spacing={2}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="CUI (opțional)"
-                    value={invoiceData.clientCUI}
-                    onChange={handleInvoiceChange('clientCUI')}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton onClick={searchClientANAF} disabled={loadingClient} size="small">
-                            {loadingClient ? <CircularProgress size={20} /> : <SearchIcon />}
-                          </IconButton>
-                        </InputAdornment>
-                      )
-                    }}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Nume client"
-                    value={invoiceData.clientName}
-                    onChange={handleInvoiceChange('clientName')}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Reg Com (opțional)"
-                    value={invoiceData.clientRegCom}
-                    onChange={handleInvoiceChange('clientRegCom')}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Adresă"
-                    value={invoiceData.clientAddress}
-                    onChange={handleInvoiceChange('clientAddress')}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Oraș"
-                    value={invoiceData.clientCity}
-                    onChange={handleInvoiceChange('clientCity')}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Telefon (opțional)"
-                    value={invoiceData.clientPhone}
-                    onChange={handleInvoiceChange('clientPhone')}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Email (opțional)"
-                    value={invoiceData.clientEmail}
-                    onChange={handleInvoiceChange('clientEmail')}
-                  />
-                </Stack>
-              </CardContent>
-            </Card>
+            <CompanyForm
+              data={invoiceData}
+              onChange={handleInvoiceChange}
+              onSearch={searchClientANAF}
+              loading={loadingClient}
+              type="client"
+              showBankDetails={true}
+              showTemplateButtons={true}
+              onTemplateSelect={() => setClientTemplateDialogOpen(true)}
+              onTemplateSave={saveCurrentClientAsTemplate}
+              onAddBankAccount={handleAddClientBankAccount}
+              onRemoveBankAccount={handleRemoveClientBankAccount}
+              onBankAccountChange={handleClientBankAccountChange}
+            />
           </Grid>
         </Grid>
 
@@ -1118,6 +1288,15 @@ const ProformaInvoiceGenerator = () => {
                     accept=".xlsx,.xls"
                     onChange={handleExcelUpload}
                   />
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  size="small"
+                  startIcon={<StarIcon />}
+                  onClick={() => setProductTemplateDialogOpen(true)}
+                >
+                  Produse
                 </Button>
               </Stack>
             </Box>
@@ -1483,8 +1662,34 @@ const ProformaInvoiceGenerator = () => {
             📊 <strong>Excel:</strong> Date editabile pentru ajustări rapide.
             <br />
             ☁️ <strong>Google Drive:</strong> Salvează rapid fișierele (PDF/Excel) în Google Drive - descarcă automat și deschide Drive pentru upload.
+            <br />
+            📚 <strong>Istoric:</strong> Toate facturile proforma exportate sunt salvate automat în browser. Click pe "Istoric Proforma" pentru a vedea, căuta și încărca facturi anterioare.
+            <br />
+            ⭐ <strong>Template-uri:</strong> Salvează produse și clienți frecvenți pentru completare rapidă. Click pe "Produse" sau "Beneficiari" pentru acces la template-uri salvate.
           </Typography>
         </Paper>
+
+        {/* Dialog Istoric Facturi Proforma */}
+        <InvoiceHistoryDialog
+          open={historyDialogOpen}
+          onClose={() => setHistoryDialogOpen(false)}
+          onLoadInvoice={loadInvoiceFromHistory}
+          type="proforma"
+        />
+
+        {/* Dialog Template-uri Produse */}
+        <ProductTemplateDialog
+          open={productTemplateDialogOpen}
+          onClose={() => setProductTemplateDialogOpen(false)}
+          onSelectProduct={selectProductFromTemplate}
+        />
+
+        {/* Dialog Template-uri Clienți */}
+        <ClientTemplateDialog
+          open={clientTemplateDialogOpen}
+          onClose={() => setClientTemplateDialogOpen(false)}
+          onSelectClient={selectClientFromTemplate}
+        />
       </Stack>
     </ToolLayout>
   );
