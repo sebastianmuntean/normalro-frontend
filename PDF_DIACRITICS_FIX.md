@@ -180,3 +180,4 @@ npm install pdfmake
 - Astfel toate stilurile CSS și diacriticele sunt păstrate exact
 - Performance: ~1-2 secunde pentru generare (acceptabil)
 
+

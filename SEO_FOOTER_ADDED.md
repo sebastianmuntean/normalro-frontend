@@ -129,3 +129,4 @@ SEO footer-ul va apărea discret la finalul paginii pe toate tool-urile care fol
 
 Verifică în browser: http://localhost:3000/tools/uuid-generator
 
+
