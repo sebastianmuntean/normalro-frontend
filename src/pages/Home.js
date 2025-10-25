@@ -235,7 +235,7 @@ const Home = () => {
             }}
           >
             {preparedTools.map((tool, index) => {
-              const heightPalette = [180, 220, 160, 200, 190, 240];
+              const heightPalette = [200, 240, 180, 220, 210, 260];
               const gradientPalette = [
                 ['#dfe7fd', '#f7f1ff'],
                 ['#fde2e4', '#fff1d0'],
@@ -284,33 +284,46 @@ const Home = () => {
                     sx={{
                       position: 'absolute',
                       inset: 0,
-                      background: `linear-gradient(to bottom, ${alpha('#000', 0)} 45%, ${alpha('#000', 0.45)})`,
+                      background: `linear-gradient(to bottom, ${alpha('#000', 0)} 30%, ${alpha('#000', 0.6)})`,
                       pointerEvents: 'none'
                     }}
                   />
                   <Box
                     sx={{
                       position: 'absolute',
-                      bottom: 20,
-                      left: 20,
-                      right: 20,
+                      bottom: 16,
+                      left: 16,
+                      right: 16,
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
+                      flexDirection: 'column',
+                      gap: 1
                     }}
                   >
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, letterSpacing: 0.4 }}>
+                    <Typography 
+                      variant="subtitle1" 
+                      sx={{ 
+                        fontWeight: 700, 
+                        letterSpacing: 0.3,
+                        fontSize: { xs: '0.9rem', sm: '1rem' }
+                      }}
+                    >
                       {t(tool.titleKey)}
                     </Typography>
-                    <Box
-                      sx={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: '50%',
-                        backgroundColor: alpha('#ffffff', 0.14),
-                        border: `1px solid ${alpha('#ffffff', 0.24)}`
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        color: 'rgba(255, 255, 255, 0.85)',
+                        fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                        lineHeight: 1.4,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
                       }}
-                    />
+                    >
+                      {t(tool.descriptionKey, { defaultValue: 'Descoperă această unealtă utilă' })}
+                    </Typography>
                   </Box>
                 </Paper>
               );

@@ -151,6 +151,7 @@
     },
     "unitConverter": {
       "title": "Convertor unități",
+      "description": "Convertește instant între diferite unități de măsură (lungime, greutate, temperatură).",
       "heading": "Convertiri rapide de unități",
       "instructions": "Alege categoria, unitățile și obții rezultatul instant.",
       "categories": {
@@ -193,6 +194,7 @@
     },
     "codeMinifier": {
       "title": "Minificator CSS/JS",
+      "description": "Minifică cod CSS sau JavaScript pentru a reduce dimensiunea fișierelor.",
       "heading": "Minifică CSS sau JavaScript",
       "instructions": "Lipește codul, alege formatul și obține varianta compactă.",
       "mode": {
@@ -213,6 +215,7 @@
     },
     "qrGenerator": {
       "title": "Generator cod QR",
+      "description": "Generează coduri QR instant din text, URL-uri sau date de contact.",
       "heading": "Creează coduri QR instant",
       "instructions": "Scrie un URL sau un mesaj scurt și descarcă imaginea generată.",
       "fields": {
@@ -230,6 +233,7 @@
     },
     "calculator": {
       "title": "Calculator",
+      "description": "Calculator numeric simplu pentru operații matematice de bază.",
       "heading": "Calculator numeric",
       "instructions": "Folosește tastatura sau butoanele pentru a evalua expresii rapide.",
       "fields": {
@@ -248,6 +252,7 @@
     },
     "timer": {
       "title": "Cronometru și timer",
+      "description": "Cronometru și temporizator pentru gestionarea timpului.",
       "messages": {
         "invalidDuration": "Setează o durată pozitivă înainte de a porni timer-ul."
       },
@@ -276,6 +281,7 @@
     },
     "loremIpsum": {
       "title": "Generator lorem ipsum",
+      "description": "Generează text placeholder Lorem Ipsum pentru design și prototipuri.",
       "heading": "Generează text placeholder",
       "instructions": "Alege paragrafe sau cuvinte și generează instant textul.",
       "mode": {
@@ -295,6 +301,7 @@
     },
     "colorConverter": {
       "title": "Convertor culori",
+      "description": "Convertește între formate de culori: HEX, RGB, HSL.",
       "heading": "Convertire HEX, RGB, HSL",
       "instructions": "Introdu o valoare în orice format pentru a vedea echivalențele.",
       "fields": {
@@ -313,6 +320,7 @@
     },
     "colorExtractor": {
       "title": "Extractor paletă din imagine",
+      "description": "Extrage culorile dominante din imagini și generează palete.",
       "heading": "Extrage culorile dominante",
       "instructions": "Încarcă o imagine locală și obține paleta de culori principală.",
       "actions": {
@@ -325,6 +333,7 @@
     },
     "gradientGenerator": {
       "title": "Generator gradient",
+      "description": "Creează gradiente CSS personalizate cu previzualizare live.",
       "heading": "Compune gradientul",
       "instructions": "Alege culori multiple și ajustează unghiul pentru gradient liniar sau radial.",
       "fields": {
@@ -345,6 +354,7 @@
     },
     "contrastChecker": {
       "title": "Verificator contrast",
+      "description": "Verifică contrastul culorilor pentru accesibilitate WCAG.",
       "heading": "Asigură perechi accesibile",
       "instructions": "Compară culorile de fundal și text folosind raportul de contrast WCAG.",
       "fields": {
@@ -359,6 +369,7 @@
     },
     "textCompressor": {
       "title": "Compresor text (zlib)",
+      "description": "Comprimă și decomprimă text folosind algoritmul zlib.",
       "heading": "Comprimă sau decomprimă text",
       "instructions": "Rulează compresia zlib local și copiază rezultatul Base64.",
       "mode": {
@@ -380,6 +391,7 @@
     },
     "tableGenerator": {
       "title": "Generator tabel HTML",
+      "description": "Creează tabele HTML cu cod gata de copiat.",
       "heading": "Generează un tabel",
       "instructions": "Setează numărul de rânduri și coloane, adaugă opțional antet și copiază codul.",
       "fields": {
@@ -400,6 +412,7 @@
     },
     "worldClock": {
       "title": "Ceas global",
+      "description": "Afișează ora curentă în diferite fusuri orare din lume.",
       "heading": "Urmărește mai multe fusuri orare",
       "instructions": "Adaugă orașe și vezi timpul curent pentru fiecare.",
       "fields": {
@@ -412,6 +425,7 @@
     },
     "shortcutSimulator": {
       "title": "Simulator scurtături",
+      "description": "Caută și testează scurtături de tastatură pentru diverse aplicații.",
       "heading": "Caută scurtături de tastatură",
       "instructions": "Scrie o combinație (Ctrl+Shift+K) pentru a vedea ce face în aplicațiile uzuale.",
       "fields": {
@@ -447,6 +461,7 @@
     },
     "regexGenerator": {
       "title": "Generator regex",
+      "description": "Generează și testează expresii regulate (regex) cu exemple.",
       "heading": "Generează și testează expresii regulate",
       "instructions": "Pornește de la modele uzuale și testează pe textul tău.",
       "fields": {
@@ -474,6 +489,7 @@
     },
     "timestampConverter": {
       "title": "Convertor timestamp",
+      "description": "Convertește între timestamp Unix și date lizibile.",
       "heading": "Convertește date și timestamp-uri",
       "instructions": "Transformă între secunde UNIX, șiruri ISO și formate lizibile.",
       "fields": {
@@ -490,6 +506,7 @@
     },
     "textCipher": {
       "title": "Cifru de text",
+      "description": "Criptează și decriptează text folosind cifrul Caesar.",
       "heading": "Cifru Caesar",
       "instructions": "Aplică un shift pe litere pentru a cripta sau decripta.",
       "fields": {
@@ -503,6 +520,7 @@
     },
     "uuidGenerator": {
       "title": "Generator UUID",
+      "description": "Generează identificatori unici universali (UUID) v4.",
       "heading": "Generează UUID v4",
       "instructions": "Produce șiruri UUID conforme direct în browser.",
       "actions": {
@@ -511,6 +529,7 @@
     },
     "markdownCompiler": {
       "title": "Markdown în HTML",
+      "description": "Convertește Markdown în HTML cu previzualizare live.",
       "heading": "Compilează Markdown în HTML",
       "instructions": "Scrie Markdown în stânga și vezi rezultatul HTML în dreapta.",
       "fields": {
@@ -522,6 +541,7 @@
     },
     "percentageCalculator": {
       "title": "Calculator procente",
+      "description": "Calculează rapid procentaje și variații procentuale.",
       "heading": "Rezolvă rapid procentaje",
       "instructions": "Răspunde la întrebările \"cât la sută\" sau aplică procente de creștere/scădere.",
       "fields": {
@@ -548,6 +568,7 @@
     },
     "asciiChart": {
       "title": "Grafic ASCII",
+      "description": "Transformă numere în grafice ASCII simple și vizuale.",
       "heading": "Transformă numere în bare ASCII",
       "instructions": "Introdu numere separate prin virgulă și obține un grafic text.",
       "fields": {
@@ -562,6 +583,7 @@
     },
     "palindromeChecker": {
       "title": "Verificator palindrom",
+      "description": "Verifică dacă un text este palindrom (se citește la fel invers).",
       "heading": "Verifică palindroame",
       "instructions": "Ignoră semnele de punctuație și majusculele pentru a testa fraze.",
       "fields": {
@@ -577,6 +599,7 @@
     },
     "baseConverter": {
       "title": "Convertor baze numerice",
+      "description": "Convertește numere între binar, zecimal, octal și hexazecimal.",
       "heading": "Convertire între binar, zecimal, hex",
       "instructions": "Introdu un număr într-o bază și vezi echivalentele.",
       "fields": {
@@ -591,6 +614,7 @@
     },
     "formGenerator": {
       "title": "Generator formular HTML",
+      "description": "Generează formulare HTML cu validare și stiluri CSS.",
       "heading": "Construiește rapid un formular",
       "instructions": "Adaugă câmpuri și copiază șablonul HTML/CSS.",
       "fields": {
@@ -617,6 +641,7 @@
     },
     "diceSimulator": {
       "title": "Simulator de zaruri",
+      "description": "Simulează aruncarea de zaruri virtuale (D4, D6, D8, D12, D20).",
       "heading": "Aruncă zaruri virtuale",
       "instructions": "Alege numărul de zaruri și fețe, apoi vezi rezultatele și totalul.",
       "fields": {
@@ -633,6 +658,7 @@
     },
     "textAnalyzer": {
       "title": "Analiză text",
+      "description": "Analizează text și oferă statistici detaliate despre conținut.",
       "heading": "Statistici pentru text",
       "instructions": "Vezi frecvența literelor, cuvintele comune și lungimea medie a cuvintelor.",
       "fields": {
@@ -650,6 +676,7 @@
     },
     "cssShadowGenerator": {
       "title": "Generator umbre CSS",
+      "description": "Creează umbre CSS (box-shadow) cu previzualizare live.",
       "heading": "Construiește umbre pentru box-shadow",
       "instructions": "Ajustează offset-urile, blur-ul, spread-ul și culoarea.",
       "fields": {
@@ -662,6 +689,7 @@
     },
     "cssBorderGenerator": {
       "title": "Generator bordură CSS",
+      "description": "Configurează borduri CSS cu previzualizare interactivă.",
       "heading": "Configurează borduri",
       "instructions": "Schimbă lățimea, stilul, culoarea și raza colțurilor.",
       "fields": {
@@ -676,6 +704,7 @@
     },
     "cssAnimationGenerator": {
       "title": "Generator animații CSS",
+      "description": "Creează animații CSS cu keyframes personalizabile.",
       "heading": "Compune animații cu keyframes",
       "instructions": "Setează durata, deplasarea și opacitatea pentru o animație de intrare.",
       "fields": {
@@ -696,6 +725,7 @@
     },
     "flexboxGenerator": {
       "title": "Generator layout Flexbox",
+      "description": "Generează layout-uri Flexbox CSS cu previzualizare live.",
       "heading": "Experimentează cu flexbox",
       "instructions": "Schimbă direcția, alinierea și spațiile, apoi copiază CSS-ul.",
       "fields": {
@@ -707,6 +737,7 @@
     },
     "gridGenerator": {
       "title": "Generator grilă CSS",
+      "description": "Creează layout-uri CSS Grid cu editor vizual interactiv.",
       "heading": "Planifică layout-uri pe grid",
       "instructions": "Setează coloane, rânduri, spațiere sau scrie un template personalizat.",
       "fields": {
@@ -721,6 +752,7 @@
     },
     "cssTypographyGenerator": {
       "title": "Generator tipografie",
+      "description": "Ajustează stiluri tipografice CSS (font, spacing, line-height).",
       "heading": "Ajustează stilurile de font",
       "instructions": "Configurează familia, dimensiunea, înălțimea rândului, spațiul și greutatea.",
       "fields": {
@@ -736,6 +768,7 @@
     },
     "hoverEffectGenerator": {
       "title": "Generator efecte hover",
+      "description": "Creează efecte CSS interactive la hover cu animații.",
       "heading": "Creează interacțiuni la hover",
       "instructions": "Alege un preset și copiază CSS-ul.",
       "fields": {
@@ -753,6 +786,7 @@
     },
     "backgroundGenerator": {
       "title": "Generator background",
+      "description": "Generează fundaluri CSS (culori, gradiente, pattern-uri).",
       "heading": "Generează fundaluri CSS",
       "instructions": "Comută între culori solide, gradient liniar sau radial.",
       "fields": {
@@ -769,6 +803,7 @@
     },
     "pseudoElementGenerator": {
       "title": "Generator pseudo-element",
+      "description": "Creează pseudo-elemente CSS (::before, ::after) decorative.",
       "heading": "Desenează ::before decorativ",
       "instructions": "Poziționează elemente decorative în jurul unui card.",
       "fields": {
@@ -785,6 +820,7 @@
     },
     "transformGenerator": {
       "title": "Generator transformări",
+      "description": "Combină transformări CSS (rotate, scale, translate, skew).",
       "heading": "Combină transformările CSS",
       "instructions": "Manipulează translate, scale, rotate și skew.",
       "fields": {
@@ -797,6 +833,7 @@
     },
     "filterGenerator": {
       "title": "Generator filtre",
+      "description": "Aplică filtre CSS (blur, brightness, contrast, saturation).",
       "heading": "Combină filtre CSS",
       "instructions": "Ajustează blur, luminozitate, contrast, nuanță și saturație.",
       "fields": {
@@ -808,7 +845,8 @@
       }
     },
     "invoiceCalculator": {
-      "title": "Calculator facturi TVA"
+      "title": "Calculator facturi TVA",
+      "description": "Calculează rapid totaluri facturi cu TVA și reduceri."
     },
     "invoiceGenerator": {
       "title": "Generator facturi complete",
