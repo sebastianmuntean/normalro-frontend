@@ -1,16 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Alert,
   Box,
   Button,
   Card,
   CardContent,
+  Checkbox,
   CircularProgress,
   Divider,
+  FormControl,
+  FormControlLabel,
   Grid,
   IconButton,
   InputAdornment,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   TextField,
   Typography
@@ -26,11 +32,13 @@ import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
+import CryptoJS from 'crypto-js';
 
 const InvoiceGenerator = () => {
   const [loadingSupplier, setLoadingSupplier] = useState(false);
   const [loadingClient, setLoadingClient] = useState(false);
   const [anafError, setAnafError] = useState('');
+  const [saveDataConsent, setSaveDataConsent] = useState(false);
   
   const [invoiceData, setInvoiceData] = useState({
     // Date factură
@@ -38,6 +46,7 @@ const InvoiceGenerator = () => {
     number: '',
     issueDate: new Date().toISOString().split('T')[0],
     dueDate: '',
+    currency: 'RON',
     
     // Furnizor
     supplierName: '',
@@ -70,6 +79,95 @@ const InvoiceGenerator = () => {
       unitGrossPrice: '0.00'
     }
   ]);
+
+  // Constantă pentru criptare/decriptare și numele cookie-ului
+  const ENCRYPTION_KEY = 'normalro-invoice-supplier-data-2024';
+  const COOKIE_NAME = 'normalro_invoice_supplier';
+
+  // Funcții pentru gestionarea cookie-urilor
+  const setCookie = (name, value, days) => {
+    const expires = new Date();
+    expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
+  };
+
+  const getCookie = (name) => {
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+      let c = ca[i];
+      while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+      if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+  };
+
+  const encryptData = (data) => {
+    return CryptoJS.AES.encrypt(JSON.stringify(data), ENCRYPTION_KEY).toString();
+  };
+
+  const decryptData = (encryptedData) => {
+    try {
+      const bytes = CryptoJS.AES.decrypt(encryptedData, ENCRYPTION_KEY);
+      const decryptedString = bytes.toString(CryptoJS.enc.Utf8);
+      return JSON.parse(decryptedString);
+    } catch (error) {
+      console.error('Eroare la decriptarea datelor:', error);
+      return null;
+    }
+  };
+
+  const saveSupplierDataToCookie = () => {
+    if (!saveDataConsent) return;
+
+    const dataToSave = {
+      series: invoiceData.series,
+      number: invoiceData.number,
+      currency: invoiceData.currency,
+      supplierName: invoiceData.supplierName,
+      supplierCUI: invoiceData.supplierCUI,
+      supplierRegCom: invoiceData.supplierRegCom,
+      supplierAddress: invoiceData.supplierAddress,
+      supplierCity: invoiceData.supplierCity,
+      supplierPhone: invoiceData.supplierPhone,
+      supplierEmail: invoiceData.supplierEmail,
+      supplierBank: invoiceData.supplierBank,
+      supplierIBAN: invoiceData.supplierIBAN
+    };
+
+    const encryptedData = encryptData(dataToSave);
+    setCookie(COOKIE_NAME, encryptedData, 90); // 90 zile
+  };
+
+  const loadSupplierDataFromCookie = () => {
+    const encryptedData = getCookie(COOKIE_NAME);
+    if (!encryptedData) return;
+
+    const data = decryptData(encryptedData);
+    if (data) {
+      setInvoiceData(prev => ({
+        ...prev,
+        series: data.series || '',
+        number: data.number || '',
+        currency: data.currency || 'RON',
+        supplierName: data.supplierName || '',
+        supplierCUI: data.supplierCUI || '',
+        supplierRegCom: data.supplierRegCom || '',
+        supplierAddress: data.supplierAddress || '',
+        supplierCity: data.supplierCity || '',
+        supplierPhone: data.supplierPhone || '',
+        supplierEmail: data.supplierEmail || '',
+        supplierBank: data.supplierBank || '',
+        supplierIBAN: data.supplierIBAN || ''
+      }));
+      setSaveDataConsent(true); // Bifează automat checkbox-ul dacă există date salvate
+    }
+  };
+
+  // Încarcă datele la mount
+  useEffect(() => {
+    loadSupplierDataFromCookie();
+  }, []);
 
   const formatNumber = (value) => {
     const num = parseFloat(value);
@@ -317,22 +415,22 @@ const InvoiceGenerator = () => {
                 <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${index + 1}</td>
                 <td style="border: 1px solid #ddd; padding: 6px; font-size: 9px;">${line.product || '-'}</td>
                 <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${line.quantity}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${line.unitNetPrice} RON</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${line.unitNetPrice} ${invoiceData.currency}</td>
                 <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${line.vatRate}%</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineVat(line)} RON</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${line.unitGrossPrice} RON</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'net')} RON</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'vat')} RON</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'gross')} RON</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineVat(line)} ${invoiceData.currency}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${line.unitGrossPrice} ${invoiceData.currency}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'net')} ${invoiceData.currency}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'vat')} ${invoiceData.currency}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'gross')} ${invoiceData.currency}</td>
               </tr>
             `).join('')}
           </tbody>
           <tfoot>
             <tr style="background-color: #f5f5f5; font-weight: bold;">
               <td colspan="7" style="border: 1px solid #ddd; padding: 8px; font-size: 11px; font-weight: bold;">TOTAL FACTURĂ</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.net} RON</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.vat} RON</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.gross} RON</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.net} ${invoiceData.currency}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.vat} ${invoiceData.currency}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.gross} ${invoiceData.currency}</td>
             </tr>
           </tfoot>
         </table>
@@ -367,6 +465,9 @@ const InvoiceGenerator = () => {
       
       // Salvează PDF
       pdf.save(`factura_${invoiceData.series || 'X'}_${invoiceData.number || '000'}_${invoiceData.issueDate}.pdf`);
+      
+      // Salvează datele în cookie dacă este consimțământ
+      saveSupplierDataToCookie();
       
     } finally {
       // Șterge elementul temporar
@@ -411,6 +512,9 @@ const InvoiceGenerator = () => {
     ];
 
     XLSX.writeFile(workbook, `factura_${invoiceData.series || 'X'}_${invoiceData.number || '000'}_${invoiceData.issueDate}.xlsx`);
+    
+    // Salvează datele în cookie dacă este consimțământ
+    saveSupplierDataToCookie();
   };
 
   return (
@@ -427,6 +531,28 @@ const InvoiceGenerator = () => {
             {anafError}
           </Alert>
         )}
+
+        {/* Checkbox pentru salvarea datelor */}
+        <Paper sx={{ p: 2, bgcolor: 'info.50', borderLeft: 4, borderColor: 'info.main' }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={saveDataConsent}
+                onChange={(e) => setSaveDataConsent(e.target.checked)}
+                color="primary"
+              />
+            }
+            label={
+              <Typography variant="body2">
+                🔒 <strong>Sunt de acord cu salvarea datelor mele într-un cookie criptat, pentru folosire ulterioară.</strong>
+                <br />
+                <Typography component="span" variant="caption" color="text.secondary" fontSize="0.75rem">
+                  Dacă bifezi această opțiune, datele furnizorului (nume, CUI, adresă, etc.), seria, numărul și moneda vor fi salvate automat în browser-ul tău (criptate) pentru 90 de zile, la apăsarea butonului de descărcare. La următoarea vizită, acestea vor fi pre-completate automat.
+                </Typography>
+              </Typography>
+            }
+          />
+        </Paper>
 
         {/* Date factură */}
         <Card variant="outlined">
@@ -455,7 +581,7 @@ const InvoiceGenerator = () => {
                   placeholder="ex: 001"
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -466,7 +592,7 @@ const InvoiceGenerator = () => {
                   InputLabelProps={{ shrink: true }}
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -476,6 +602,23 @@ const InvoiceGenerator = () => {
                   onChange={handleInvoiceChange('dueDate')}
                   InputLabelProps={{ shrink: true }}
                 />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Monedă</InputLabel>
+                  <Select
+                    value={invoiceData.currency}
+                    onChange={handleInvoiceChange('currency')}
+                    label="Monedă"
+                  >
+                    <MenuItem value="RON">RON - Leu românesc</MenuItem>
+                    <MenuItem value="EUR">EUR - Euro</MenuItem>
+                    <MenuItem value="USD">USD - Dolar american</MenuItem>
+                    <MenuItem value="GBP">GBP - Liră sterlină</MenuItem>
+                    <MenuItem value="CHF">CHF - Franc elvețian</MenuItem>
+                    <MenuItem value="JPY">JPY - Yen japonez</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
             </Grid>
           </CardContent>
@@ -735,7 +878,7 @@ const InvoiceGenerator = () => {
                       value={line.unitNetPrice}
                       onChange={(e) => updateLine(line.id, 'unitNetPrice', e.target.value)}
                       InputProps={{
-                        endAdornment: <InputAdornment position="end">RON</InputAdornment>,
+                        endAdornment: <InputAdornment position="end">{invoiceData.currency}</InputAdornment>,
                         inputProps: { min: 0, step: 0.01 }
                       }}
                     />
@@ -778,7 +921,7 @@ const InvoiceGenerator = () => {
                   <Grid size={{ xs: 12, md: 3.5 }}>
                     <Typography variant="caption" color="text.secondary">Total linie:</Typography>
                     <Typography variant="body2" fontWeight="600">
-                      {calculateLineTotal(line, 'net')} + {calculateLineTotal(line, 'vat')} = <span style={{ color: '#2e7d32' }}>{calculateLineTotal(line, 'gross')} RON</span>
+                      {calculateLineTotal(line, 'net')} + {calculateLineTotal(line, 'vat')} = <span style={{ color: '#2e7d32' }}>{calculateLineTotal(line, 'gross')} {invoiceData.currency}</span>
                     </Typography>
                   </Grid>
                 </Grid>
@@ -806,16 +949,16 @@ const InvoiceGenerator = () => {
               <Stack spacing={1}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography>Total net:</Typography>
-                  <Typography fontWeight="700">{totals.net} RON</Typography>
+                  <Typography fontWeight="700">{totals.net} {invoiceData.currency}</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography>Total TVA:</Typography>
-                  <Typography fontWeight="700" color="info.main">{totals.vat} RON</Typography>
+                  <Typography fontWeight="700" color="info.main">{totals.vat} {invoiceData.currency}</Typography>
                 </Box>
                 <Divider />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography variant="h6">Total brut:</Typography>
-                  <Typography variant="h5" fontWeight="800" color="success.dark">{totals.gross} RON</Typography>
+                  <Typography variant="h5" fontWeight="800" color="success.dark">{totals.gross} {invoiceData.currency}</Typography>
                 </Box>
               </Stack>
             </Grid>
