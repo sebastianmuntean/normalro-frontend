@@ -1,9 +1,10 @@
 import React from 'react';
 import { Box, Container, Paper, Stack, Typography } from '@mui/material';
 import SeoFooter from './SeoFooter';
+import AdSenseAd from './AdSenseAd';
 import { getSeoContent } from '../data/seoContent';
 
-const ToolLayout = ({ title, description, maxWidth = 'md', seoSlug, children }) => {
+const ToolLayout = ({ title, description, maxWidth = 'md', seoSlug, showAd = true, children }) => {
   const seoData = seoSlug ? getSeoContent(seoSlug) : null;
 
   return (
@@ -31,6 +32,9 @@ const ToolLayout = ({ title, description, maxWidth = 'md', seoSlug, children }) 
             </Box>
           )}
           {children}
+          {showAd && (
+            <AdSenseAd />
+          )}
           {seoData && (
             <SeoFooter
               title={seoData.title}

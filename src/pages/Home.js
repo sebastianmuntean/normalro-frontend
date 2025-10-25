@@ -8,6 +8,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import BuildCircleIcon from '@mui/icons-material/BuildCircle';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AdSenseAd from '../components/AdSenseAd';
 import { tools as catalog } from '../data/tools';
 import '../App.css';
 
@@ -199,6 +200,11 @@ const Home = () => {
         </Paper>
       </Container>
 
+      {/* AdSense Horizontal Ad */}
+      <Container>
+        <AdSenseAd />
+      </Container>
+
       <Container sx={{ py: { xs: 6, md: 10 } }}>
         <Stack spacing={1} mb={4} alignItems="center" textAlign="center">
           <BuildCircleIcon color="primary" sx={{ fontSize: 36 }} />
@@ -308,6 +314,11 @@ const Home = () => {
             })}
           </Box>
         </Box>
+      </Container>
+
+      {/* AdSense Bottom Ad */}
+      <Container sx={{ pb: { xs: 4, md: 6 } }}>
+        <AdSenseAd />
       </Container>
     </Box>
   );
