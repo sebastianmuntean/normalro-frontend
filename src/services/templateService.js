@@ -143,6 +143,42 @@ class TemplateService {
     }
   }
 
+  // Actualizează un template de produs existent
+  updateProductTemplate(id, productData) {
+    try {
+      const templates = this.getAllProductTemplates();
+      const templateIndex = templates.findIndex(t => t.id === id);
+      
+      if (templateIndex === -1) {
+        console.error('Template produs nu a fost găsit:', id);
+        return false;
+      }
+
+      // Păstrează datele importante (id, usageCount, etc.) și actualizează restul
+      const existingTemplate = templates[templateIndex];
+      const updatedTemplate = {
+        ...existingTemplate,
+        name: productData.name || existingTemplate.name,
+        category: productData.category !== undefined ? productData.category : existingTemplate.category,
+        purchasePrice: productData.purchasePrice || existingTemplate.purchasePrice,
+        markup: productData.markup || existingTemplate.markup,
+        unitNetPrice: productData.unitNetPrice || existingTemplate.unitNetPrice,
+        vatRate: productData.vatRate || existingTemplate.vatRate,
+        unitGrossPrice: productData.unitGrossPrice || existingTemplate.unitGrossPrice,
+        description: productData.description !== undefined ? productData.description : existingTemplate.description,
+        defaultQuantity: productData.defaultQuantity || existingTemplate.defaultQuantity,
+        updatedAt: Date.now()
+      };
+
+      templates[templateIndex] = updatedTemplate;
+      localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(templates));
+      return true;
+    } catch (error) {
+      console.error('Eroare actualizare template produs:', error);
+      return false;
+    }
+  }
+
   // Actualizează GUID-ul pentru un produs
   updateProductGuid(id, guid) {
     try {
@@ -206,6 +242,7 @@ class TemplateService {
         phone: client.phone || client.clientPhone || '',
         email: client.email || client.clientEmail || '',
         vatPrefix: client.vatPrefix || client.clientVatPrefix || 'RO',
+        bankAccounts: client.bankAccounts || client.clientBankAccounts || [{ bank: '', iban: '', currency: 'RON' }],
         isFavorite: client.isFavorite || false,
         usageCount: 0,
         createdAt: Date.now(),
@@ -290,6 +327,44 @@ class TemplateService {
     });
 
     return templates;
+  }
+
+  // Actualizează un template de client existent
+  updateClientTemplate(id, clientData) {
+    try {
+      const templates = this.getAllClientTemplates();
+      const templateIndex = templates.findIndex(t => t.id === id);
+      
+      if (templateIndex === -1) {
+        console.error('Template client nu a fost găsit:', id);
+        return false;
+      }
+
+      // Păstrează datele importante (id, usageCount, etc.) și actualizează restul
+      const existingTemplate = templates[templateIndex];
+      const updatedTemplate = {
+        ...existingTemplate,
+        name: clientData.name || clientData.clientName || existingTemplate.name,
+        cui: clientData.cui || clientData.clientCUI || existingTemplate.cui,
+        regCom: clientData.regCom || clientData.clientRegCom || existingTemplate.regCom,
+        address: clientData.address || clientData.clientAddress || existingTemplate.address,
+        city: clientData.city || clientData.clientCity || existingTemplate.city,
+        county: clientData.county || clientData.clientCounty || existingTemplate.county,
+        country: clientData.country || clientData.clientCountry || existingTemplate.country,
+        phone: clientData.phone || clientData.clientPhone || existingTemplate.phone,
+        email: clientData.email || clientData.clientEmail || existingTemplate.email,
+        vatPrefix: clientData.vatPrefix || clientData.clientVatPrefix || existingTemplate.vatPrefix,
+        bankAccounts: clientData.bankAccounts || existingTemplate.bankAccounts || [],
+        updatedAt: Date.now()
+      };
+
+      templates[templateIndex] = updatedTemplate;
+      localStorage.setItem(STORAGE_KEY_CLIENTS, JSON.stringify(templates));
+      return true;
+    } catch (error) {
+      console.error('Eroare actualizare template client:', error);
+      return false;
+    }
   }
 
   // Șterge un template de client

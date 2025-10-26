@@ -28,10 +28,12 @@ import {
   Box
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import templateService from '../services/templateService';
 import CompanyForm from './CompanyForm';
 import { getCompanyDataByCUI } from '../services/anafService';
@@ -46,14 +48,16 @@ const JUDETE_ROMANIA = [
   'Sibiu', 'Suceava', 'Teleorman', 'Timiș', 'Tulcea', 'Vâlcea', 'Vaslui', 'Vrancea'
 ];
 
-const ClientTemplateDialog = ({ open, onClose, onSelectClient }) => {
+const ClientTemplateDialog = ({ open, onClose, onSelectClient, onOpenProfile }) => {
   const [templates, setTemplates] = useState([]);
   const [search, setSearch] = useState('');
   const [showFavorites, setShowFavorites] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [loadingAnaf, setLoadingAnaf] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editingClientId, setEditingClientId] = useState(null);
   
-  // Form state pentru adăugare client (format compatibil cu CompanyForm)
+  // Form state pentru adăugare/editare client (format compatibil cu CompanyForm)
   const [newClient, setNewClient] = useState({
     clientName: '',
     clientCUI: '',
@@ -65,7 +69,7 @@ const ClientTemplateDialog = ({ open, onClose, onSelectClient }) => {
     clientPhone: '',
     clientEmail: '',
     clientVatPrefix: '-',
-    clientBankAccounts: [{ bank: '', iban: '' }]
+    clientBankAccounts: [{ bank: '', iban: '', currency: 'RON' }]
   });
 
   useEffect(() => {
@@ -130,6 +134,32 @@ const ClientTemplateDialog = ({ open, onClose, onSelectClient }) => {
     }
   };
 
+  const handleStartEdit = (template) => {
+    // Populează formularul cu datele clientului pentru editare
+    setNewClient({
+      clientName: template.name || '',
+      clientCUI: template.cui || '',
+      clientRegCom: template.regCom || '',
+      clientAddress: template.address || '',
+      clientCity: template.city || '',
+      clientCounty: template.county || '',
+      clientCountry: template.country || 'Romania',
+      clientPhone: template.phone || '',
+      clientEmail: template.email || '',
+      clientVatPrefix: template.vatPrefix || '-',
+      clientBankAccounts: template.bankAccounts && template.bankAccounts.length > 0 
+        ? template.bankAccounts.map(acc => ({
+            bank: acc.bank || '',
+            iban: acc.iban || '',
+            currency: acc.currency || 'RON'
+          }))
+        : [{ bank: '', iban: '', currency: 'RON' }]
+    });
+    setEditingClientId(template.id);
+    setEditMode(true);
+    setShowAddForm(true);
+  };
+
   const handleAddClient = () => {
     if (!newClient.clientName) {
       alert('Introdu numele clientului!');
@@ -151,7 +181,13 @@ const ClientTemplateDialog = ({ open, onClose, onSelectClient }) => {
       bankAccounts: newClient.clientBankAccounts
     };
 
-    templateService.saveClientTemplate(clientToSave);
+    if (editMode && editingClientId) {
+      // Modifică client existent
+      templateService.updateClientTemplate(editingClientId, clientToSave);
+    } else {
+      // Adaugă client nou
+      templateService.saveClientTemplate(clientToSave);
+    }
 
     // Reset form
     setNewClient({
@@ -165,17 +201,38 @@ const ClientTemplateDialog = ({ open, onClose, onSelectClient }) => {
       clientPhone: '',
       clientEmail: '',
       clientVatPrefix: '-',
-      clientBankAccounts: [{ bank: '', iban: '' }]
+      clientBankAccounts: [{ bank: '', iban: '', currency: 'RON' }]
     });
 
     setShowAddForm(false);
+    setEditMode(false);
+    setEditingClientId(null);
     loadTemplates();
+  };
+
+  const handleCancelEdit = () => {
+    setNewClient({
+      clientName: '',
+      clientCUI: '',
+      clientRegCom: '',
+      clientAddress: '',
+      clientCity: '',
+      clientCounty: '',
+      clientCountry: 'Romania',
+      clientPhone: '',
+      clientEmail: '',
+      clientVatPrefix: '-',
+      clientBankAccounts: [{ bank: '', iban: '', currency: 'RON' }]
+    });
+    setShowAddForm(false);
+    setEditMode(false);
+    setEditingClientId(null);
   };
 
   const handleAddBankAccount = () => {
     setNewClient({
       ...newClient,
-      clientBankAccounts: [...newClient.clientBankAccounts, { bank: '', iban: '' }]
+      clientBankAccounts: [...newClient.clientBankAccounts, { bank: '', iban: '', currency: 'RON' }]
     });
   };
 
@@ -183,7 +240,7 @@ const ClientTemplateDialog = ({ open, onClose, onSelectClient }) => {
     const updatedAccounts = newClient.clientBankAccounts.filter((_, i) => i !== index);
     setNewClient({
       ...newClient,
-      clientBankAccounts: updatedAccounts.length > 0 ? updatedAccounts : [{ bank: '', iban: '' }]
+      clientBankAccounts: updatedAccounts.length > 0 ? updatedAccounts : [{ bank: '', iban: '', currency: 'RON' }]
     });
   };
 
@@ -283,11 +340,11 @@ const ClientTemplateDialog = ({ open, onClose, onSelectClient }) => {
             </Grid>
           </Grid>
 
-          {/* Formular adăugare client */}
+          {/* Formular adăugare/editare client */}
           {showAddForm ? (
-            <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+            <Box sx={{ p: 2, bgcolor: editMode ? 'warning.50' : 'grey.50', borderRadius: 1, border: editMode ? '2px solid' : 'none', borderColor: editMode ? 'warning.main' : 'transparent' }}>
               <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-                Adaugă client nou
+                {editMode ? '✏️ Modifică client' : 'Adaugă client nou'}
               </Typography>
               <CompanyForm
                 data={newClient}
@@ -302,10 +359,10 @@ const ClientTemplateDialog = ({ open, onClose, onSelectClient }) => {
                 onBankAccountChange={handleBankAccountChange}
               />
               <Stack direction="row" spacing={1} sx={{ mt: 3 }}>
-                <Button variant="contained" onClick={handleAddClient}>
-                  Salvează
+                <Button variant="contained" onClick={handleAddClient} color={editMode ? 'warning' : 'primary'}>
+                  {editMode ? 'Actualizează' : 'Salvează'}
                 </Button>
-                <Button onClick={() => setShowAddForm(false)}>
+                <Button onClick={handleCancelEdit}>
                   Anulează
                 </Button>
               </Stack>
@@ -317,7 +374,7 @@ const ClientTemplateDialog = ({ open, onClose, onSelectClient }) => {
               onClick={() => setShowAddForm(true)}
               fullWidth
             >
-              Adaugă client nou în template-uri
+              Adaugă client nou în șabloane
             </Button>
           )}
 
@@ -382,16 +439,44 @@ const ClientTemplateDialog = ({ open, onClose, onSelectClient }) => {
                       <TableCell>{template.cui || '-'}</TableCell>
                       <TableCell>{template.city || '-'}</TableCell>
                       <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(template.id);
-                          }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        <Stack direction="row" spacing={0.5} justifyContent="center">
+                          {onOpenProfile && (
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenProfile(template);
+                                onClose();
+                              }}
+                              title="Vezi fișa client cu facturi"
+                            >
+                              <VisibilityIcon fontSize="small" />
+                            </IconButton>
+                          )}
+                          <IconButton
+                            size="small"
+                            color="warning"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartEdit(template);
+                            }}
+                            title="Modifică client"
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(template.id);
+                            }}
+                            title="Șterge client"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
                       </TableCell>
                     </TableRow>
                   ))}

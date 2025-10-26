@@ -29,7 +29,8 @@ import {
   Chip,
   Pagination,
   Alert,
-  Divider
+  Divider,
+  Checkbox
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -37,10 +38,12 @@ import RestoreIcon from '@mui/icons-material/Restore';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import FolderZipIcon from '@mui/icons-material/FolderZip';
 import invoiceHistoryService from '../services/invoiceHistoryService';
 import * as XLSX from 'xlsx';
 
-const InvoiceHistoryDialog = ({ open, onClose, onLoadInvoice, type = 'invoice' }) => {
+const InvoiceHistoryDialog = ({ open, onClose, onLoadInvoice, type = 'invoice', onBatchPDF, onBatchZIP }) => {
   const [currentTab, setCurrentTab] = useState(0);
   const [search, setSearch] = useState('');
   const [dateRange, setDateRange] = useState('all');
@@ -50,6 +53,9 @@ const InvoiceHistoryDialog = ({ open, onClose, onLoadInvoice, type = 'invoice' }
   const [total, setTotal] = useState(0);
   const [statistics, setStatistics] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  
+  // State pentru selecție multiplă (batch export)
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
   
   // State pentru export SAGA
   const [sagaDialogOpen, setSagaDialogOpen] = useState(false);
@@ -333,6 +339,30 @@ const InvoiceHistoryDialog = ({ open, onClose, onLoadInvoice, type = 'invoice' }
     return `${amount} ${currency}`;
   };
 
+  // Funcții pentru selecție multiplă
+  const handleSelectAll = (event) => {
+    if (event.target.checked) {
+      const allIds = invoices.map(inv => inv.id);
+      setSelectedInvoiceIds(allIds);
+    } else {
+      setSelectedInvoiceIds([]);
+    }
+  };
+
+  const handleSelectInvoice = (invoiceId) => {
+    setSelectedInvoiceIds(prev => {
+      if (prev.includes(invoiceId)) {
+        return prev.filter(id => id !== invoiceId);
+      } else {
+        return [...prev, invoiceId];
+      }
+    });
+  };
+
+  const isInvoiceSelected = (invoiceId) => selectedInvoiceIds.includes(invoiceId);
+  const isAllSelected = invoices.length > 0 && selectedInvoiceIds.length === invoices.length;
+  const isIndeterminate = selectedInvoiceIds.length > 0 && selectedInvoiceIds.length < invoices.length;
+
   return (
     <Dialog
       open={open}
@@ -408,6 +438,13 @@ const InvoiceHistoryDialog = ({ open, onClose, onLoadInvoice, type = 'invoice' }
                   <Table size="small">
                     <TableHead>
                       <TableRow sx={{ bgcolor: 'grey.100' }}>
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            indeterminate={isIndeterminate}
+                            checked={isAllSelected}
+                            onChange={handleSelectAll}
+                          />
+                        </TableCell>
                         <TableCell><strong>Serie/Nr</strong></TableCell>
                         <TableCell><strong>Data</strong></TableCell>
                         <TableCell><strong>Client</strong></TableCell>
@@ -420,8 +457,15 @@ const InvoiceHistoryDialog = ({ open, onClose, onLoadInvoice, type = 'invoice' }
                         <TableRow 
                           key={invoice.id}
                           hover
+                          selected={isInvoiceSelected(invoice.id)}
                           sx={{ '&:hover': { bgcolor: 'action.hover' } }}
                         >
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              checked={isInvoiceSelected(invoice.id)}
+                              onChange={() => handleSelectInvoice(invoice.id)}
+                            />
+                          </TableCell>
                           <TableCell>
                             <Typography variant="body2" fontWeight={600}>
                               {invoice.series}{invoice.number}
@@ -643,16 +687,92 @@ const InvoiceHistoryDialog = ({ open, onClose, onLoadInvoice, type = 'invoice' }
         {currentTab === 2 && (
           <Stack spacing={3}>
             <Alert severity="info">
-              Exportă toate facturile din istoric într-un singur fișier Excel pentru arhivare sau analiză.
+              Exportă facturile din istoric în diverse formate pentru arhivare, backup sau distribuție.
             </Alert>
+
+            {/* Batch Export - PDF și ZIP */}
+            {selectedInvoiceIds.length > 0 && (
+              <Paper variant="outlined" sx={{ p: 3, bgcolor: 'primary.50', border: '2px solid', borderColor: 'primary.main' }}>
+                <Stack spacing={2}>
+                  <Typography variant="h6" color="primary.main">
+                    📦 Export Batch ({selectedInvoiceIds.length} {selectedInvoiceIds.length === 1 ? 'factură selectată' : 'facturi selectate'})
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Selectează facturi din tab "Istoric" folosind checkbox-urile, apoi alege una din opțiunile de mai jos:
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={4}>
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        color="error"
+                        startIcon={<PictureAsPdfIcon />}
+                        onClick={() => onBatchPDF && onBatchPDF(selectedInvoiceIds)}
+                        disabled={!onBatchPDF}
+                      >
+                        PDF Batch
+                      </Button>
+                      <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Un singur PDF cu toate facturile
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        color="warning"
+                        startIcon={<FolderZipIcon />}
+                        onClick={() => onBatchZIP && onBatchZIP(selectedInvoiceIds, 'pdf')}
+                        disabled={!onBatchZIP}
+                      >
+                        ZIP PDF
+                      </Button>
+                      <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Arhivă ZIP cu fișiere PDF separate
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        color="success"
+                        startIcon={<FolderZipIcon />}
+                        onClick={() => onBatchZIP && onBatchZIP(selectedInvoiceIds, 'excel')}
+                        disabled={!onBatchZIP}
+                      >
+                        ZIP Excel
+                      </Button>
+                      <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Arhivă ZIP cu fișiere Excel separate
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => setSelectedInvoiceIds([])}
+                  >
+                    Șterge selecția ({selectedInvoiceIds.length})
+                  </Button>
+                </Stack>
+              </Paper>
+            )}
+
+            {selectedInvoiceIds.length === 0 && (
+              <Alert severity="warning">
+                <Typography variant="body2">
+                  <strong>💡 Tip:</strong> Mergi în tab-ul "Istoric" și selectează facturi folosind checkbox-urile pentru a activa opțiunile de export batch.
+                </Typography>
+              </Alert>
+            )}
 
             <Paper variant="outlined" sx={{ p: 3 }}>
               <Stack spacing={2}>
                 <Typography variant="h6">
-                  Export complet istoric
+                  Export complet istoric (Excel)
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Include toate facturile cu date complete: furnizor, client, produse, totaluri.
+                  Include toate facturile cu date complete: furnizor, client, produse, totaluri într-un singur fișier Excel.
                 </Typography>
                 <Button
                   variant="contained"

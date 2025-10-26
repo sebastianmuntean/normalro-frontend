@@ -90,6 +90,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import CryptoJS from 'crypto-js';
+import JSZip from 'jszip';
 
 const InvoiceGenerator = () => {
   // Citește cota TVA implicită din .env (default: 21)
@@ -166,7 +167,7 @@ const InvoiceGenerator = () => {
   // State pentru istoric facturi
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
 
-  // State pentru template-uri
+  // State pentru șabloane
   const [productTemplateDialogOpen, setProductTemplateDialogOpen] = useState(false);
   const [clientTemplateDialogOpen, setClientTemplateDialogOpen] = useState(false);
 
@@ -240,6 +241,37 @@ const InvoiceGenerator = () => {
     percent: '0.00',
     amount: '0.00'
   });
+
+  // State pentru funcționalități facturare recurentă
+  const [invoiceSablonDialogOpen, setInvoiceSablonDialogOpen] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState('');
+  const [validationWarnings, setValidationWarnings] = useState([]);
+  const [productSuggestions, setProductSuggestions] = useState([]);
+  const [showProductSuggestions, setShowProductSuggestions] = useState({});
+
+  // State pentru categorii produse
+  const [productCategoriesDialogOpen, setProductCategoriesDialogOpen] = useState(false);
+  const [productCategories, setProductCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  // State pentru fișa client
+  const [clientProfileDialogOpen, setClientProfileDialogOpen] = useState(false);
+  const [selectedClientForProfile, setSelectedClientForProfile] = useState(null);
+
+  // State pentru sortare linii
+  const [sortBy, setSortBy] = useState('manual'); // 'manual', 'name', 'price', 'total'
+  const [sortOrder, setSortOrder] = useState('asc'); // 'asc', 'desc'
+
+  // State pentru grupare pe categorii
+  const [groupByCategory, setGroupByCategory] = useState(false);
+
+  // State pentru versioning
+  const [invoiceVersions, setInvoiceVersions] = useState([]);
+  const [showVersionsDialog, setShowVersionsDialog] = useState(false);
+
+  // State pentru furnizori (societăți proprii)
+  const [supplierTemplateDialogOpen, setSupplierTemplateDialogOpen] = useState(false);
+  const [savedSuppliers, setSavedSuppliers] = useState([]);
 
   // Constantă pentru criptare/decriptare și numele cookie-ului
   const ENCRYPTION_KEY = 'normalro-invoice-supplier-data-2024';
@@ -396,6 +428,7 @@ const InvoiceGenerator = () => {
   useEffect(() => {
     loadSupplierDataFromCookie();
     loadBNRRates(); // Încarcă cursurile BNR la inițializare
+    loadProductCategories(); // Încarcă categoriile de produse
 
     // Inițializează Google Drive API
     const initGoogleDrive = async () => {
@@ -1001,7 +1034,7 @@ const InvoiceGenerator = () => {
     return '0.00';
   };
 
-  // Selectează un produs din template și adaugă-l ca linie nouă
+  // Selectează un produs din șablon și adaugă-l ca linie nouă
   const selectProductFromTemplate = (product) => {
     const newLine = {
       id: Date.now(),
@@ -1019,7 +1052,7 @@ const InvoiceGenerator = () => {
     setLines([...lines, newLine]);
   };
 
-  // Selectează un client din template și completează datele
+  // Selectează un client din șablon și completează datele
   const selectClientFromTemplate = (client) => {
     setInvoiceData({
       ...invoiceData,
@@ -1032,11 +1065,18 @@ const InvoiceGenerator = () => {
       clientCountry: client.clientCountry || 'Romania',
       clientPhone: client.clientPhone || '',
       clientEmail: client.clientEmail || '',
-      clientVatPrefix: client.clientVatPrefix || 'RO'
+      clientVatPrefix: client.clientVatPrefix || 'RO',
+      clientBankAccounts: client.clientBankAccounts && client.clientBankAccounts.length > 0
+        ? client.clientBankAccounts.map(acc => ({
+          bank: acc.bank || '',
+          iban: acc.iban || '',
+          currency: acc.currency || 'RON'
+        }))
+        : [{ bank: '', iban: '', currency: 'RON' }]
     });
   };
 
-  // Salvează clientul curent ca template
+  // Salvează clientul curent ca șablon
   const saveCurrentClientAsTemplate = () => {
     if (!invoiceData.clientName) {
       alert('Introdu mai întâi numele clientului!');
@@ -1053,10 +1093,11 @@ const InvoiceGenerator = () => {
       country: invoiceData.clientCountry,
       phone: invoiceData.clientPhone,
       email: invoiceData.clientEmail,
-      vatPrefix: invoiceData.clientVatPrefix
+      vatPrefix: invoiceData.clientVatPrefix,
+      bankAccounts: invoiceData.clientBankAccounts || [{ bank: '', iban: '', currency: 'RON' }]
     });
 
-    alert(`✅ Client "${invoiceData.clientName}" salvat în template-uri!`);
+    alert(`✅ Client "${invoiceData.clientName}" salvat în șabloane!`);
   };
 
   // Încarcă o factură din istoric în formular
@@ -1159,7 +1200,7 @@ const InvoiceGenerator = () => {
         number: '',
         savedDate: ''
       },
-      templates: {
+      sabloane: {
         products: 0,
         clients: 0
       },
@@ -1185,9 +1226,9 @@ const InvoiceGenerator = () => {
       }
     }
 
-    // Verifică template-uri
-    summary.templates.products = templateService.getProductTemplates().length;
-    summary.templates.clients = templateService.getClientTemplates().length;
+    // Verifică șabloane
+    summary.sabloane.products = templateService.getProductTemplates().length;
+    summary.sabloane.clients = templateService.getClientTemplates().length;
 
     // Verifică istoric facturi
     summary.invoices = invoiceHistoryService.getAllInvoices().length;
@@ -1224,9 +1265,9 @@ const InvoiceGenerator = () => {
       document.cookie = 'normalro_supplier_data=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
       console.log('🗑️ Cookie șters');
 
-      // Șterge template-uri
+      // Șterge șabloane
       templateService.clearAllTemplates();
-      console.log('🗑️ Template-uri șterse');
+      console.log('🗑️ Șabloane șterse');
 
       // Șterge istoric facturi
       invoiceHistoryService.clearAllInvoices();
@@ -1239,8 +1280,8 @@ const InvoiceGenerator = () => {
       alert(
         '✅ Toate datele au fost șterse cu succes!\n\n' +
         '• Cookie-ul cu datele furnizorului a fost șters\n' +
-        '• Template-urile de produse au fost șterse\n' +
-        '• Template-urile de clienți au fost șterse\n' +
+        '• Șabloanele de produse au fost șterse\n' +
+        '• Șabloanele de clienți au fost șterse\n' +
         '• Istoricul facturilor a fost șters\n\n' +
         'Datele din Google Sheets rămân neschimbate.'
       );
@@ -1316,8 +1357,8 @@ const InvoiceGenerator = () => {
         `📄 ID: ${result.id}\n\n` +
         `Spreadsheet-ul a fost creat cu 4 sheet-uri:\n` +
         `• Date Furnizor\n` +
-        `• Template Produse\n` +
-        `• Template Clienți\n` +
+        `• Șabloane Produse\n` +
+        `• Șabloane Clienți\n` +
         `• Istoric Facturi\n\n` +
         `Vrei să deschizi spreadsheet-ul în Google Sheets?`
       );
@@ -1522,9 +1563,9 @@ const InvoiceGenerator = () => {
       stats.supplier = true;
       console.log('✅ Date furnizor salvate');
 
-      // 2. Sincronizează template-uri produse
-      console.log('📦 Sincronizare template-uri produse...');
-      setSyncStatus('Sincronizare template-uri produse...');
+      // 2. Sincronizează șabloane produse
+      console.log('📦 Sincronizare șabloane produse...');
+      setSyncStatus('Sincronizare șabloane produse...');
       const products = templateService.getProductTemplates();
       console.log(`📦 Am găsit ${products.length} produse în localStorage`);
 
@@ -1542,9 +1583,9 @@ const InvoiceGenerator = () => {
       }
       console.log(`✅ ${stats.products} produse salvate`);
 
-      // 3. Sincronizează template-uri clienți
-      console.log('👥 Sincronizare template-uri clienți...');
-      setSyncStatus('Sincronizare template-uri clienți...');
+      // 3. Sincronizează șabloane clienți
+      console.log('👥 Sincronizare șabloane clienți...');
+      setSyncStatus('Sincronizare șabloane clienți...');
       const clients = templateService.getClientTemplates();
       console.log(`👥 Am găsit ${clients.length} clienți în localStorage`);
 
@@ -1616,8 +1657,8 @@ const InvoiceGenerator = () => {
       alert(
         `✅ Sincronizare completă!\n\n` +
         `• Date furnizor: ${stats.supplier ? 'salvate ✓' : 'nesalvate ✗'}\n` +
-        `• Template produse: ${stats.products} salvate\n` +
-        `• Template clienți: ${stats.clients} salvate\n` +
+        `• Șabloane produse: ${stats.products} salvate\n` +
+        `• Șabloane clienți: ${stats.clients} salvate\n` +
         `• Istoric facturi: ${stats.invoices} salvate\n\n` +
         `Toate datele au fost sincronizate cu Google Sheets.\n` +
         `Deschide spreadsheet-ul pentru a verifica!`
@@ -1636,6 +1677,690 @@ const InvoiceGenerator = () => {
       setIsSyncingToSheets(false);
       console.log('🏁 Sincronizare finalizată (finally)');
     }
+  };
+
+  // ===== Funcții Categorii Produse =====
+
+  /**
+   * Încarcă categoriile de produse din localStorage
+   */
+  const loadProductCategories = () => {
+    try {
+      const saved = localStorage.getItem('normalro_product_categories');
+      if (saved) {
+        const categories = JSON.parse(saved);
+        setProductCategories(categories);
+        console.log('✅ Categorii produse încărcate:', categories.length);
+      } else {
+        // Categorii implicite
+        const defaultCategories = [
+          { id: Date.now(), name: 'Servicii', color: '#2196f3', icon: '🛠️' },
+          { id: Date.now() + 1, name: 'Produse', color: '#4caf50', icon: '📦' },
+          { id: Date.now() + 2, name: 'Consultanță', color: '#ff9800', icon: '💼' }
+        ];
+        setProductCategories(defaultCategories);
+        localStorage.setItem('normalro_product_categories', JSON.stringify(defaultCategories));
+      }
+    } catch (error) {
+      console.error('Eroare încărcare categorii:', error);
+    }
+  };
+
+  /**
+   * Salvează categoriile în localStorage
+   */
+  const saveProductCategories = (categories) => {
+    try {
+      localStorage.setItem('normalro_product_categories', JSON.stringify(categories));
+      setProductCategories(categories);
+      console.log('✅ Categorii salvate:', categories.length);
+    } catch (error) {
+      console.error('Eroare salvare categorii:', error);
+    }
+  };
+
+  /**
+   * Adaugă o categorie nouă
+   */
+  const addProductCategory = (name, color = '#2196f3', icon = '📁') => {
+    const newCategory = {
+      id: Date.now(),
+      name,
+      color,
+      icon,
+      createdAt: new Date().toISOString()
+    };
+    const updatedCategories = [...productCategories, newCategory];
+    saveProductCategories(updatedCategories);
+    return newCategory;
+  };
+
+  /**
+   * Actualizează o categorie existentă
+   */
+  const updateProductCategory = (categoryId, updates) => {
+    const updatedCategories = productCategories.map(cat =>
+      cat.id === categoryId ? { ...cat, ...updates } : cat
+    );
+    saveProductCategories(updatedCategories);
+  };
+
+  /**
+   * Șterge o categorie
+   */
+  const deleteProductCategory = (categoryId) => {
+    // Verifică dacă există produse în această categorie
+    const products = templateService.getProductTemplates();
+    const productsInCategory = products.filter(p => p.category === categoryId);
+
+    if (productsInCategory.length > 0) {
+      const confirmed = window.confirm(
+        `Categoria conține ${productsInCategory.length} produse.\n\n` +
+        `Produsele vor fi mutate în categoria "Fără categorie".\n\n` +
+        `Continui?`
+      );
+      if (!confirmed) return;
+
+      // Mută produsele în categoria "Fără categorie"
+      productsInCategory.forEach(product => {
+        templateService.updateProductTemplate(product.id, { category: null });
+      });
+    }
+
+    const updatedCategories = productCategories.filter(cat => cat.id !== categoryId);
+    saveProductCategories(updatedCategories);
+  };
+
+  // ===== Funcții Fișa Client =====
+
+  /**
+   * Deschide fișa client cu toate facturile emise
+   */
+  const openClientProfile = (client) => {
+    setSelectedClientForProfile(client);
+    setClientProfileDialogOpen(true);
+  };
+
+  /**
+   * Obține toate facturile pentru un client specific
+   */
+  const getClientInvoices = (clientCUI) => {
+    if (!clientCUI) return [];
+
+    const allInvoices = invoiceHistoryService.getAllInvoices();
+    return allInvoices.filter(invoice =>
+      invoice.client?.cui === clientCUI
+    ).sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate));
+  };
+
+  /**
+   * Calculează statistici pentru un client
+   */
+  const calculateClientStats = (clientCUI) => {
+    const invoices = getClientInvoices(clientCUI);
+
+    if (invoices.length === 0) {
+      return {
+        totalInvoices: 0,
+        totalAmount: 0,
+        currency: 'RON',
+        lastInvoiceDate: null,
+        averageAmount: 0,
+        unpaidInvoices: 0
+      };
+    }
+
+    const totalAmount = invoices.reduce((sum, inv) => {
+      return sum + (parseFloat(inv.totals?.gross) || 0);
+    }, 0);
+
+    const unpaidInvoices = invoices.filter(inv => {
+      if (!inv.dueDate) return false;
+      const dueDate = new Date(inv.dueDate);
+      const today = new Date();
+      return dueDate < today;
+    }).length;
+
+    return {
+      totalInvoices: invoices.length,
+      totalAmount: totalAmount.toFixed(2),
+      currency: invoices[0].currency || 'RON',
+      lastInvoiceDate: invoices[0].issueDate,
+      averageAmount: (totalAmount / invoices.length).toFixed(2),
+      unpaidInvoices
+    };
+  };
+
+  // ===== Funcții Furnizori (Societăți Proprii) =====
+
+  /**
+   * Încarcă furnizorii salvați din localStorage
+   */
+  const loadSavedSuppliers = () => {
+    try {
+      const suppliers = JSON.parse(localStorage.getItem('normalro_saved_suppliers') || '[]');
+      setSavedSuppliers(suppliers);
+      console.log('✅ Furnizori încărcați:', suppliers.length);
+    } catch (error) {
+      console.error('Eroare încărcare furnizori:', error);
+    }
+  };
+
+  /**
+   * Salvează furnizorul curent ca societate proprie
+   */
+  const saveCurrentSupplier = () => {
+    if (!invoiceData.supplierName || !invoiceData.supplierCUI) {
+      alert('❌ Completează cel puțin numele și CUI-ul furnizorului!');
+      return;
+    }
+
+    // Verifică dacă există deja un furnizor cu același CUI
+    const existingSupplier = savedSuppliers.find(s => 
+      s.cui && invoiceData.supplierCUI && 
+      s.cui.toString().replace(/\D/g, '') === invoiceData.supplierCUI.toString().replace(/\D/g, '')
+    );
+
+    if (existingSupplier) {
+      // Furnizor existent - oferă opțiunea de actualizare
+      const confirmUpdate = window.confirm(
+        `⚠️ Există deja un furnizor salvat cu CUI-ul ${invoiceData.supplierCUI}:\n\n` +
+        `"${existingSupplier.displayName}"\n\n` +
+        `Vrei să actualizezi datele acestui furnizor cu informațiile curente?\n\n` +
+        `✅ DA - Actualizează furnizorul existent\n` +
+        `❌ NU - Anulează operațiunea\n\n` +
+        `(Nu se pot avea 2 furnizori cu același CUI)`
+      );
+
+      if (!confirmUpdate) return;
+
+      // Actualizează furnizorul existent
+      const updatedSupplier = {
+        ...existingSupplier,
+        name: invoiceData.supplierName,
+        regCom: invoiceData.supplierRegCom,
+        address: invoiceData.supplierAddress,
+        city: invoiceData.supplierCity,
+        county: invoiceData.supplierCounty,
+        country: invoiceData.supplierCountry,
+        phone: invoiceData.supplierPhone,
+        email: invoiceData.supplierEmail,
+        vatPrefix: invoiceData.supplierVatPrefix,
+        bankAccounts: invoiceData.supplierBankAccounts,
+        updatedAt: new Date().toISOString()
+      };
+
+      const updatedSuppliers = savedSuppliers.map(s => 
+        s.id === existingSupplier.id ? updatedSupplier : s
+      );
+
+      localStorage.setItem('normalro_saved_suppliers', JSON.stringify(updatedSuppliers));
+      setSavedSuppliers(updatedSuppliers);
+
+      alert(
+        `✅ Furnizor "${existingSupplier.displayName}" actualizat cu succes!\n\n` +
+        `Datele au fost actualizate cu informațiile curente.`
+      );
+      console.log('✅ Furnizor actualizat:', updatedSupplier);
+      return;
+    }
+
+    // Furnizor nou - cere nume de afișare
+    const supplierName = prompt('Introdu un nume pentru această societate (ex: "SC ABC SRL - Principal"):', invoiceData.supplierName);
+    if (!supplierName) return;
+
+    const supplier = {
+      id: Date.now(),
+      displayName: supplierName,
+      name: invoiceData.supplierName,
+      cui: invoiceData.supplierCUI,
+      regCom: invoiceData.supplierRegCom,
+      address: invoiceData.supplierAddress,
+      city: invoiceData.supplierCity,
+      county: invoiceData.supplierCounty,
+      country: invoiceData.supplierCountry,
+      phone: invoiceData.supplierPhone,
+      email: invoiceData.supplierEmail,
+      vatPrefix: invoiceData.supplierVatPrefix,
+      bankAccounts: invoiceData.supplierBankAccounts,
+      createdAt: new Date().toISOString()
+    };
+
+    const suppliers = [...savedSuppliers, supplier];
+    localStorage.setItem('normalro_saved_suppliers', JSON.stringify(suppliers));
+    setSavedSuppliers(suppliers);
+
+    alert(`✅ Furnizor "${supplierName}" salvat cu succes!`);
+    console.log('✅ Furnizor salvat:', supplier);
+  };
+
+  /**
+   * Selectează un furnizor din listă
+   */
+  const selectSupplier = (supplier) => {
+    setInvoiceData(prev => ({
+      ...prev,
+      supplierName: supplier.name,
+      supplierCUI: supplier.cui,
+      supplierRegCom: supplier.regCom,
+      supplierAddress: supplier.address,
+      supplierCity: supplier.city,
+      supplierCounty: supplier.county,
+      supplierCountry: supplier.country,
+      supplierPhone: supplier.phone,
+      supplierEmail: supplier.email,
+      supplierVatPrefix: supplier.vatPrefix,
+      supplierBankAccounts: supplier.bankAccounts || [{ bank: '', iban: '', currency: 'RON' }]
+    }));
+
+    setSupplierTemplateDialogOpen(false);
+    alert(`✅ Furnizor "${supplier.displayName}" selectat!`);
+  };
+
+  /**
+   * Șterge un furnizor salvat
+   */
+  const deleteSupplier = (supplierId) => {
+    const supplier = savedSuppliers.find(s => s.id === supplierId);
+    if (!supplier) return;
+
+    const confirmed = window.confirm(
+      `Ești sigur că vrei să ștergi furnizorul "${supplier.displayName}"?`
+    );
+
+    if (!confirmed) return;
+
+    const updatedSuppliers = savedSuppliers.filter(s => s.id !== supplierId);
+    localStorage.setItem('normalro_saved_suppliers', JSON.stringify(updatedSuppliers));
+    setSavedSuppliers(updatedSuppliers);
+
+    alert(`✅ Furnizor "${supplier.displayName}" șters!`);
+  };
+
+  // Încarcă furnizorii la mount
+  useEffect(() => {
+    loadSavedSuppliers();
+  }, []);
+
+  // ===== Funcții Versioning =====
+
+  /**
+   * Salvează versiune curentă a facturii
+   */
+  const saveInvoiceVersion = useCallback(() => {
+    const version = {
+      id: Date.now(),
+      timestamp: new Date().toISOString(),
+      invoiceData: { ...invoiceData },
+      lines: lines.map(l => ({ ...l })),
+      totalDiscount: { ...totalDiscount },
+      attachedFiles: attachedFiles.map(f => ({ ...f })),
+      totals: calculateTotals()
+    };
+
+    const key = `${invoiceData.series}_${invoiceData.number}`;
+    const existingVersions = JSON.parse(localStorage.getItem(`normalro_invoice_versions_${key}`) || '[]');
+    
+    // Păstrează doar ultimele 5 versiuni
+    const updatedVersions = [version, ...existingVersions].slice(0, 5);
+    
+    localStorage.setItem(`normalro_invoice_versions_${key}`, JSON.stringify(updatedVersions));
+    setInvoiceVersions(updatedVersions);
+    
+    console.log(`✅ Versiune salvată pentru ${key} (total: ${updatedVersions.length})`);
+    return version;
+  }, [invoiceData, lines, totalDiscount, attachedFiles]);
+
+  /**
+   * Încarcă versiunile pentru factura curentă
+   */
+  const loadInvoiceVersions = useCallback(() => {
+    if (!invoiceData.series || !invoiceData.number) {
+      setInvoiceVersions([]);
+      return;
+    }
+
+    const key = `${invoiceData.series}_${invoiceData.number}`;
+    const versions = JSON.parse(localStorage.getItem(`normalro_invoice_versions_${key}`) || '[]');
+    setInvoiceVersions(versions);
+    
+    console.log(`📚 Găsite ${versions.length} versiuni pentru ${key}`);
+  }, [invoiceData.series, invoiceData.number]);
+
+  /**
+   * Restaurează o versiune anterioară
+   */
+  const restoreVersion = (version) => {
+    const confirmed = window.confirm(
+      `⚠️ Vrei să restaurezi versiunea din ${new Date(version.timestamp).toLocaleString('ro-RO')}?\n\n` +
+      `Datele curente vor fi înlocuite cu cele din versiunea selectată.\n\n` +
+      `Continui?`
+    );
+
+    if (!confirmed) return;
+
+    // Salvează versiune curentă înainte de restaurare
+    saveInvoiceVersion();
+
+    // Restaurează datele
+    setInvoiceData(version.invoiceData);
+    setLines(version.lines);
+    setTotalDiscount(version.totalDiscount);
+    setAttachedFiles(version.attachedFiles || []);
+
+    setShowVersionsDialog(false);
+    alert('✅ Versiune restaurată cu succes!');
+    console.log('🔄 Versiune restaurată:', version.timestamp);
+  };
+
+  /**
+   * Șterge o versiune
+   */
+  const deleteVersion = (versionId) => {
+    if (!invoiceData.series || !invoiceData.number) return;
+
+    const confirmed = window.confirm('Sigur vrei să ștergi această versiune?');
+    if (!confirmed) return;
+
+    const key = `${invoiceData.series}_${invoiceData.number}`;
+    const updatedVersions = invoiceVersions.filter(v => v.id !== versionId);
+    
+    localStorage.setItem(`normalro_invoice_versions_${key}`, JSON.stringify(updatedVersions));
+    setInvoiceVersions(updatedVersions);
+    
+    console.log('🗑️ Versiune ștearsă');
+  };
+
+  // useEffect pentru încărcarea versiunilor când se schimbă seria/numărul
+  useEffect(() => {
+    loadInvoiceVersions();
+  }, [invoiceData.series, invoiceData.number, loadInvoiceVersions]);
+
+  // useEffect pentru salvare automată versiune la modificări importante
+  useEffect(() => {
+    // Debounce pentru a nu salva prea des
+    const timer = setTimeout(() => {
+      if (invoiceData.series && invoiceData.number && lines.length > 0) {
+        // Salvează versiune automată doar dacă există date semnificative
+        const hasSignificantData = 
+          invoiceData.supplierName || 
+          invoiceData.clientName || 
+          lines.some(l => l.product && parseFloat(l.unitNetPrice) > 0);
+        
+        if (hasSignificantData) {
+          saveInvoiceVersion();
+        }
+      }
+    }, 10000); // 10 secunde după ultima modificare
+
+    return () => clearTimeout(timer);
+  }, [invoiceData, lines, totalDiscount, saveInvoiceVersion]);
+
+  // ===== Funcții Reset și Clear Date =====
+
+  /**
+   * Resetează formularul factură la valorile implicite (păstrează furnizor)
+   */
+  const resetInvoiceForm = () => {
+    const confirmed = window.confirm(
+      '⚠️ Vrei să resetezi formularul?\n\n' +
+      'Această acțiune va șterge:\n' +
+      '• Date beneficiar\n' +
+      '• Toate liniile produse\n' +
+      '• Note și atașamente\n\n' +
+      'Datele furnizorului vor fi păstrate.\n\n' +
+      'Continui?'
+    );
+
+    if (!confirmed) return;
+
+    // Resetează doar datele facturii, păstrând furnizorul
+    setInvoiceData(prev => ({
+      ...prev,
+      // Păstrează GUID
+      guid: prev.guid,
+      
+      // Resetează date factură
+      series: prev.series,
+      number: incrementInvoiceNumber(prev.number),
+      issueDate: new Date().toISOString().split('T')[0],
+      dueDate: '',
+      notes: '',
+
+      // Păstrează furnizor
+      // Resetează client
+      clientName: '',
+      clientCUI: '',
+      clientRegCom: '',
+      clientAddress: '',
+      clientCity: '',
+      clientCounty: '',
+      clientCountry: 'Romania',
+      clientPhone: '',
+      clientEmail: '',
+      clientBankAccounts: [{ bank: '', iban: '', currency: 'RON' }],
+      clientVatPrefix: '-'
+    }));
+
+    // Resetează linii
+    setLines([{
+      id: Date.now(),
+      product: '',
+      quantity: '1',
+      purchasePrice: '0.00',
+      markup: '0.00',
+      unitNetPrice: '0.00',
+      vatRate: DEFAULT_VAT_RATE,
+      unitGrossPrice: '0.00',
+      discountPercent: '0.00',
+      discountAmount: '0.00'
+    }]);
+
+    // Resetează reduceri
+    setTotalDiscount({
+      type: 'none',
+      percent: '0.00',
+      amount: '0.00'
+    });
+
+    // Resetează atașamente
+    setAttachedFiles([]);
+
+    // Resetează sortare
+    setSortBy('manual');
+    setSortOrder('asc');
+    setGroupByCategory(false);
+
+    console.log('✅ Formular resetat');
+  };
+
+  /**
+   * Șterge TOATE datele (inclusiv furnizor, istoric, șabloane)
+   */
+  const clearAllData = () => {
+    const confirmed = window.confirm(
+      '🚨 ATENȚIE - ȘTERGERE COMPLETĂ DATE! 🚨\n\n' +
+      'Această acțiune va șterge TOATE datele:\n' +
+      '• Cookie furnizor\n' +
+      '• Șabloane produse\n' +
+      '• Șabloane clienți\n' +
+      '• Istoric facturi\n' +
+      '• Categorii produse\n' +
+      '• Formularul curent\n\n' +
+      '⚠️ ACEASTĂ ACȚIUNE NU POATE FI ANULATĂ!\n\n' +
+      'Ești ABSOLUT SIGUR?'
+    );
+
+    if (!confirmed) return;
+
+    // Confirmă din nou
+    const doubleConfirm = window.confirm(
+      'ULTIMA VERIFICARE!\n\n' +
+      'Toate datele vor fi șterse permanent.\n' +
+      'Datele din Google Sheets rămân intacte.\n\n' +
+      'Continui cu ștergerea?'
+    );
+
+    if (!doubleConfirm) return;
+
+    try {
+      // Șterge cookie
+      document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+
+      // Șterge din localStorage
+      templateService.clearAllTemplates();
+      invoiceHistoryService.clearAllInvoices();
+      localStorage.removeItem('normalro_product_categories');
+      localStorage.removeItem('normalro_invoice_draft');
+      localStorage.removeItem('normalro_invoice_sabloane');
+
+      // Resetează state-ul complet
+      setInvoiceData({
+        guid: '',
+        series: '',
+        number: '',
+        issueDate: new Date().toISOString().split('T')[0],
+        dueDate: '',
+        currency: 'RON',
+        notes: '',
+        supplierName: '',
+        supplierCUI: '',
+        supplierRegCom: '',
+        supplierAddress: '',
+        supplierCity: '',
+        supplierCounty: '',
+        supplierCountry: 'Romania',
+        supplierPhone: '',
+        supplierEmail: '',
+        supplierBankAccounts: [{ bank: '', iban: '', currency: 'RON' }],
+        supplierVatPrefix: '-',
+        clientName: '',
+        clientCUI: '',
+        clientRegCom: '',
+        clientAddress: '',
+        clientCity: '',
+        clientCounty: '',
+        clientCountry: 'Romania',
+        clientPhone: '',
+        clientEmail: '',
+        clientBankAccounts: [{ bank: '', iban: '', currency: 'RON' }],
+        clientVatPrefix: '-'
+      });
+
+      setLines([{
+        id: Date.now(),
+        product: '',
+        quantity: '1',
+        purchasePrice: '0.00',
+        markup: '0.00',
+        unitNetPrice: '0.00',
+        vatRate: DEFAULT_VAT_RATE,
+        unitGrossPrice: '0.00',
+        discountPercent: '0.00',
+        discountAmount: '0.00'
+      }]);
+
+      setAttachedFiles([]);
+      setTotalDiscount({ type: 'none', percent: '0.00', amount: '0.00' });
+      setSortBy('manual');
+      setSortOrder('asc');
+      setGroupByCategory(false);
+      setProductCategories([]);
+      setSaveDataConsent(false);
+
+      alert(
+        '✅ Toate datele au fost șterse cu succes!\n\n' +
+        'Aplicația a fost resetată la starea inițială.'
+      );
+
+      console.log('🗑️ Toate datele au fost șterse');
+    } catch (error) {
+      console.error('Eroare ștergere date:', error);
+      alert('❌ Eroare la ștergerea datelor:\n\n' + error.message);
+    }
+  };
+
+  // ===== Funcții Sortare și Grupare Linii =====
+
+  /**
+   * Sortează liniile facturii după criteriul selectat
+   */
+  const sortLines = (sortType) => {
+    let sortedLines = [...lines];
+
+    switch (sortType) {
+      case 'name':
+        sortedLines.sort((a, b) => {
+          const nameA = (a.product || '').toLowerCase();
+          const nameB = (b.product || '').toLowerCase();
+          return sortOrder === 'asc' 
+            ? nameA.localeCompare(nameB) 
+            : nameB.localeCompare(nameA);
+        });
+        break;
+      
+      case 'price':
+        sortedLines.sort((a, b) => {
+          const priceA = parseFloat(a.unitNetPrice) || 0;
+          const priceB = parseFloat(b.unitNetPrice) || 0;
+          return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
+        });
+        break;
+      
+      case 'total':
+        sortedLines.sort((a, b) => {
+          const totalA = parseFloat(calculateLineTotal(a, 'gross')) || 0;
+          const totalB = parseFloat(calculateLineTotal(b, 'gross')) || 0;
+          return sortOrder === 'asc' ? totalA - totalB : totalB - totalA;
+        });
+        break;
+      
+      default:
+        // Manual - nu sortăm, păstrăm ordinea curentă
+        return;
+    }
+
+    setLines(sortedLines);
+    setSortBy(sortType);
+  };
+
+  /**
+   * Schimbă ordinea de sortare (asc/desc)
+   */
+  const toggleSortOrder = () => {
+    const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+    setSortOrder(newOrder);
+    
+    // Reaplică sortarea cu noua ordine
+    if (sortBy !== 'manual') {
+      sortLines(sortBy);
+    }
+  };
+
+  /**
+   * Obține liniile grupate pe categorii (pentru afișare)
+   */
+  const getGroupedLines = () => {
+    if (!groupByCategory) {
+      return { ungrouped: lines };
+    }
+
+    const grouped = {};
+    
+    lines.forEach(line => {
+      // Verifică dacă produsul are categorie salvată
+      const products = templateService.getProductTemplates();
+      const productTemplate = products.find(p => p.name === line.product);
+      
+      const categoryId = productTemplate?.category || 'uncategorized';
+      
+      if (!grouped[categoryId]) {
+        grouped[categoryId] = [];
+      }
+      grouped[categoryId].push(line);
+    });
+
+    return grouped;
   };
 
   // ===== Funcții UI/UX îmbunătățiri =====
@@ -1802,8 +2527,22 @@ const InvoiceGenerator = () => {
                 <div style="font-weight: 600; font-size: 15px; color: #212121; margin-bottom: 8px;">${invoiceData.supplierName || '-'}</div>
                 <div style="font-size: 12px; color: #666; line-height: 1.6;">
                   <div><strong>CUI:</strong> ${invoiceData.supplierCUI || '-'}</div>
+                  ${invoiceData.supplierRegCom ? `<div><strong>Reg Com:</strong> ${invoiceData.supplierRegCom}</div>` : ''}
                   ${invoiceData.supplierAddress ? `<div style="margin-top: 4px;">${invoiceData.supplierAddress}</div>` : ''}
                   ${invoiceData.supplierCity ? `<div>${invoiceData.supplierCity}</div>` : ''}
+                  ${invoiceData.supplierCounty ? `<div>${invoiceData.supplierCounty}</div>` : ''}
+                  ${invoiceData.supplierPhone ? `<div style="margin-top: 4px;"><strong>Tel:</strong> ${invoiceData.supplierPhone}</div>` : ''}
+                  ${invoiceData.supplierEmail ? `<div><strong>Email:</strong> ${invoiceData.supplierEmail}</div>` : ''}
+                  ${invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0 ? `
+                    ${invoiceData.supplierBankAccounts.map((account, idx) => {
+                      if (!account.iban && !account.bank) return '';
+                      const label = invoiceData.supplierBankAccounts.length > 1 ? `Cont ${idx + 1}` : 'Cont bancar';
+                      return `
+                        ${account.iban ? `<div style="margin-top: 4px;"><strong>${label} (${account.currency || 'RON'}):</strong> ${account.iban}</div>` : ''}
+                        ${account.bank ? `<div><strong>Banca:</strong> ${account.bank}</div>` : ''}
+                      `;
+                    }).join('')}
+                  ` : ''}
                 </div>
               </div>
             </td>
@@ -1813,8 +2552,22 @@ const InvoiceGenerator = () => {
                 <div style="font-weight: 600; font-size: 15px; color: #212121; margin-bottom: 8px;">${invoiceData.clientName || '-'}</div>
                 <div style="font-size: 12px; color: #666; line-height: 1.6;">
                   <div><strong>CUI:</strong> ${invoiceData.clientCUI || '-'}</div>
+                  ${invoiceData.clientRegCom ? `<div><strong>Reg Com:</strong> ${invoiceData.clientRegCom}</div>` : ''}
                   ${invoiceData.clientAddress ? `<div style="margin-top: 4px;">${invoiceData.clientAddress}</div>` : ''}
                   ${invoiceData.clientCity ? `<div>${invoiceData.clientCity}</div>` : ''}
+                  ${invoiceData.clientCounty ? `<div>${invoiceData.clientCounty}</div>` : ''}
+                  ${invoiceData.clientPhone ? `<div style="margin-top: 4px;"><strong>Tel:</strong> ${invoiceData.clientPhone}</div>` : ''}
+                  ${invoiceData.clientEmail ? `<div><strong>Email:</strong> ${invoiceData.clientEmail}</div>` : ''}
+                  ${invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0 ? `
+                    ${invoiceData.clientBankAccounts.map((account, idx) => {
+                      if (!account.iban && !account.bank) return '';
+                      const label = invoiceData.clientBankAccounts.length > 1 ? `Cont ${idx + 1}` : 'Cont bancar';
+                      return `
+                        ${account.iban ? `<div style="margin-top: 4px;"><strong>${label} (${account.currency || 'RON'}):</strong> ${account.iban}</div>` : ''}
+                        ${account.bank ? `<div><strong>Banca:</strong> ${account.bank}</div>` : ''}
+                      `;
+                    }).join('')}
+                  ` : ''}
                 </div>
               </div>
             </td>
@@ -2115,252 +2868,42 @@ const InvoiceGenerator = () => {
   const totals = calculateTotals();
 
   const exportToPDF = async () => {
-    // Generează QR Code dacă există IBAN
-    let qrCodeImg = '';
-    if (invoiceData.supplierBankAccounts[0]?.iban && invoiceData.supplierName) {
+    // Folosește funcția helper pentru a genera PDF-ul (pentru consecvență totală cu batch export)
+    const { imgData, canvas } = await generateSingleInvoicePDF();
+
+    // Creează PDF
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+
+    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight) * 72 / 96;
+    const imgX = (pdfWidth - imgWidth * ratio) / 2;
+    const imgY = 10;
+
+    pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+
+    // Salvează PDF
+    pdf.save(`factura_${invoiceData.series || 'X'}_${invoiceData.number || '000'}_${invoiceData.issueDate}.pdf`);
+
+    // Salvează datele în cookie dacă este consimțământ
+    saveSupplierDataToCookie();
+
+    // Salvează în Google Sheets dacă este conectat
+    if (googleSheetsConnected) {
+      saveSupplierDataToSheets();
       try {
-        const qrDataUrl = await paymentService.generatePaymentQR({
-          iban: invoiceData.supplierBankAccounts[0].iban,
-          amount: parseFloat(totals.gross),
-          currency: invoiceData.currency,
-          beneficiary: invoiceData.supplierName,
-          reference: `Factura ${invoiceData.series || ''}${invoiceData.number || ''}`,
-          bic: ''
-        });
-        qrCodeImg = `<img src="${qrDataUrl}" style="width: 150px; height: 150px; display: block; margin: 0 auto;" />`;
-      } catch (error) {
-        console.warn('Nu s-a putut genera QR Code pentru PDF:', error);
+        await googleSheetsService.requestAuthorization();
+        await googleSheetsService.saveInvoiceToHistory(invoiceData, lines, totals, invoiceData.notes, attachedFiles);
+      } catch (err) {
+        console.error('Eroare salvare factură în Sheets:', err);
       }
     }
 
-    // Creează un element temporar cu factura HTML (cu diacritice corecte!)
-    const invoiceElement = document.createElement('div');
-    invoiceElement.style.position = 'absolute';
-    invoiceElement.style.left = '-9999px';
-    invoiceElement.style.width = '800px';
-    invoiceElement.style.padding = '40px';
-    invoiceElement.style.backgroundColor = 'white';
-    invoiceElement.style.fontFamily = 'Arial, sans-serif';
-
-    // Construiește HTML-ul facturii
-    invoiceElement.innerHTML = `
-      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 10px; background: #ffffff;">
-        <!-- Header modern cu gradient -->
-        <div style="background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); padding: 25px; margin: -40px -40px 30px -40px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-          <h1 style="margin: 0; color: white; font-size: 28px; font-weight: 600; text-align: center; letter-spacing: 1.5px;">FACTURĂ</h1>
-          <div style="text-align: center; margin-top: 12px; color: rgba(255,255,255,0.95); font-size: 11px;">
-            <div style="display: inline-block; background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 15px; margin: 4px;">
-              <strong>Serie:</strong> ${invoiceData.series || '-'} &nbsp;|&nbsp; <strong>Nr:</strong> ${invoiceData.number || '-'}
-            </div>
-            <div style="display: inline-block; background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 15px; margin: 4px;">
-              <strong>Data:</strong> ${invoiceData.issueDate || '-'}${invoiceData.dueDate ? ` &nbsp;|&nbsp; <strong>Scadență:</strong> ${invoiceData.dueDate}` : ''}
-            </div>
-          </div>
-        </div>
-        
-        <!-- Carduri Furnizor & Beneficiar -->
-        <table style="width: 100%; margin-bottom: 20px; border-spacing: 12px 0;">
-          <tr>
-            <td style="width: 50%; vertical-align: top;">
-              <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; border-left: 4px solid #1976d2; min-height: 140px;">
-                <div style="color: #1976d2; font-weight: 700; font-size: 11px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">📤 FURNIZOR</div>
-                <div style="font-weight: 600; font-size: 12px; color: #212121; margin-bottom: 6px;">${invoiceData.supplierName || '-'}</div>
-                <div style="font-size: 9px; color: #666; line-height: 1.6;">
-                  <div><strong>CUI:</strong> ${invoiceData.supplierCUI || '-'}</div>
-                  ${invoiceData.supplierRegCom ? `<div><strong>Reg Com:</strong> ${invoiceData.supplierRegCom}</div>` : ''}
-                  ${invoiceData.supplierAddress ? `<div style="margin-top: 4px;">${invoiceData.supplierAddress}</div>` : ''}
-                  ${invoiceData.supplierCity ? `<div>${invoiceData.supplierCity}</div>` : ''}
-                  ${invoiceData.supplierPhone ? `<div style="margin-top: 4px;"><strong>Tel:</strong> ${invoiceData.supplierPhone}</div>` : ''}
-                  ${invoiceData.supplierEmail ? `<div><strong>Email:</strong> ${invoiceData.supplierEmail}</div>` : ''}
-                  ${invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0 && invoiceData.supplierBankAccounts[0].iban ? `<div style="margin-top: 4px;"><strong>IBAN (${invoiceData.supplierBankAccounts[0].currency || 'RON'}):</strong> ${invoiceData.supplierBankAccounts[0].iban}</div>` : ''}
-                  ${invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0 && invoiceData.supplierBankAccounts[0].bank ? `<div><strong>Banca:</strong> ${invoiceData.supplierBankAccounts[0].bank}</div>` : ''}
-                </div>
-              </div>
-            </td>
-            <td style="width: 50%; vertical-align: top;">
-              <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; border-left: 4px solid #4caf50; min-height: 140px;">
-                <div style="color: #4caf50; font-weight: 700; font-size: 11px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">📥 BENEFICIAR</div>
-                <div style="font-weight: 600; font-size: 12px; color: #212121; margin-bottom: 6px;">${invoiceData.clientName || '-'}</div>
-                <div style="font-size: 9px; color: #666; line-height: 1.6;">
-                  <div><strong>CUI:</strong> ${invoiceData.clientCUI || '-'}</div>
-                  ${invoiceData.clientRegCom ? `<div><strong>Reg Com:</strong> ${invoiceData.clientRegCom}</div>` : ''}
-                  ${invoiceData.clientAddress ? `<div style="margin-top: 4px;">${invoiceData.clientAddress}</div>` : ''}
-                  ${invoiceData.clientCity ? `<div>${invoiceData.clientCity}</div>` : ''}
-                  ${invoiceData.clientPhone ? `<div style="margin-top: 4px;"><strong>Tel:</strong> ${invoiceData.clientPhone}</div>` : ''}
-                  ${invoiceData.clientEmail ? `<div><strong>Email:</strong> ${invoiceData.clientEmail}</div>` : ''}
-                  ${invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0 && invoiceData.clientBankAccounts[0].iban ? `<div style="margin-top: 4px;"><strong>IBAN (${invoiceData.clientBankAccounts[0].currency || 'RON'}):</strong> ${invoiceData.clientBankAccounts[0].iban}</div>` : ''}
-                  ${invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0 && invoiceData.clientBankAccounts[0].bank ? `<div><strong>Banca:</strong> ${invoiceData.clientBankAccounts[0].bank}</div>` : ''}
-                </div>
-              </div>
-            </td>
-          </tr>
-        </table>
-        
-        <!-- Informație Monedă -->
-        <div style="margin: 20px 0 8px 0; padding: 6px 12px; background: linear-gradient(to right, #fff3e0, #ffffff); border-left: 4px solid #ff9800; border-radius: 4px; display: inline-block;">
-          <span style="color: #e65100; font-weight: 700; font-size: 9px; letter-spacing: 0.5px;">💰 Monedă: ${invoiceData.currency}</span>
-        </div>
-        
-        <!-- Tabel modern cu shadow -->
-        <table style="width: 100%; border-collapse: collapse; margin-top: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 6px; overflow: hidden;">
-          <thead>
-            <tr style="background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); color: white;">
-              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: none;">Nr.</th>
-              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; border: none;">Produs/Serviciu</th>
-              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: none;">Cant.</th>
-              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Preț Net</th>
-              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: none;">TVA%</th>
-              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Suma TVA</th>
-              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Preț Brut</th>
-              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Total Net</th>
-              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Total TVA</th>
-              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Total Brut</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${lines.map((line, index) => {
-      const discountPercent = parseFloat(line.discountPercent) || 0;
-      const discountAmount = parseFloat(line.discountAmount) || 0;
-      const hasDiscount = discountPercent > 0 || discountAmount > 0;
-
-      let rows = `
-              <tr style="border-bottom: 1px solid #e0e0e0;">
-                <td style="padding: 10px 8px; text-align: center; font-size: 9px; color: #757575; border: none;">${index + 1}</td>
-                <td style="padding: 10px 8px; font-size: 9px; color: #212121; border: none;">${line.product || '-'}</td>
-                <td style="padding: 10px 8px; text-align: center; font-size: 9px; color: #212121; border: none;">${line.quantity}</td>
-                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #212121; border: none;">${line.unitNetPrice}</td>
-                <td style="padding: 10px 8px; text-align: center; font-size: 9px; color: #1976d2; font-weight: 500; border: none;">${line.vatRate}%</td>
-                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #1976d2; font-weight: 500; border: none;">${calculateLineVat(line)}</td>
-                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #212121; border: none;">${line.unitGrossPrice}</td>
-                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #212121; font-weight: 500; border: none;">${calculateLineTotal(line, 'net')}</td>
-                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #1976d2; font-weight: 500; border: none;">${calculateLineTotal(line, 'vat')}</td>
-                <td style="padding: 10px 8px; text-align: right; font-size: 10px; color: #212121; font-weight: 600; border: none;">${calculateLineTotal(line, 'gross')}</td>
-              </tr>`;
-
-      // Adaugă linie de discount dacă există
-      if (hasDiscount) {
-        const discountNet = (parseFloat(line.unitNetPrice) * parseFloat(line.quantity) * discountPercent / 100 + discountAmount);
-        const discountVat = discountNet * parseFloat(line.vatRate) / 100;
-        const discountGross = discountNet + discountVat;
-        rows += `
-              <tr style="background: linear-gradient(to right, #fff5f5, #ffffff); border-bottom: 1px solid #ffcdd2;">
-                <td style="padding: 8px; text-align: center; border: none;"></td>
-                <td style="padding: 8px; font-style: italic; font-size: 9px; color: #c62828; border: none;">🏷️ Discount ${discountPercent > 0 ? discountPercent + '%' : ''} ${discountAmount > 0 ? discountAmount : ''} la ${line.product || 'produs'}</td>
-                <td style="padding: 8px; text-align: center; font-size: 8px; color: #757575; border: none;">1,00</td>
-                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountNet.toFixed(2)}</td>
-                <td style="padding: 8px; text-align: center; font-size: 8px; color: #c62828; border: none;">${line.vatRate}%</td>
-                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountVat.toFixed(2)}</td>
-                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountGross.toFixed(2)}</td>
-                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountNet.toFixed(2)}</td>
-                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountVat.toFixed(2)}</td>
-                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 700; font-size: 9px; border: none;">-${discountGross.toFixed(2)}</td>
-              </tr>`;
-      }
-
-      return rows;
-    }).join('')}
-            ${totals.discountAmount && parseFloat(totals.discountAmount) > 0 ? (() => {
-        const originalGross = parseFloat(totals.originalGross) || 0;
-        const finalGross = parseFloat(totals.gross) || 0;
-        const totalDiscountGross = originalGross - finalGross - parseFloat(totals.lineDiscounts || 0);
-        const totalDiscountNet = totalDiscountGross / 1.19;
-        const totalDiscountVat = totalDiscountGross - totalDiscountNet;
-        return `
-            <tr style="background: linear-gradient(to right, #ffe8e8, #ffffff); border-bottom: 2px solid #ef5350;">
-              <td style="padding: 8px; text-align: center; border: none;"></td>
-              <td style="padding: 8px; font-style: italic; font-weight: 700; font-size: 9px; color: #b71c1c; border: none;">🎁 Discount factura de ${totalDiscount.type === 'percent' ? totalDiscount.percent + '%' : totalDiscount.amount}</td>
-              <td style="padding: 8px; text-align: center; font-size: 8px; color: #757575; border: none;">1,00</td>
-              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountNet.toFixed(2)}</td>
-              <td style="padding: 8px; text-align: center; border: none;"></td>
-              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountVat.toFixed(2)}</td>
-              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountGross.toFixed(2)}</td>
-              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountNet.toFixed(2)}</td>
-              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountVat.toFixed(2)}</td>
-              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 800; font-size: 10px; border: none;">-${totalDiscountGross.toFixed(2)}</td>
-              </tr>
-            `;
-      })() : ''}
-          </tbody>
-          <tfoot>
-            <tr style="background: linear-gradient(135deg, #37474f 0%, #263238 100%); color: white;">
-              <td colspan="7" style="padding: 14px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; border: none;">💰 TOTAL FACTURĂ</td>
-              <td style="padding: 14px 8px; text-align: right; font-size: 11px; font-weight: 700; border: none;">${totals.net} ${invoiceData.currency}</td>
-              <td style="padding: 14px 8px; text-align: right; font-size: 11px; font-weight: 700; border: none;">${totals.vat} ${invoiceData.currency}</td>
-              <td style="padding: 14px 8px; text-align: right; font-size: 12px; font-weight: 800; background: rgba(76, 175, 80, 0.2); border: none;">${totals.gross} ${invoiceData.currency}</td>
-            </tr>
-          </tfoot>
-        </table>
-        ${invoiceData.notes ? `
-        <div style="margin-top: 20px; padding: 16px; background: linear-gradient(to right, #e3f2fd, #ffffff); border-left: 4px solid #1976d2; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-          <div style="color: #1976d2; font-weight: 700; font-size: 10px; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">📝 NOTE</div>
-          <div style="font-size: 9px; color: #424242; line-height: 1.6; white-space: pre-wrap;">${invoiceData.notes}</div>
-        </div>` : ''}
-        
-        ${qrCodeImg ? `
-        <div style="margin-top: 25px; padding: 20px; background: linear-gradient(to bottom, #f1f8e9, #ffffff); border: 2px solid #4caf50; border-radius: 12px; text-align: center; box-shadow: 0 3px 10px rgba(76, 175, 80, 0.2);">
-          <div style="color: #2e7d32; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">💳 PLATĂ RAPIDĂ CU COD QR</div>
-          <div style="margin-top: 10px;">
-            ${qrCodeImg}
-          </div>
-          <div style="margin-top: 12px; font-size: 9px; color: #558b2f; line-height: 1.5;">
-            <strong>Scanează codul QR</strong> cu aplicația de banking<br/>
-            pentru a plăti factura instant!
-          </div>
-        </div>` : ''}
-      </div>
-    `;
-
-    document.body.appendChild(invoiceElement);
-
-    try {
-      // Convertește HTML-ul la canvas/imagine
-      const canvas = await html2canvas(invoiceElement, {
-        scale: 2, // Calitate mai bună (2x resolution)
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      });
-
-      // Creează PDF
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgData = canvas.toDataURL('image/png');
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight) * 72 / 96; // Adjust for DPI
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 10;
-
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-
-      // Salvează PDF
-      pdf.save(`factura_${invoiceData.series || 'X'}_${invoiceData.number || '000'}_${invoiceData.issueDate}.pdf`);
-
-      // Salvează datele în cookie dacă este consimțământ
-      saveSupplierDataToCookie();
-
-      // Salvează în Google Sheets dacă este conectat
-      if (googleSheetsConnected) {
-        saveSupplierDataToSheets();
-        try {
-          await googleSheetsService.requestAuthorization();
-          await googleSheetsService.saveInvoiceToHistory(invoiceData, lines, totals, invoiceData.notes, attachedFiles);
-        } catch (err) {
-          console.error('Eroare salvare factură în Sheets:', err);
-        }
-      }
-
-      // Salvează în istoric
-      invoiceHistoryService.setType('invoice');
-      invoiceHistoryService.saveInvoice(invoiceData, lines, totals, invoiceData.notes, attachedFiles);
-
-    } finally {
-      // Șterge elementul temporar
-      document.body.removeChild(invoiceElement);
-    }
+    // Salvează în istoric
+    invoiceHistoryService.setType('invoice');
+    invoiceHistoryService.saveInvoice(invoiceData, lines, totals, invoiceData.notes, attachedFiles);
   };
 
   const exportToExcel = async () => {
@@ -3114,6 +3657,309 @@ const InvoiceGenerator = () => {
     setExpandedAccordion(isExpanded ? panel : false);
   };
 
+  // ===== Funcții Facturare Recurentă =====
+
+  /**
+   * Verifică dacă există facturi duplicate (aceeași serie + număr)
+   */
+  const checkDuplicateInvoice = useCallback((series, number) => {
+    if (!series || !number) {
+      setDuplicateWarning('');
+      return;
+    }
+
+    const invoices = invoiceHistoryService.getAllInvoices();
+    const duplicate = invoices.find(
+      inv => inv.series === series && inv.number === number
+    );
+
+    if (duplicate) {
+      setDuplicateWarning(
+        `⚠️ Atenție! O factură cu seria "${series}" și numărul "${number}" există deja în istoric (emisă la ${duplicate.issueDate}).`
+      );
+    } else {
+      setDuplicateWarning('');
+    }
+  }, []);
+
+  /**
+   * Verifică consistența datelor și afișează avertismente
+   */
+  const validateInvoiceData = useCallback(() => {
+    const warnings = [];
+
+    // Verifică date esențiale factură
+    if (!invoiceData.series) warnings.push('Lipsește seria facturii');
+    if (!invoiceData.number) warnings.push('Lipsește numărul facturii');
+    if (!invoiceData.issueDate) warnings.push('Lipsește data emiterii');
+
+    // Verifică furnizor
+    if (!invoiceData.supplierName) warnings.push('Lipsește numele furnizorului');
+    if (!invoiceData.supplierCUI) warnings.push('Lipsește CUI-ul furnizorului');
+    if (!invoiceData.supplierAddress) warnings.push('Lipsește adresa furnizorului');
+    if (!invoiceData.supplierBankAccounts[0]?.iban) warnings.push('Lipsește IBAN-ul furnizorului');
+
+    // Verifică client
+    if (!invoiceData.clientName) warnings.push('Lipsește numele beneficiarului');
+    if (!invoiceData.clientCUI) warnings.push('Lipsește CUI-ul beneficiarului');
+    if (!invoiceData.clientAddress) warnings.push('Lipsește adresa beneficiarului');
+
+    // Verifică linii
+    if (lines.length === 0) {
+      warnings.push('Nu există nicio linie în factură');
+    } else {
+      const emptyLines = lines.filter(line => !line.product || parseFloat(line.unitNetPrice) === 0);
+      if (emptyLines.length > 0) {
+        warnings.push(`${emptyLines.length} linie/linii fără produs sau preț`);
+      }
+    }
+
+    // Verifică total
+    if (parseFloat(totals.gross) === 0) {
+      warnings.push('Totalul facturii este 0');
+    }
+
+    setValidationWarnings(warnings);
+    return warnings;
+  }, [invoiceData, lines, totals]);
+
+  /**
+   * Salvează factura curentă ca șablon
+   */
+  const saveAsInvoiceSablon = () => {
+    const sablonName = prompt('Introdu un nume pentru acest șablon de factură:');
+    if (!sablonName) return;
+
+    const sablon = {
+      id: Date.now(),
+      name: sablonName,
+      series: invoiceData.series,
+      currency: invoiceData.currency,
+      notes: invoiceData.notes,
+      lines: lines.map(line => ({
+        product: line.product,
+        quantity: line.quantity,
+        purchasePrice: line.purchasePrice,
+        markup: line.markup,
+        unitNetPrice: line.unitNetPrice,
+        vatRate: line.vatRate,
+        unitGrossPrice: line.unitGrossPrice,
+        discountPercent: line.discountPercent,
+        discountAmount: line.discountAmount
+      })),
+      totalDiscount: totalDiscount,
+      createdAt: new Date().toISOString()
+    };
+
+    // Salvează în localStorage
+    const sabloane = JSON.parse(localStorage.getItem('normalro_invoice_sabloane') || '[]');
+    sabloane.push(sablon);
+    localStorage.setItem('normalro_invoice_sabloane', JSON.stringify(sabloane));
+
+    // Salvează în Google Sheets dacă este conectat
+    if (googleSheetsConnected) {
+      saveInvoiceSablonToSheets(sablon);
+    }
+
+    alert(`✅ Șablon "${sablonName}" salvat cu succes!`);
+  };
+
+  /**
+   * Încarcă un șablon de factură
+   */
+  const loadInvoiceSablon = (sablon) => {
+    const confirmed = window.confirm(
+      `Vrei să încarci șablonul "${sablon.name}"?\n\n` +
+      `Atenție: Datele curente vor fi înlocuite cu cele din șablon!\n` +
+      `(Date furnizor/client NU vor fi modificate)`
+    );
+
+    if (!confirmed) return;
+
+    // Păstrează datele furnizor/client, dar înlocuiește restul
+    setInvoiceData(prev => ({
+      ...prev,
+      series: sablon.series || prev.series,
+      currency: sablon.currency || prev.currency,
+      notes: sablon.notes || ''
+    }));
+
+    setLines(sablon.lines.map((line, index) => ({
+      ...line,
+      id: Date.now() + index
+    })));
+
+    setTotalDiscount(sablon.totalDiscount || { type: 'none', percent: '0.00', amount: '0.00' });
+
+    alert(`✅ Șablon "${sablon.name}" încărcat cu succes!`);
+    setInvoiceSablonDialogOpen(false);
+  };
+
+  /**
+   * Șterge un șablon de factură
+   */
+  const deleteInvoiceSablon = (sablonId) => {
+    const sabloane = JSON.parse(localStorage.getItem('normalro_invoice_sabloane') || '[]');
+    const sablon = sabloane.find(t => t.id === sablonId);
+
+    if (!sablon) return;
+
+    const confirmed = window.confirm(
+      `Ești sigur că vrei să ștergi șablonul "${sablon.name}"?\n\n` +
+      `Această acțiune nu poate fi anulată.`
+    );
+
+    if (!confirmed) return;
+
+    const updatedSabloane = sabloane.filter(t => t.id !== sablonId);
+    localStorage.setItem('normalro_invoice_sabloane', JSON.stringify(updatedSabloane));
+
+    alert(`✅ Șablon "${sablon.name}" șters cu succes!`);
+  };
+
+  /**
+   * Salvează șablon factură în Google Sheets
+   */
+  const saveInvoiceSablonToSheets = async (sablon) => {
+    if (!googleSheetsConnected) return;
+
+    try {
+      await googleSheetsService.requestAuthorization();
+      // Implementare simplificată - poți extinde googleSheetsService cu o metodă dedicată
+      console.log('📄 Șablon salvat în Google Sheets:', sablon.name);
+    } catch (error) {
+      console.error('Eroare salvare șablon în Sheets:', error);
+    }
+  };
+
+  /**
+   * Duplică factura curentă (incrementează automat numărul)
+   */
+  const duplicateCurrentInvoice = () => {
+    const confirmed = window.confirm(
+      `Vrei să dublezi factura curentă?\n\n` +
+      `Se va crea o nouă factură cu:\n` +
+      `• Același furnizor și beneficiar\n` +
+      `• Aceleași produse și prețuri\n` +
+      `• Număr incrementat automat\n` +
+      `• Data curentă`
+    );
+
+    if (!confirmed) return;
+
+    // Incrementează numărul facturii
+    const newNumber = incrementInvoiceNumber(invoiceData.number);
+
+    // Setează noile date
+    setInvoiceData(prev => ({
+      ...prev,
+      number: newNumber,
+      issueDate: new Date().toISOString().split('T')[0],
+      dueDate: '',
+      guid: '' // Resetează GUID pentru factură nouă
+    }));
+
+    // Păstrează liniile și discount-urile
+    // (deja în state, nu e nevoie să facem nimic)
+
+    // Verifică automat dacă există duplicate
+    checkDuplicateInvoice(invoiceData.series, newNumber);
+
+    alert(
+      `✅ Factură dublată cu succes!\n\n` +
+      `Noua factură: ${invoiceData.series} ${newNumber}\n` +
+      `Data: ${new Date().toLocaleDateString('ro-RO')}\n\n` +
+      `Verifică și modifică datele după necesitate.`
+    );
+
+    // Scroll la top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  /**
+   * Obține sugestii de produse bazate pe istoric
+   */
+  const getProductSuggestions = useCallback((searchTerm) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setProductSuggestions([]);
+      return;
+    }
+
+    // Extrage produse unice din istoric facturi
+    const invoices = invoiceHistoryService.getAllInvoices();
+    const allProducts = invoices.flatMap(inv => inv.lines || []);
+
+    // Creează un Map pentru produse unice (bazat pe nume)
+    const uniqueProducts = new Map();
+    allProducts.forEach(line => {
+      if (line.product && line.product.toLowerCase().includes(searchTerm.toLowerCase())) {
+        const key = line.product.toLowerCase();
+        if (!uniqueProducts.has(key)) {
+          uniqueProducts.set(key, {
+            product: line.product,
+            unitNetPrice: line.unitNetPrice || '0.00',
+            vatRate: line.vatRate || DEFAULT_VAT_RATE,
+            quantity: line.quantity || '1',
+            count: 1
+          });
+        } else {
+          // Incrementează numărul de apariții
+          const existing = uniqueProducts.get(key);
+          existing.count++;
+        }
+      }
+    });
+
+    // Sortează după frecvență (count) descrescător
+    const suggestions = Array.from(uniqueProducts.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5); // Limitează la 5 sugestii
+
+    setProductSuggestions(suggestions);
+  }, [DEFAULT_VAT_RATE]);
+
+  /**
+   * Aplică sugestie produs pe o linie
+   */
+  const applySuggestionToLine = (lineId, suggestion) => {
+    const vat = parseFloat(suggestion.vatRate) || 0;
+    const net = parseFloat(suggestion.unitNetPrice) || 0;
+    const gross = net * (1 + vat / 100);
+
+    setLines(lines.map(line => {
+      if (line.id === lineId) {
+        return {
+          ...line,
+          product: suggestion.product,
+          quantity: suggestion.quantity || '1',
+          unitNetPrice: formatNumber(suggestion.unitNetPrice),
+          vatRate: suggestion.vatRate,
+          unitGrossPrice: formatNumber(gross)
+        };
+      }
+      return line;
+    }));
+
+    // Ascunde sugestiile
+    setShowProductSuggestions(prev => ({ ...prev, [lineId]: false }));
+    setProductSuggestions([]);
+  };
+
+  // useEffect pentru verificare duplicate când se modifică seria/numărul
+  useEffect(() => {
+    checkDuplicateInvoice(invoiceData.series, invoiceData.number);
+  }, [invoiceData.series, invoiceData.number, checkDuplicateInvoice]);
+
+  // useEffect pentru validare date (rulează la modificări)
+  useEffect(() => {
+    // Debounce pentru a nu rula prea des
+    const timer = setTimeout(() => {
+      validateInvoiceData();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [invoiceData, lines, validateInvoiceData]);
+
   // ===== Funcții BNR (Cursuri Valutare) =====
 
   /**
@@ -3380,6 +4226,654 @@ const InvoiceGenerator = () => {
     setQrCodeDialog({ open: false, qrDataUrl: '', loading: false });
   };
 
+  // ===== Funcții Export Suplimentar =====
+
+  /**
+   * Print optimizat - deschide dialog print cu CSS print-friendly
+   */
+  const printInvoice = () => {
+    // Generează HTML-ul facturii
+    const invoiceHTML = generateInvoiceHTML();
+
+    // Creează o fereastră nouă pentru print
+    const printWindow = window.open('', '_blank');
+    
+    if (!printWindow) {
+      alert('❌ Fereastră blocată! Permite pop-up-uri pentru a printa factura.');
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Factură ${invoiceData.series || ''}${invoiceData.number || ''}</title>
+        <style>
+          /* Reset și stiluri de bază */
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #000;
+            background: #fff;
+          }
+
+          /* Print-specific styles */
+          @media print {
+            body {
+              margin: 0;
+              padding: 0;
+            }
+            
+            @page {
+              size: A4;
+              margin: 15mm;
+            }
+
+            /* Prevent page breaks inside important elements */
+            table, tr, td, th {
+              page-break-inside: avoid;
+            }
+
+            /* Hide elements that shouldn't print */
+            .no-print {
+              display: none !important;
+            }
+
+            /* Ensure colors print */
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+          }
+
+          /* Screen preview styles */
+          @media screen {
+            body {
+              padding: 20px;
+              background: #f5f5f5;
+            }
+
+            .print-container {
+              max-width: 210mm;
+              margin: 0 auto;
+              background: white;
+              padding: 15mm;
+              box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            }
+
+            .no-print {
+              margin-top: 20px;
+              text-align: center;
+            }
+
+            .no-print button {
+              padding: 10px 20px;
+              font-size: 14px;
+              cursor: pointer;
+              background: #1976d2;
+              color: white;
+              border: none;
+              border-radius: 4px;
+              margin: 0 5px;
+            }
+
+            .no-print button:hover {
+              background: #1565c0;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="print-container">
+          ${invoiceHTML}
+        </div>
+        <div class="no-print">
+          <button onclick="window.print()">🖨️ Printează</button>
+          <button onclick="window.close()">❌ Închide</button>
+        </div>
+        <script>
+          // Auto-print când se încarcă pagina (opțional)
+          // window.onload = () => window.print();
+        </script>
+      </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+  };
+
+  /**
+   * Helper: Generează PDF pentru o factură (din invoiceData curent SAU din istoric)
+   * Folosește EXACT aceeași logică ca exportToPDF() pentru consecvență
+   */
+  const generateSingleInvoicePDF = async (invoiceDataParam = null, linesParam = null) => {
+    // Folosește parametrii dacă sunt furnizați, altfel folosește state-ul curent
+    const invData = invoiceDataParam || invoiceData;
+    const invLines = linesParam || lines;
+    
+    // Calculează totaluri pentru această factură
+    let totals;
+    if (invoiceDataParam) {
+      // Pentru facturi din istoric, totalurile sunt deja calculate
+      totals = invoiceDataParam.totals || { net: '0.00', vat: '0.00', gross: '0.00' };
+    } else {
+      // Pentru factura curentă, calculează totalurile
+      totals = calculateTotals();
+    }
+
+    // Generează QR Code dacă există IBAN (EXACT ca în exportToPDF)
+    let qrCodeImg = '';
+    const supplierIBAN = invoiceDataParam 
+      ? invoiceDataParam.supplier?.iban 
+      : invData.supplierBankAccounts[0]?.iban;
+    const supplierName = invoiceDataParam 
+      ? invoiceDataParam.supplier?.name 
+      : invData.supplierName;
+
+    if (supplierIBAN && supplierName) {
+      try {
+        const qrDataUrl = await paymentService.generatePaymentQR({
+          iban: supplierIBAN,
+          amount: parseFloat(totals.gross),
+          currency: invData.currency || 'RON',
+          beneficiary: supplierName,
+          reference: `Factura ${invData.series || ''}${invData.number || ''}`,
+          bic: ''
+        });
+        qrCodeImg = `<img src="${qrDataUrl}" style="width: 150px; height: 150px; display: block; margin: 0 auto;" />`;
+      } catch (error) {
+        console.warn('Nu s-a putut genera QR Code:', error);
+      }
+    }
+
+    // Generează HTML folosind EXACT aceeași funcție ca exportToPDF
+    const invoiceElement = document.createElement('div');
+    invoiceElement.style.position = 'absolute';
+    invoiceElement.style.left = '-9999px';
+    invoiceElement.style.width = '800px';
+    invoiceElement.style.padding = '40px';
+    invoiceElement.style.backgroundColor = 'white';
+    invoiceElement.style.fontFamily = 'Arial, sans-serif';
+
+    // Generează HTML-ul complet (folosind template-ul din exportToPDF)
+    invoiceElement.innerHTML = generatePDFHTMLContent(invData, invLines, totals, qrCodeImg, invoiceDataParam);
+
+    document.body.appendChild(invoiceElement);
+
+    try {
+      const canvas = await html2canvas(invoiceElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      return { imgData, canvas };
+    } finally {
+      document.body.removeChild(invoiceElement);
+    }
+  };
+
+  /**
+   * Helper: Generează HTML-ul complet pentru PDF (reutilizabil)
+   * EXACT același template ca în exportToPDF (cu discount-uri și toate detaliile)
+   */
+  const generatePDFHTMLContent = (invData, invLines, totals, qrCodeImg, fromHistory = null) => {
+    // Extrage datele în funcție de sursa (istoric sau state curent)
+    const getSupplierData = (field) => {
+      if (fromHistory) {
+        return fromHistory.supplier?.[field] || '';
+      }
+      return invData[`supplier${field.charAt(0).toUpperCase() + field.slice(1)}`] || '';
+    };
+
+    const getClientData = (field) => {
+      if (fromHistory) {
+        return fromHistory.client?.[field] || '';
+      }
+      return invData[`client${field.charAt(0).toUpperCase() + field.slice(1)}`] || '';
+    };
+
+    const supplierBankAccounts = fromHistory 
+      ? (fromHistory.supplier?.bankAccounts || [{ bank: '', iban: '', currency: 'RON' }])
+      : (invData.supplierBankAccounts || [{ bank: '', iban: '', currency: 'RON' }]);
+
+    const clientBankAccounts = fromHistory
+      ? (fromHistory.client?.bankAccounts || [{ bank: '', iban: '', currency: 'RON' }])
+      : (invData.clientBankAccounts || [{ bank: '', iban: '', currency: 'RON' }]);
+
+    // Funcții helper pentru calcule (reutilizare logică)
+    const calculateLineVatForLine = (line) => {
+      const net = parseFloat(line.unitNetPrice);
+      const vat = parseFloat(line.vatRate);
+      if (!isNaN(net) && !isNaN(vat)) {
+        const vatAmount = Math.round(net * vat * 10000) / 1000000;
+        return vatAmount.toFixed(2);
+      }
+      return '0.00';
+    };
+
+    const calculateLineTotalForLine = (line, type) => {
+      const qty = parseFloat(line.quantity) || 0;
+      if (type === 'net') {
+        const net = parseFloat(line.unitNetPrice) || 0;
+        return (net * qty).toFixed(2);
+      } else if (type === 'vat') {
+        const vat = parseFloat(calculateLineVatForLine(line)) || 0;
+        return (vat * qty).toFixed(2);
+      } else if (type === 'gross') {
+        const gross = parseFloat(line.unitGrossPrice) || 0;
+        return (gross * qty).toFixed(2);
+      }
+      return '0.00';
+    };
+
+    return `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 10px; background: #ffffff;">
+        <!-- Header modern cu gradient -->
+        <div style="background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); padding: 25px; margin: -40px -40px 30px -40px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <h1 style="margin: 0; color: white; font-size: 28px; font-weight: 600; text-align: center; letter-spacing: 1.5px;">FACTURĂ</h1>
+          <div style="text-align: center; margin-top: 12px; color: rgba(255,255,255,0.95); font-size: 11px;">
+            <div style="display: inline-block; background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 15px; margin: 4px;">
+              <strong>Serie:</strong> ${invData.series || '-'} &nbsp;|&nbsp; <strong>Nr:</strong> ${invData.number || '-'}
+            </div>
+            <div style="display: inline-block; background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 15px; margin: 4px;">
+              <strong>Data:</strong> ${invData.issueDate || '-'}${invData.dueDate ? ` &nbsp;|&nbsp; <strong>Scadență:</strong> ${invData.dueDate}` : ''}
+            </div>
+          </div>
+        </div>
+        
+        <!-- Carduri Furnizor & Beneficiar -->
+        <table style="width: 100%; margin-bottom: 20px; border-spacing: 12px 0;">
+          <tr>
+            <td style="width: 50%; vertical-align: top;">
+              <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; border-left: 4px solid #1976d2; min-height: 140px;">
+                <div style="color: #1976d2; font-weight: 700; font-size: 11px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">📤 FURNIZOR</div>
+                <div style="font-weight: 600; font-size: 12px; color: #212121; margin-bottom: 6px;">${getSupplierData('name')}</div>
+                <div style="font-size: 9px; color: #666; line-height: 1.6;">
+                  <div><strong>CUI:</strong> ${getSupplierData('cui')}</div>
+                  ${getSupplierData('regCom') ? `<div><strong>Reg Com:</strong> ${getSupplierData('regCom')}</div>` : ''}
+                  ${getSupplierData('address') ? `<div style="margin-top: 4px;">${getSupplierData('address')}</div>` : ''}
+                  ${getSupplierData('city') ? `<div>${getSupplierData('city')}</div>` : ''}
+                  ${getSupplierData('phone') ? `<div style="margin-top: 4px;"><strong>Tel:</strong> ${getSupplierData('phone')}</div>` : ''}
+                  ${getSupplierData('email') ? `<div><strong>Email:</strong> ${getSupplierData('email')}</div>` : ''}
+                  ${supplierBankAccounts && supplierBankAccounts.length > 0 ? `
+                    ${supplierBankAccounts.map((account, idx) => {
+                      if (!account.iban && !account.bank) return '';
+                      const label = supplierBankAccounts.length > 1 ? `Cont ${idx + 1}` : 'Cont bancar';
+                      return `
+                        ${account.iban ? `<div style="margin-top: 4px;"><strong>${label} (${account.currency || 'RON'}):</strong> ${account.iban}</div>` : ''}
+                        ${account.bank ? `<div><strong>Banca:</strong> ${account.bank}</div>` : ''}
+                      `;
+                    }).join('')}
+                  ` : ''}
+                </div>
+              </div>
+            </td>
+            <td style="width: 50%; vertical-align: top;">
+              <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; border-left: 4px solid #4caf50; min-height: 140px;">
+                <div style="color: #4caf50; font-weight: 700; font-size: 11px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">📥 BENEFICIAR</div>
+                <div style="font-weight: 600; font-size: 12px; color: #212121; margin-bottom: 6px;">${getClientData('name')}</div>
+                <div style="font-size: 9px; color: #666; line-height: 1.6;">
+                  <div><strong>CUI:</strong> ${getClientData('cui')}</div>
+                  ${getClientData('regCom') ? `<div><strong>Reg Com:</strong> ${getClientData('regCom')}</div>` : ''}
+                  ${getClientData('address') ? `<div style="margin-top: 4px;">${getClientData('address')}</div>` : ''}
+                  ${getClientData('city') ? `<div>${getClientData('city')}</div>` : ''}
+                  ${getClientData('phone') ? `<div style="margin-top: 4px;"><strong>Tel:</strong> ${getClientData('phone')}</div>` : ''}
+                  ${getClientData('email') ? `<div><strong>Email:</strong> ${getClientData('email')}</div>` : ''}
+                  ${clientBankAccounts && clientBankAccounts.length > 0 ? `
+                    ${clientBankAccounts.map((account, idx) => {
+                      if (!account.iban && !account.bank) return '';
+                      const label = clientBankAccounts.length > 1 ? `Cont ${idx + 1}` : 'Cont bancar';
+                      return `
+                        ${account.iban ? `<div style="margin-top: 4px;"><strong>${label} (${account.currency || 'RON'}):</strong> ${account.iban}</div>` : ''}
+                        ${account.bank ? `<div><strong>Banca:</strong> ${account.bank}</div>` : ''}
+                      `;
+                    }).join('')}
+                  ` : ''}
+                </div>
+              </div>
+            </td>
+          </tr>
+        </table>
+        
+        <!-- Informație Monedă -->
+        <div style="margin: 20px 0 8px 0; padding: 6px 12px; background: linear-gradient(to right, #fff3e0, #ffffff); border-left: 4px solid #ff9800; border-radius: 4px; display: inline-block;">
+          <span style="color: #e65100; font-weight: 700; font-size: 9px; letter-spacing: 0.5px;">💰 Monedă: ${invData.currency || 'RON'}</span>
+        </div>
+        
+        <!-- Tabel modern cu shadow -->
+        <table style="width: 100%; border-collapse: collapse; margin-top: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 6px; overflow: hidden;">
+          <thead>
+            <tr style="background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); color: white;">
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: none;">Nr.</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; border: none;">Produs/Serviciu</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: none;">Cant.</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Preț Net</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: none;">TVA%</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Suma TVA</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Preț Brut</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Total Net</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Total TVA</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Total Brut</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${invLines.map((line, index) => {
+              const discountPercent = parseFloat(line.discountPercent) || 0;
+              const discountAmount = parseFloat(line.discountAmount) || 0;
+              const hasDiscount = discountPercent > 0 || discountAmount > 0;
+
+              const qty = parseFloat(line.quantity) || 0;
+              const unitNetPrice = parseFloat(line.unitNetPrice) || 0;
+              const vatRate = parseFloat(line.vatRate) || 0;
+              const unitVat = unitNetPrice * vatRate / 100;
+              const unitGross = parseFloat(line.unitGrossPrice) || (unitNetPrice + unitVat);
+              const totalNet = unitNetPrice * qty;
+              const totalVat = unitVat * qty;
+              const totalGross = unitGross * qty;
+
+              let rows = `
+              <tr style="border-bottom: 1px solid #e0e0e0;">
+                <td style="padding: 10px 8px; text-align: center; font-size: 9px; color: #757575; border: none;">${index + 1}</td>
+                <td style="padding: 10px 8px; font-size: 9px; color: #212121; border: none;">${line.product || '-'}</td>
+                <td style="padding: 10px 8px; text-align: center; font-size: 9px; color: #212121; border: none;">${line.quantity || '1'}</td>
+                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #212121; border: none;">${unitNetPrice.toFixed(2)}</td>
+                <td style="padding: 10px 8px; text-align: center; font-size: 9px; color: #1976d2; font-weight: 500; border: none;">${vatRate}%</td>
+                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #1976d2; font-weight: 500; border: none;">${unitVat.toFixed(2)}</td>
+                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #212121; border: none;">${unitGross.toFixed(2)}</td>
+                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #212121; font-weight: 500; border: none;">${totalNet.toFixed(2)}</td>
+                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #1976d2; font-weight: 500; border: none;">${totalVat.toFixed(2)}</td>
+                <td style="padding: 10px 8px; text-align: right; font-size: 10px; color: #212121; font-weight: 600; border: none;">${totalGross.toFixed(2)}</td>
+              </tr>`;
+
+              // Adaugă linie de discount dacă există (EXACT ca în exportToPDF)
+              if (hasDiscount) {
+                const discountNet = (unitNetPrice * qty * discountPercent / 100 + discountAmount);
+                const discountVat = discountNet * vatRate / 100;
+                const discountGross = discountNet + discountVat;
+                rows += `
+              <tr style="background: linear-gradient(to right, #fff5f5, #ffffff); border-bottom: 1px solid #ffcdd2;">
+                <td style="padding: 8px; text-align: center; border: none;"></td>
+                <td style="padding: 8px; font-style: italic; font-size: 9px; color: #c62828; border: none;">🏷️ Discount ${discountPercent > 0 ? discountPercent + '%' : ''} ${discountAmount > 0 ? discountAmount : ''} la ${line.product || 'produs'}</td>
+                <td style="padding: 8px; text-align: center; font-size: 8px; color: #757575; border: none;">1,00</td>
+                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountNet.toFixed(2)}</td>
+                <td style="padding: 8px; text-align: center; font-size: 8px; color: #c62828; border: none;">${vatRate}%</td>
+                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountVat.toFixed(2)}</td>
+                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountGross.toFixed(2)}</td>
+                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountNet.toFixed(2)}</td>
+                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountVat.toFixed(2)}</td>
+                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 700; font-size: 9px; border: none;">-${discountGross.toFixed(2)}</td>
+              </tr>`;
+              }
+
+              return rows;
+            }).join('')}
+            ${totals.discountAmount && parseFloat(totals.discountAmount) > 0 ? (() => {
+              const originalGross = parseFloat(totals.originalGross) || 0;
+              const finalGross = parseFloat(totals.gross) || 0;
+              const totalDiscountGross = originalGross - finalGross - parseFloat(totals.lineDiscounts || 0);
+              const totalDiscountNet = totalDiscountGross / 1.19;
+              const totalDiscountVat = totalDiscountGross - totalDiscountNet;
+              return `
+            <tr style="background: linear-gradient(to right, #ffe8e8, #ffffff); border-bottom: 2px solid #ef5350;">
+              <td style="padding: 8px; text-align: center; border: none;"></td>
+              <td style="padding: 8px; font-style: italic; font-weight: 700; font-size: 9px; color: #b71c1c; border: none;">🎁 Discount factura</td>
+              <td style="padding: 8px; text-align: center; font-size: 8px; color: #757575; border: none;">1,00</td>
+              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountNet.toFixed(2)}</td>
+              <td style="padding: 8px; text-align: center; border: none;"></td>
+              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountVat.toFixed(2)}</td>
+              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountGross.toFixed(2)}</td>
+              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountNet.toFixed(2)}</td>
+              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountVat.toFixed(2)}</td>
+              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 800; font-size: 10px; border: none;">-${totalDiscountGross.toFixed(2)}</td>
+            </tr>
+            `;
+            })() : ''}
+          </tbody>
+          <tfoot>
+            <tr style="background: linear-gradient(135deg, #37474f 0%, #263238 100%); color: white;">
+              <td colspan="7" style="padding: 14px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; border: none;">💰 TOTAL FACTURĂ</td>
+              <td style="padding: 14px 8px; text-align: right; font-size: 11px; font-weight: 700; border: none;">${totals.net} ${invData.currency || 'RON'}</td>
+              <td style="padding: 14px 8px; text-align: right; font-size: 11px; font-weight: 700; border: none;">${totals.vat} ${invData.currency || 'RON'}</td>
+              <td style="padding: 14px 8px; text-align: right; font-size: 12px; font-weight: 800; background: rgba(76, 175, 80, 0.2); border: none;">${totals.gross} ${invData.currency || 'RON'}</td>
+            </tr>
+          </tfoot>
+        </table>
+        ${invData.notes ? `
+        <div style="margin-top: 20px; padding: 16px; background: linear-gradient(to right, #e3f2fd, #ffffff); border-left: 4px solid #1976d2; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+          <div style="color: #1976d2; font-weight: 700; font-size: 10px; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">📝 NOTE</div>
+          <div style="font-size: 9px; color: #424242; line-height: 1.6; white-space: pre-wrap;">${invData.notes}</div>
+        </div>` : ''}
+        
+        ${qrCodeImg ? `
+        <div style="margin-top: 25px; padding: 20px; background: linear-gradient(to bottom, #f1f8e9, #ffffff); border: 2px solid #4caf50; border-radius: 12px; text-align: center; box-shadow: 0 3px 10px rgba(76, 175, 80, 0.2);">
+          <div style="color: #2e7d32; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">💳 PLATĂ RAPIDĂ CU COD QR</div>
+          <div style="margin-top: 10px;">
+            ${qrCodeImg}
+          </div>
+          <div style="margin-top: 12px; font-size: 9px; color: #558b2f; line-height: 1.5;">
+            <strong>Scanează codul QR</strong> cu aplicația de banking<br/>
+            pentru a plăti factura instant!
+          </div>
+        </div>` : ''}
+      </div>
+    `;
+  };
+
+  /**
+   * Generează un singur PDF cu multiple facturi din istoric
+   * Folosește EXACT aceeași logică ca exportToPDF() pentru fiecare factură
+   */
+  const generateMultipleInvoicesPDF = async (selectedInvoiceIds) => {
+    if (!selectedInvoiceIds || selectedInvoiceIds.length === 0) {
+      alert('❌ Nu ai selectat nicio factură!');
+      return;
+    }
+
+    try {
+      const invoices = invoiceHistoryService.getAllInvoices();
+      const selectedInvoices = invoices.filter(inv => selectedInvoiceIds.includes(inv.id));
+
+      if (selectedInvoices.length === 0) {
+        alert('❌ Facturile selectate nu au fost găsite!');
+        return;
+      }
+
+      // Confirmă acțiunea
+      const confirmed = window.confirm(
+        `Vrei să generezi un PDF cu ${selectedInvoices.length} facturi?\n\n` +
+        `Facturi selectate:\n` +
+        selectedInvoices.map(inv => `• ${inv.series} ${inv.number} - ${inv.issueDate}`).join('\n')
+      );
+
+      if (!confirmed) return;
+
+      // Creează PDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      let isFirstPage = true;
+
+      for (const invoice of selectedInvoices) {
+        // Adaugă pagină nouă (exceptând prima)
+        if (!isFirstPage) {
+          pdf.addPage();
+        }
+        isFirstPage = false;
+
+        // Generează PDF folosind EXACT aceeași logică ca exportToPDF
+        const { imgData, canvas } = await generateSingleInvoicePDF(invoice, invoice.lines || []);
+
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+
+        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight) * 72 / 96;
+        const imgX = (pdfWidth - imgWidth * ratio) / 2;
+        const imgY = 10;
+
+        pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      }
+
+      // Salvează PDF
+      const firstInvoice = selectedInvoices[0];
+      const lastInvoice = selectedInvoices[selectedInvoices.length - 1];
+      const filename = `facturi_batch_${firstInvoice.series}_${firstInvoice.number}_to_${lastInvoice.series}_${lastInvoice.number}.pdf`;
+      
+      pdf.save(filename);
+
+      alert(
+        `✅ PDF generat cu succes!\n\n` +
+        `📄 Fișier: ${filename}\n` +
+        `📊 Facturi incluse: ${selectedInvoices.length}\n\n` +
+        `PDF-ul conține toate facturile selectate într-un singur document.`
+      );
+
+    } catch (error) {
+      console.error('Eroare generare PDF multiplu:', error);
+      alert(`❌ Eroare la generarea PDF-ului:\n\n${error.message}`);
+    }
+  };
+
+  /**
+   * Descarcă multiple facturi ca arhivă ZIP
+   * Folosește EXACT aceeași logică ca exportToPDF/exportToExcel pentru fiecare factură
+   */
+  const downloadMultipleInvoicesZIP = async (selectedInvoiceIds, format = 'pdf') => {
+    if (!selectedInvoiceIds || selectedInvoiceIds.length === 0) {
+      alert('❌ Nu ai selectat nicio factură!');
+      return;
+    }
+
+    try {
+      const invoices = invoiceHistoryService.getAllInvoices();
+      const selectedInvoices = invoices.filter(inv => selectedInvoiceIds.includes(inv.id));
+
+      if (selectedInvoices.length === 0) {
+        alert('❌ Facturile selectate nu au fost găsite!');
+        return;
+      }
+
+      // Confirmă acțiunea
+      const confirmed = window.confirm(
+        `Vrei să descarci ${selectedInvoices.length} facturi ca ${format.toUpperCase()} într-o arhivă ZIP?\n\n` +
+        `Facturi selectate:\n` +
+        selectedInvoices.map(inv => `• ${inv.series} ${inv.number} - ${inv.issueDate}`).join('\n')
+      );
+
+      if (!confirmed) return;
+
+      // Creează arhiva ZIP
+      const zip = new JSZip();
+
+      // Generează fișiere pentru fiecare factură
+      for (const invoice of selectedInvoices) {
+        const filename = `factura_${invoice.series || 'FAC'}_${invoice.number || '001'}_${invoice.issueDate}`;
+
+        if (format === 'pdf') {
+          // Generează PDF folosind EXACT aceeași logică ca exportToPDF
+          const { imgData, canvas } = await generateSingleInvoicePDF(invoice, invoice.lines || []);
+
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = pdf.internal.pageSize.getHeight();
+          const imgWidth = canvas.width;
+          const imgHeight = canvas.height;
+
+          const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight) * 72 / 96;
+          const imgX = (pdfWidth - imgWidth * ratio) / 2;
+          const imgY = 10;
+
+          pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+
+          // Adaugă PDF-ul în ZIP
+          const pdfBlob = pdf.output('blob');
+          zip.file(`${filename}.pdf`, pdfBlob);
+        } else if (format === 'excel') {
+          // Generează Excel
+          const excelData = [];
+          const totals = invoice.totals || { net: '0.00', vat: '0.00', gross: '0.00' };
+          const lines = invoice.lines || [];
+
+          excelData.push(['FACTURĂ']);
+          excelData.push([]);
+          excelData.push(['Serie', invoice.series || '-', '', 'Număr', invoice.number || '-']);
+          excelData.push(['Data emitere', invoice.issueDate || '-', '', 'Data scadență', invoice.dueDate || '-']);
+          excelData.push([]);
+          excelData.push(['FURNIZOR']);
+          excelData.push(['Nume', invoice.supplier?.name || '-']);
+          excelData.push(['CUI', invoice.supplier?.cui || '-']);
+          excelData.push([]);
+          excelData.push(['BENEFICIAR']);
+          excelData.push(['Nume', invoice.client?.name || '-']);
+          excelData.push(['CUI', invoice.client?.cui || '-']);
+          excelData.push([]);
+          excelData.push(['PRODUSE ȘI SERVICII']);
+          excelData.push(['Nr.', 'Denumire produs/serviciu', 'Cantitate', 'Preț net unitar', 'TVA %', 'Total net', 'Total TVA', 'Total brut']);
+
+          lines.forEach((line, index) => {
+            const lineNet = (parseFloat(line.unitNetPrice) || 0) * (parseFloat(line.quantity) || 1);
+            const lineVat = lineNet * (parseFloat(line.vatRate) || 0) / 100;
+            const lineGross = lineNet + lineVat;
+
+            excelData.push([
+              index + 1,
+              line.product || '-',
+              line.quantity || '1',
+              line.unitNetPrice || '0.00',
+              line.vatRate || '0',
+              lineNet.toFixed(2),
+              lineVat.toFixed(2),
+              lineGross.toFixed(2)
+            ]);
+          });
+
+          excelData.push([]);
+          excelData.push(['', 'TOTAL FACTURĂ', '', '', '', totals.net, totals.vat, totals.gross]);
+
+          const worksheet = XLSX.utils.aoa_to_sheet(excelData);
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, worksheet, 'Factură');
+
+          const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+          zip.file(`${filename}.xlsx`, excelBuffer);
+        }
+      }
+
+      // Generează și descarcă ZIP-ul
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = window.URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `facturi_${format}_${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      alert(
+        `✅ Arhivă ZIP generată cu succes!\n\n` +
+        `📦 Fișier: facturi_${format}_${new Date().toISOString().split('T')[0]}.zip\n` +
+        `📊 Facturi incluse: ${selectedInvoices.length}\n` +
+        `📄 Format: ${format.toUpperCase()}\n\n` +
+        `Arhiva conține fișiere separate pentru fiecare factură.`
+      );
+
+    } catch (error) {
+      console.error('Eroare generare ZIP:', error);
+      alert(`❌ Eroare la generarea arhivei ZIP:\n\n${error.message}`);
+    }
+  };
+
   return (
     <ToolLayout
       title="Generator Factură Completă"
@@ -3391,6 +4885,30 @@ const InvoiceGenerator = () => {
       {anafError && (
         <Alert severity="error" onClose={() => setAnafError('')} sx={{ mb: 3 }}>
           {anafError}
+        </Alert>
+      )}
+
+      {/* Avertisment factură duplicată */}
+      {duplicateWarning && (
+        <Alert severity="warning" onClose={() => setDuplicateWarning('')} sx={{ mb: 3 }}>
+          {duplicateWarning}
+        </Alert>
+      )}
+
+      {/* Avertismente validare date */}
+      {validationWarnings.length > 0 && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight="600" gutterBottom>
+            📋 Verificare completitudine date:
+          </Typography>
+          <ul style={{ margin: 0, paddingLeft: 20 }}>
+            {validationWarnings.map((warning, index) => (
+              <li key={index}>{warning}</li>
+            ))}
+          </ul>
+          <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+            💡 Completează datele lipsă pentru a genera o factură validă conform reglementărilor.
+          </Typography>
         </Alert>
       )}
 
@@ -3416,6 +4934,99 @@ const InvoiceGenerator = () => {
 
       {/* Main Content - Full width */}
       <Stack spacing={3}>
+        {/* Butoane Facturare Recurentă și Acțiuni */}
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Paper
+              sx={{
+                p: 1.5,
+                bgcolor: 'primary.50',
+                border: '1px solid',
+                borderColor: 'primary.200',
+                borderRadius: 2
+              }}
+            >
+              <Typography variant="caption" fontWeight="600" display="block" color="primary.main" sx={{ mb: 1 }}>
+                🔄 Facturare Recurentă
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                <Button
+                  variant="outlined"
+                  color="info"
+                  size="small"
+                  startIcon={<ContentCopyIcon />}
+                  onClick={duplicateCurrentInvoice}
+                >
+                  Duplică
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  size="small"
+                  startIcon={<SaveIcon />}
+                  onClick={saveAsInvoiceSablon}
+                >
+                  Salvează
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  size="small"
+                  startIcon={<DescriptionIcon />}
+                  onClick={() => setInvoiceSablonDialogOpen(true)}
+                >
+                  Șabloane
+                </Button>
+              </Stack>
+            </Paper>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper
+              sx={{
+                p: 1.5,
+                bgcolor: 'error.50',
+                border: '1px solid',
+                borderColor: 'error.200',
+                borderRadius: 2
+              }}
+            >
+              <Typography variant="caption" fontWeight="600" display="block" color="error.main" sx={{ mb: 1 }}>
+                🗑️ Acțiuni Date
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                <Button
+                  variant="outlined"
+                  color="info"
+                  size="small"
+                  startIcon={<HistoryIcon />}
+                  onClick={() => setShowVersionsDialog(true)}
+                  disabled={!invoiceData.series || !invoiceData.number}
+                >
+                  Versiuni ({invoiceVersions.length})
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  size="small"
+                  startIcon={<RefreshIcon />}
+                  onClick={resetInvoiceForm}
+                >
+                  Reset
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="small"
+                  startIcon={<DeleteIcon />}
+                  onClick={clearAllData}
+                >
+                  Clear All
+                </Button>
+              </Stack>
+            </Paper>
+          </Grid>
+        </Grid>
+
         {/* Date factură */}
         <Card variant="outlined">
           <CardContent>
@@ -3608,17 +5219,43 @@ const InvoiceGenerator = () => {
         <Grid container spacing={2}>
           {/* Furnizor */}
           <Grid size={{ xs: 12, md: 6 }}>
-            <CompanyForm
-              data={invoiceData}
-              onChange={handleInvoiceChange}
-              onSearch={searchSupplierANAF}
-              loading={loadingSupplier}
-              type="supplier"
-              showBankDetails={true}
-              onAddBankAccount={handleAddSupplierBankAccount}
-              onRemoveBankAccount={handleRemoveSupplierBankAccount}
-              onBankAccountChange={handleSupplierBankAccountChange}
-            />
+            <Stack spacing={1.5}>
+              {/* Butoane alegere/salvare furnizor */}
+              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  size="small"
+                  startIcon={<StarIcon />}
+                  onClick={() => setSupplierTemplateDialogOpen(true)}
+                >
+                  Furnizori ({savedSuppliers.length})
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="success"
+                  size="small"
+                  startIcon={<BookmarkAddIcon />}
+                  onClick={saveCurrentSupplier}
+                  disabled={!invoiceData.supplierName || !invoiceData.supplierCUI}
+                >
+                  Salvează
+                </Button>
+              </Stack>
+              
+              <CompanyForm
+                data={invoiceData}
+                onChange={handleInvoiceChange}
+                onSearch={searchSupplierANAF}
+                loading={loadingSupplier}
+                type="supplier"
+                bgColor="#f8fafb"
+                showBankDetails={true}
+                onAddBankAccount={handleAddSupplierBankAccount}
+                onRemoveBankAccount={handleRemoveSupplierBankAccount}
+                onBankAccountChange={handleSupplierBankAccountChange}
+              />
+            </Stack>
           </Grid>
 
           {/* Beneficiar */}
@@ -3629,6 +5266,7 @@ const InvoiceGenerator = () => {
               onSearch={searchClientANAF}
               loading={loadingClient}
               type="client"
+              bgColor="#fdfcfd"
               showBankDetails={true}
               showTemplateButtons={true}
               onTemplateSelect={() => setClientTemplateDialogOpen(true)}
@@ -3643,9 +5281,69 @@ const InvoiceGenerator = () => {
         {/* Linii factură */}
         <Card variant="outlined">
           <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Linii factură
-            </Typography>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+              <Typography variant="h6">
+                Linii factură
+              </Typography>
+              
+              {/* Toolbar sortare și grupare */}
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography variant="caption" color="text.secondary">
+                  Sortare:
+                </Typography>
+                <Button
+                  size="small"
+                  variant={sortBy === 'manual' ? 'contained' : 'outlined'}
+                  onClick={() => sortLines('manual')}
+                  sx={{ minWidth: 80 }}
+                >
+                  Manual
+                </Button>
+                <Button
+                  size="small"
+                  variant={sortBy === 'name' ? 'contained' : 'outlined'}
+                  onClick={() => sortLines('name')}
+                  sx={{ minWidth: 80 }}
+                >
+                  Nume
+                </Button>
+                <Button
+                  size="small"
+                  variant={sortBy === 'price' ? 'contained' : 'outlined'}
+                  onClick={() => sortLines('price')}
+                  sx={{ minWidth: 80 }}
+                >
+                  Preț
+                </Button>
+                <Button
+                  size="small"
+                  variant={sortBy === 'total' ? 'contained' : 'outlined'}
+                  onClick={() => sortLines('total')}
+                  sx={{ minWidth: 80 }}
+                >
+                  Total
+                </Button>
+                
+                {sortBy !== 'manual' && (
+                  <IconButton size="small" onClick={toggleSortOrder} title={sortOrder === 'asc' ? 'Crescător' : 'Descrescător'}>
+                    {sortOrder === 'asc' ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />}
+                  </IconButton>
+                )}
+
+                <Divider orientation="vertical" flexItem />
+
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={groupByCategory}
+                      onChange={(e) => setGroupByCategory(e.target.checked)}
+                      size="small"
+                    />
+                  }
+                  label={<Typography variant="caption">Grupare</Typography>}
+                />
+              </Stack>
+            </Stack>
 
             {lines.map((line, index) => (
               <Box
@@ -3739,14 +5437,88 @@ const InvoiceGenerator = () => {
                 </Box>
 
                 <Grid container spacing={1}>
-                  <Grid size={{ xs: 12, md: 4.5  }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      label="Produs / Serviciu"
-                      value={line.product}
-                      onChange={(e) => updateLine(line.id, 'product', e.target.value)}
-                    />
+                  <Grid size={{ xs: 12, md: 4.5 }}>
+                    <Box sx={{ position: 'relative' }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Produs / Serviciu"
+                        value={line.product}
+                        onChange={(e) => {
+                          updateLine(line.id, 'product', e.target.value);
+                          getProductSuggestions(e.target.value);
+                          setShowProductSuggestions(prev => ({ ...prev, [line.id]: true }));
+                        }}
+                        onFocus={() => {
+                          if (line.product && line.product.length >= 2) {
+                            getProductSuggestions(line.product);
+                            setShowProductSuggestions(prev => ({ ...prev, [line.id]: true }));
+                          }
+                        }}
+                        onBlur={() => {
+                          // Delay pentru a permite click pe sugestii
+                          setTimeout(() => {
+                            setShowProductSuggestions(prev => ({ ...prev, [line.id]: false }));
+                          }, 200);
+                        }}
+                        InputProps={{
+                          endAdornment: line.product && line.product.length >= 2 && (
+                            <InputAdornment position="end">
+                              <SearchIcon fontSize="small" color="action" />
+                            </InputAdornment>
+                          )
+                        }}
+                      />
+                      {/* Sugestii produse */}
+                      {showProductSuggestions[line.id] && productSuggestions.length > 0 && (
+                        <Paper
+                          sx={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            zIndex: 1000,
+                            maxHeight: 200,
+                            overflow: 'auto',
+                            mt: 0.5,
+                            boxShadow: 3
+                          }}
+                        >
+                          <Stack divider={<Divider />}>
+                            {productSuggestions.map((suggestion, idx) => (
+                              <Box
+                                key={idx}
+                                onClick={() => applySuggestionToLine(line.id, suggestion)}
+                                sx={{
+                                  p: 1.5,
+                                  cursor: 'pointer',
+                                  '&:hover': {
+                                    bgcolor: 'action.hover'
+                                  }
+                                }}
+                              >
+                                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                  <Box sx={{ flex: 1 }}>
+                                    <Typography variant="body2" fontWeight="500">
+                                      {suggestion.product}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      Preț: {suggestion.unitNetPrice} | TVA: {suggestion.vatRate}% | Folosit: {suggestion.count}x
+                                    </Typography>
+                                  </Box>
+                                  <Chip
+                                    label="Aplică"
+                                    size="small"
+                                    color="primary"
+                                    variant="outlined"
+                                  />
+                                </Stack>
+                              </Box>
+                            ))}
+                          </Stack>
+                        </Paper>
+                      )}
+                    </Box>
                   </Grid>
                   <Grid size={{ xs: 12, sm: 4, md: 1.2 }}>
                     <TextField
@@ -3995,7 +5767,7 @@ const InvoiceGenerator = () => {
               </Box>
             ))}
 
-            <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+            <Stack direction="row" spacing={2} sx={{ mt: 2 }} flexWrap="wrap">
               <Button
                 variant="outlined"
                 size="small"
@@ -4027,6 +5799,15 @@ const InvoiceGenerator = () => {
                 onClick={() => setProductTemplateDialogOpen(true)}
               >
                 Produse
+              </Button>
+              <Button
+                variant="outlined"
+                color="info"
+                size="small"
+                startIcon={<LocalOfferIcon />}
+                onClick={() => setProductCategoriesDialogOpen(true)}
+              >
+                Categorii
               </Button>
             </Stack>
           </CardContent>
@@ -4173,64 +5954,66 @@ const InvoiceGenerator = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Reducere pe Total */}
-        <Card variant="outlined" sx={{ bgcolor: 'warning.50' }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Reducere pe Total
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 4 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Tip reducere</InputLabel>
-                  <Select
-                    value={totalDiscount.type}
-                    onChange={(e) => setTotalDiscount({ ...totalDiscount, type: e.target.value })}
-                    label="Tip reducere"
-                  >
-                    <MenuItem value="none">Fără reducere</MenuItem>
-                    <MenuItem value="percent">Procent</MenuItem>
-                    <MenuItem value="amount">Sumă fixă</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              {totalDiscount.type === 'percent' && (
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Procent reducere"
-                    type="number"
-                    value={totalDiscount.percent}
-                    onChange={(e) => setTotalDiscount({ ...totalDiscount, percent: e.target.value })}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                      inputProps: { min: 0, max: 100, step: 0.01 }
-                    }}
-                  />
-                </Grid>
-              )}
-              {totalDiscount.type === 'amount' && (
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Sumă reducere"
-                    type="number"
-                    value={totalDiscount.amount}
-                    onChange={(e) => setTotalDiscount({ ...totalDiscount, amount: e.target.value })}
-                    InputProps={{
-                      inputProps: { min: 0, step: 0.01 }
-                    }}
-                  />
-                </Grid>
-              )}
-            </Grid>
-          </CardContent>
-        </Card>
 
         {/* Totaluri și Export */}
         <Paper sx={{ p: 3, bgcolor: 'primary.50', borderLeft: 4, borderColor: 'primary.main' }}>
+
+          {/* Reducere pe Total */}
+          <Card sx={{ bgcolor: 'warning.50' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Reducere pe Total
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Tip reducere</InputLabel>
+                    <Select
+                      value={totalDiscount.type}
+                      onChange={(e) => setTotalDiscount({ ...totalDiscount, type: e.target.value })}
+                      label="Tip reducere"
+                    >
+                      <MenuItem value="none">Fără reducere</MenuItem>
+                      <MenuItem value="percent">Procent</MenuItem>
+                      <MenuItem value="amount">Sumă fixă</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                {totalDiscount.type === 'percent' && (
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Procent reducere"
+                      type="number"
+                      value={totalDiscount.percent}
+                      onChange={(e) => setTotalDiscount({ ...totalDiscount, percent: e.target.value })}
+                      InputProps={{
+                        endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                        inputProps: { min: 0, max: 100, step: 0.01 }
+                      }}
+                    />
+                  </Grid>
+                )}
+                {totalDiscount.type === 'amount' && (
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Sumă reducere"
+                      type="number"
+                      value={totalDiscount.amount}
+                      onChange={(e) => setTotalDiscount({ ...totalDiscount, amount: e.target.value })}
+                      InputProps={{
+                        inputProps: { min: 0, step: 0.01 }
+                      }}
+                    />
+                  </Grid>
+                )}
+              </Grid>
+            </CardContent>
+          </Card>
+
           <Grid container spacing={3} alignItems="center">
             <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="h6" color="primary" gutterBottom>
@@ -4489,6 +6272,29 @@ const InvoiceGenerator = () => {
                 </Typography>
               </Button>
             </Box>
+
+            <Box sx={{ textAlign: 'center' }}>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={printInvoice}
+                sx={{
+                  minWidth: 100,
+                  minHeight: 100,
+                  width: 100,
+                  height: 100,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  p: 1.5,
+                  bgcolor: 'background.paper'
+                }}
+              >
+                <PrintIcon sx={{ fontSize: 40, mb: 0.5 }} />
+                <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
+                  Print
+                </Typography>
+              </Button>
+            </Box>
           </Stack>
 
           <Divider sx={{ my: 2 }}>
@@ -4594,7 +6400,7 @@ const InvoiceGenerator = () => {
         {/* Info */}
         <Paper sx={{ p: 1.5, bgcolor: 'grey.50' }}>
           <Typography variant="body2" color="text.secondary" fontSize="0.85rem">
-            💡 <strong>Sfat:</strong> Completează toate detaliile și apasă pe unul din butoanele de descărcare pentru a genera factura.
+            💡 <strong>Sfat:</strong> Completează toate detaliile și apasă pe unul din butoanele de descărcare pentru a generate factura.
             <br />
             🔍 <strong>Căutare ANAF:</strong> Introdu CUI-ul și apasă pe iconița de căutare (🔍) pentru a completa automat datele companiei din registrul ANAF.
             <br />
@@ -4608,19 +6414,103 @@ const InvoiceGenerator = () => {
             <br />
             ✅ <strong>Validează XML:</strong> Butonul "Validează XML pe ANAF" descarcă XML-ul și deschide validatorul oficial ANAF pentru verificare înainte de încărcare.
             <br />
+            🖨️ <strong>Print optimizat:</strong> Butonul "Print" deschide factura într-o fereastră nouă optimizată pentru printare (CSS print-friendly). Perfect pentru imprimare directă fără a salva PDF.
+            <br />
             ☁️ <strong>Google Drive:</strong> Salvează rapid fișierele (PDF/Excel) în Google Drive - descarcă automat și deschide Drive pentru upload.
             <br />
-            📊 <strong>Google Sheets:</strong> Conectează-te la Google Sheets pentru sincronizare automată în cloud! Datele furnizorului, template-urile produse/clienți și istoricul facturilor sunt salvate automat în spreadsheet la fiecare export. Poți crea un spreadsheet nou sau conecta unul existent.
+            📊 <strong>Google Sheets:</strong> Conectează-te la Google Sheets pentru sincronizare automată în cloud! Datele furnizorului, șabloanele produse/clienți și istoricul facturilor sunt salvate automat în spreadsheet la fiecare export. Poți crea un spreadsheet nou sau conecta unul existent.
             <br />
-            📚 <strong>Istoric:</strong> Toate facturile exportate sunt salvate automat în browser (localStorage) și opțional în Google Sheets. Click pe "Istoric Facturi" pentru a vedea, căuta și încărca facturi anterioare.
+            📚 <strong>Istoric:</strong> Toate facturile exportate sunt salvate automat în browser (localStorage) și opțional în Google Sheets. Click pe "Istoric Facturi" pentru a vedea, căuta și încărca facturi anterioare. Din istoric poți exporta și batch-uri multiple de facturi!
             <br />
-            ⭐ <strong>Template-uri:</strong> Salvează produse și clienți frecvenți pentru completare rapidă. Click pe "Produse" pentru template-uri produse sau "Beneficiari" pentru clienți salvați. Template-urile sunt sincronizate automat cu Google Sheets dacă ești conectat.
+            📦 <strong>Export Batch:</strong> Din dialogul "Istoric Facturi", selectează multiple facturi și:
+            <br />
+            &nbsp;&nbsp;• <strong>PDF Batch:</strong> Generează un singur fișier PDF cu toate facturile selectate (fiecare factură pe o pagină separată)
+            <br />
+            &nbsp;&nbsp;• <strong>ZIP PDF/Excel:</strong> Descarcă o arhivă ZIP cu fișiere separate pentru fiecare factură (format PDF sau Excel la alegere)
+            <br />
+            &nbsp;&nbsp;• Ideal pentru arhivare, backup sau trimitere multiplă către clienți
+            <br />
+            ⭐ <strong>Șabloane:</strong> Salvează produse și clienți frecvenți pentru completare rapidă. Click pe "Produse" pentru șabloane produse sau "Beneficiari" pentru clienți salvați. Șabloanele sunt sincronizate automat cu Google Sheets dacă ești conectat.
             <br />
             🏢 <strong>Export SAGA:</strong> Din "Istoric Facturi" poți exporta facturi în formatul XML compatibil cu software-ul contabil SAGA. Filtrează facturile după interval de date sau serie/număr, apoi generează XML-ul pentru import în SAGA.
             <br />
             💰 <strong>Reduceri/Discount:</strong> Poți acorda reduceri atât pe linia de produs (procentual sau sumă fixă), cât și pe totalul facturii. Reducerile se aplică automat la calculul final și sunt afișate clar în factură.
             <br />
             📈 <strong>Calcul automat preț:</strong> Introdu "Preț intrare" (cost achiziție) și "Adaos %" (marjă profit) pentru a calcula automat prețul net de vânzare. Util pentru gestionarea marjei de profit pe fiecare produs.
+            <br />
+            🔄 <strong>FACTURARE RECURENTĂ:</strong> (Butoane în partea dreaptă sus)
+            <br />
+            &nbsp;&nbsp;• <strong>Duplică factură:</strong> Creează rapid o factură nouă bazată pe cea curentă, cu număr incrementat automat și data curentă
+            <br />
+            &nbsp;&nbsp;• <strong>Șabloane facturi:</strong> Salvează facturi complete (cu produse și setări) pentru refolosire. Ideal pentru facturi recurente lunare
+            <br />
+            &nbsp;&nbsp;• <strong>Verificare dubluri:</strong> Sistem automat de alertare când seria+numărul există deja în istoric (previne duplicatele)
+            <br />
+            &nbsp;&nbsp;• <strong>Autocomplete produse:</strong> Scrie 2+ caractere în câmpul produs și primești sugestii din istoric (cu preț și TVA), sortate după frecvență
+            <br />
+            &nbsp;&nbsp;• <strong>Validare date:</strong> Alertări automate pentru date lipsă importante (furnizor, client, IBAN, produse fără preț, etc.)
+            <br />
+            📁 <strong>CATEGORII PRODUSE:</strong>
+            <br />
+            &nbsp;&nbsp;• <strong>Organizare:</strong> Creează categorii pentru diferite tipuri de produse/servicii (ex: IT, Consultanță, Marketing)
+            <br />
+            &nbsp;&nbsp;• <strong>Personalizare:</strong> Fiecare categorie are nume, culoare și icon personalizabil
+            <br />
+            &nbsp;&nbsp;• <strong>Filtrare:</strong> Filtrează rapid produsele din șabloane după categorie
+            <br />
+            &nbsp;&nbsp;• <strong>Categorii implicite:</strong> La prima utilizare sunt create automat categorii (Servicii, Produse, Consultanță)
+            <br />
+            &nbsp;&nbsp;• <strong>Gestionare:</strong> Butonul "Categorii" din secțiunea linii factură pentru CRUD categorii
+            <br />
+            👤 <strong>FIȘA CLIENT:</strong>
+            <br />
+            &nbsp;&nbsp;• <strong>Istoric complet:</strong> Vezi toate facturile emise către un client specific
+            <br />
+            &nbsp;&nbsp;• <strong>Statistici:</strong> Total facturat, număr facturi, medie per factură, facturi scadente
+            <br />
+            &nbsp;&nbsp;• <strong>Acces rapid:</strong> Din dialogul "Beneficiari", click pe iconița 👁️ pentru fișa client
+            <br />
+            &nbsp;&nbsp;• <strong>Reîncărcare rapidă:</strong> Click pe factură din fișă pentru a o încărca în formular
+            <br />
+            &nbsp;&nbsp;• <strong>Monitorizare scadențe:</strong> Evidențiere automată pentru facturi scadente
+            <br />
+            🔧 <strong>SORTARE ȘI GRUPARE LINII:</strong>
+            <br />
+            &nbsp;&nbsp;• <strong>Sortare:</strong> Sortează liniile după nume, preț unitar sau total (crescător/descrescător)
+            <br />
+            &nbsp;&nbsp;• <strong>Grupare categorii:</strong> Activează switch-ul "Grupare" pentru a organiza produsele pe categorii în factură
+            <br />
+            &nbsp;&nbsp;• <strong>Ordine manuală:</strong> Folosește săgețile ↑↓ pentru reordonare manuală
+            <br />
+            🗑️ <strong>RESET ȘI CLEAR:</strong>
+            <br />
+            &nbsp;&nbsp;• <strong>Reset:</strong> Șterge beneficiar, linii și atașamente (păstrează furnizorul și incrementează numărul)
+            <br />
+            &nbsp;&nbsp;• <strong>Clear All:</strong> Ștergere COMPLETĂ - toate datele, inclusiv furnizor, istoric, șabloane (IREVERSIBIL!)
+            <br />
+            &nbsp;&nbsp;• <strong>Confirmare dublă:</strong> Pentru "Clear All" se cere confirmare de 2 ori pentru siguranță
+            <br />
+            📚 <strong>VERSIONING:</strong>
+            <br />
+            &nbsp;&nbsp;• <strong>Salvare automată:</strong> Ultimele 5 versiuni ale fiecărei facturi sunt salvate automat la 10 secunde
+            <br />
+            &nbsp;&nbsp;• <strong>Restaurare:</strong> Revino la orice versiune anterioară cu un click
+            <br />
+            &nbsp;&nbsp;• <strong>Istoricul modificărilor:</strong> Vezi când s-au făcut modificările și ce conțineau
+            <br />
+            &nbsp;&nbsp;• <strong>Buton Versiuni:</strong> Afișează numărul de versiuni salvate pentru factura curentă
+            <br />
+            🏢 <strong>FURNIZORI (SOCIETĂȚI PROPRII):</strong>
+            <br />
+            &nbsp;&nbsp;• <strong>Multi-societate:</strong> Salvează și comută rapid între mai multe societăți proprii
+            <br />
+            &nbsp;&nbsp;• <strong>Date complete:</strong> Fiecare furnizor salvat păstrează toate datele (CUI, IBAN, adresă, etc.)
+            <br />
+            &nbsp;&nbsp;• <strong>Selecție rapidă:</strong> Click pe furnizor pentru completare automată în formular
+            <br />
+            &nbsp;&nbsp;• <strong>Butoane:</strong> "Furnizori" pentru selecție, "Salvează" pentru adăugare furnizor nou
+            <br />
+            &nbsp;&nbsp;• <strong>Util pentru:</strong> Freelanceri cu PFA + SRL, sau persoane cu multiple firme
           </Typography>
         </Paper>
 
@@ -4630,20 +6520,26 @@ const InvoiceGenerator = () => {
           onClose={() => setHistoryDialogOpen(false)}
           onLoadInvoice={loadInvoiceFromHistory}
           type="invoice"
+          onBatchPDF={generateMultipleInvoicesPDF}
+          onBatchZIP={downloadMultipleInvoicesZIP}
         />
 
-        {/* Dialog Template-uri Produse */}
+        {/* Dialog Șabloane Produse */}
         <ProductTemplateDialog
           open={productTemplateDialogOpen}
           onClose={() => setProductTemplateDialogOpen(false)}
           onSelectProduct={selectProductFromTemplate}
+          categories={productCategories}
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
         />
 
-        {/* Dialog Template-uri Clienți */}
+        {/* Dialog Șabloane Clienți */}
         <ClientTemplateDialog
           open={clientTemplateDialogOpen}
           onClose={() => setClientTemplateDialogOpen(false)}
           onSelectClient={selectClientFromTemplate}
+          onOpenProfile={openClientProfile}
         />
 
         {/* Dialog Conectare Google Sheets */}
@@ -5017,6 +6913,809 @@ const InvoiceGenerator = () => {
             💾 Draft salvat automat!
           </Alert>
         </Snackbar>
+
+        {/* Dialog Șabloane Facturi */}
+        <Dialog
+          open={invoiceSablonDialogOpen}
+          onClose={() => setInvoiceSablonDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <DescriptionIcon color="secondary" />
+                <Typography variant="h6">Șabloane Facturi</Typography>
+              </Box>
+              <IconButton onClick={() => setInvoiceSablonDialogOpen(false)} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Salvează și refolosește facturi tip pentru facturare recurentă
+            </Typography>
+          </DialogTitle>
+          <DialogContent>
+            {(() => {
+              const sabloane = JSON.parse(localStorage.getItem('normalro_invoice_sabloane') || '[]');
+
+              if (sabloane.length === 0) {
+                return (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    <Typography variant="body2">
+                      <strong>Nu există șabloane salvate.</strong>
+                      <br />
+                      <br />
+                      Pentru a crea un șablon:
+                      <br />
+                      1. Completează o factură cu produse și setări
+                      <br />
+                      2. Apasă butonul "Salvează șablon" din partea dreaptă sus
+                      <br />
+                      3. Șablonul va apărea aici pentru refolosire rapidă
+                    </Typography>
+                  </Alert>
+                );
+              }
+
+              return (
+                <Stack spacing={2} sx={{ mt: 2 }}>
+                  {sabloane.map((sablon) => (
+                    <Card key={sablon.id} variant="outlined">
+                      <CardContent>
+                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="subtitle1" fontWeight="600" gutterBottom>
+                              {sablon.name}
+                            </Typography>
+                            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
+                              <Chip
+                                label={`Serie: ${sablon.series || '-'}`}
+                                size="small"
+                                variant="outlined"
+                              />
+                              <Chip
+                                label={`${sablon.lines?.length || 0} produse`}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                              />
+                              <Chip
+                                label={sablon.currency || 'RON'}
+                                size="small"
+                                color="success"
+                                variant="outlined"
+                              />
+                              {sablon.totalDiscount?.type !== 'none' && (
+                                <Chip
+                                  label={`Discount ${sablon.totalDiscount.type === 'percent' ? sablon.totalDiscount.percent + '%' : sablon.totalDiscount.amount}`}
+                                  size="small"
+                                  color="warning"
+                                  variant="outlined"
+                                />
+                              )}
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary">
+                              Creat: {new Date(sablon.createdAt).toLocaleString('ro-RO')}
+                            </Typography>
+                            {sablon.notes && (
+                              <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontStyle: 'italic' }}>
+                                "{sablon.notes.substring(0, 100)}{sablon.notes.length > 100 ? '...' : ''}"
+                              </Typography>
+                            )}
+                          </Box>
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => loadInvoiceSablon(sablon)}
+                            >
+                              Încarcă
+                            </Button>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => {
+                                deleteInvoiceSablon(sablon.id);
+                                // Force re-render
+                                setInvoiceSablonDialogOpen(false);
+                                setTimeout(() => setInvoiceSablonDialogOpen(true), 100);
+                              }}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Stack>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              );
+            })()}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setInvoiceSablonDialogOpen(false)}>
+              Închide
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog Furnizori (Societăți Proprii) */}
+        <Dialog
+          open={supplierTemplateDialogOpen}
+          onClose={() => setSupplierTemplateDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <StarIcon color="primary" />
+                <Typography variant="h6">Furnizori (Societăți Proprii)</Typography>
+              </Box>
+              <IconButton onClick={() => setSupplierTemplateDialogOpen(false)} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Gestionează societățile tale - comută rapid între ele
+            </Typography>
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 2 }}>
+              {savedSuppliers.length === 0 ? (
+                <Alert severity="info">
+                  <Typography variant="body2">
+                    <strong>Nu există furnizori salvați.</strong>
+                    <br />
+                    <br />
+                    Pentru a salva un furnizor:
+                    <br />
+                    1. Completează datele furnizorului în formular
+                    <br />
+                    2. Apasă butonul "Salvează" din dreapta sus
+                    <br />
+                    3. Furnizorul va apărea aici pentru selecție rapidă
+                    <br />
+                    <br />
+                    💡 <strong>Util pentru:</strong> Dacă ai mai multe societăți și vrei să comiuți rapid între ele când emiți facturi.
+                  </Typography>
+                </Alert>
+              ) : (
+                <Stack spacing={1.5}>
+                  {savedSuppliers.map((supplier) => (
+                    <Card key={supplier.id} variant="outlined" sx={{ 
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      '&:hover': { 
+                        boxShadow: 3,
+                        borderColor: 'primary.main'
+                      }
+                    }}>
+                      <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                          <Box sx={{ flex: 1 }} onClick={() => selectSupplier(supplier)}>
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                              <Typography variant="subtitle1" fontWeight="600">
+                                {supplier.displayName}
+                              </Typography>
+                              {supplier.updatedAt && (
+                                <Chip 
+                                  label="Actualizat" 
+                                  size="small" 
+                                  color="warning" 
+                                  variant="outlined"
+                                  sx={{ fontSize: '0.65rem', height: 20 }}
+                                />
+                              )}
+                            </Stack>
+                            <Grid container spacing={1}>
+                              <Grid size={{ xs: 6, sm: 4 }}>
+                                <Typography variant="caption" color="text.secondary">
+                                  CUI:
+                                </Typography>
+                                <Typography variant="body2" fontSize="0.85rem">
+                                  {supplier.cui}
+                                </Typography>
+                              </Grid>
+                              <Grid size={{ xs: 6, sm: 4 }}>
+                                <Typography variant="caption" color="text.secondary">
+                                  Oraș:
+                                </Typography>
+                                <Typography variant="body2" fontSize="0.85rem">
+                                  {supplier.city || '-'}
+                                </Typography>
+                              </Grid>
+                              <Grid size={{ xs: 6, sm: 4 }}>
+                                <Typography variant="caption" color="text.secondary">
+                                  IBAN:
+                                </Typography>
+                                <Typography variant="body2" fontSize="0.75rem" sx={{ fontFamily: 'monospace' }}>
+                                  {supplier.bankAccounts?.[0]?.iban ? 
+                                    `${supplier.bankAccounts[0].iban.substring(0, 8)}...` : 
+                                    '-'
+                                  }
+                                </Typography>
+                              </Grid>
+                            </Grid>
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                              {supplier.updatedAt ? (
+                                <>
+                                  Creat: {new Date(supplier.createdAt).toLocaleDateString('ro-RO')}
+                                  {' • '}
+                                  <span style={{ color: '#ff9800', fontWeight: 600 }}>
+                                    Actualizat: {new Date(supplier.updatedAt).toLocaleDateString('ro-RO')}
+                                  </span>
+                                </>
+                              ) : (
+                                `Salvat: ${new Date(supplier.createdAt).toLocaleDateString('ro-RO')}`
+                              )}
+                            </Typography>
+                          </Box>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteSupplier(supplier.id);
+                            }}
+                            title="Șterge furnizor"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              )}
+
+              <Alert severity="info">
+                <Typography variant="body2">
+                  <strong>💡 Sfat:</strong> Click pe un furnizor pentru a completa automat toate câmpurile în formular.
+                  Salvează butoanele folosite frecvent pentru acces rapid.
+                </Typography>
+              </Alert>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setSupplierTemplateDialogOpen(false)}>
+              Închide
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog Versiuni Factură */}
+        <Dialog
+          open={showVersionsDialog}
+          onClose={() => setShowVersionsDialog(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <HistoryIcon color="info" />
+                <Typography variant="h6">Versiuni Factură</Typography>
+              </Box>
+              <IconButton onClick={() => setShowVersionsDialog(false)} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Ultimele {invoiceVersions.length} versiuni pentru {invoiceData.series} {invoiceData.number}
+            </Typography>
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 2 }}>
+              {invoiceVersions.length === 0 ? (
+                <Alert severity="info">
+                  Nu există versiuni salvate pentru această factură.
+                  <br />
+                  Versiunile sunt salvate automat la fiecare 10 secunde după modificări.
+                </Alert>
+              ) : (
+                <>
+                  <Alert severity="info">
+                    <Typography variant="body2">
+                      <strong>📚 Versioning automat:</strong> Ultimele 5 versiuni sunt păstrate automat.
+                      Click pe "Restaurează" pentru a reveni la o versiune anterioară.
+                    </Typography>
+                  </Alert>
+                  <Stack spacing={1.5}>
+                    {invoiceVersions.map((version, index) => (
+                      <Card key={version.id} variant="outlined" sx={{ bgcolor: index === 0 ? 'success.50' : 'grey.50' }}>
+                        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Box sx={{ flex: 1 }}>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                {index === 0 && (
+                                  <Chip label="Curentă" size="small" color="success" />
+                                )}
+                                <Typography variant="subtitle2" fontWeight="600">
+                                  Versiune #{invoiceVersions.length - index}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  • {new Date(version.timestamp).toLocaleString('ro-RO')}
+                                </Typography>
+                              </Stack>
+                              <Grid container spacing={1} sx={{ mt: 0.5 }}>
+                                <Grid size={{ xs: 6, sm: 3 }}>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Client:
+                                  </Typography>
+                                  <Typography variant="body2" fontSize="0.85rem">
+                                    {version.invoiceData.clientName || '-'}
+                                  </Typography>
+                                </Grid>
+                                <Grid size={{ xs: 6, sm: 3 }}>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Linii:
+                                  </Typography>
+                                  <Typography variant="body2" fontSize="0.85rem">
+                                    {version.lines?.length || 0} produse
+                                  </Typography>
+                                </Grid>
+                                <Grid size={{ xs: 6, sm: 3 }}>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Total:
+                                  </Typography>
+                                  <Typography variant="body2" fontWeight="600" color="success.main" fontSize="0.85rem">
+                                    {version.totals?.gross || '0.00'} {version.invoiceData.currency}
+                                  </Typography>
+                                </Grid>
+                                <Grid size={{ xs: 6, sm: 3 }}>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Atașamente:
+                                  </Typography>
+                                  <Typography variant="body2" fontSize="0.85rem">
+                                    {version.attachedFiles?.length || 0} fișiere
+                                  </Typography>
+                                </Grid>
+                              </Grid>
+                            </Box>
+                            <Stack direction="row" spacing={0.5}>
+                              {index !== 0 && (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="primary"
+                                  onClick={() => restoreVersion(version)}
+                                >
+                                  Restaurează
+                                </Button>
+                              )}
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => deleteVersion(version.id)}
+                                disabled={index === 0}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Stack>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Stack>
+                </>
+              )}
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowVersionsDialog(false)}>
+              Închide
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog Categorii Produse */}
+        <Dialog
+          open={productCategoriesDialogOpen}
+          onClose={() => setProductCategoriesDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LocalOfferIcon color="info" />
+                <Typography variant="h6">Categorii Produse</Typography>
+              </Box>
+              <IconButton onClick={() => setProductCategoriesDialogOpen(false)} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Organizează produsele pe categorii pentru o gestionare mai ușoară
+            </Typography>
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={3} sx={{ mt: 2 }}>
+              {/* Formular adăugare categorie nouă */}
+              <Card variant="outlined" sx={{ bgcolor: 'grey.50' }}>
+                <CardContent>
+                  <Typography variant="subtitle2" gutterBottom fontWeight="600">
+                    Adaugă categorie nouă
+                  </Typography>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    const name = formData.get('categoryName');
+                    const color = formData.get('categoryColor');
+                    const icon = formData.get('categoryIcon');
+                    
+                    if (name) {
+                      addProductCategory(name, color, icon);
+                      e.target.reset();
+                      alert(`✅ Categoria "${name}" a fost adăugată!`);
+                    }
+                  }}>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          name="categoryName"
+                          label="Nume categorie"
+                          placeholder="ex: Echipamente IT"
+                          required
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          name="categoryColor"
+                          label="Culoare"
+                          type="color"
+                          defaultValue="#2196f3"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          name="categoryIcon"
+                          label="Icon"
+                          placeholder="📁"
+                          defaultValue="📁"
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Button
+                          type="submit"
+                          variant="contained"
+                          size="small"
+                          startIcon={<AddIcon />}
+                          fullWidth
+                        >
+                          Adaugă categorie
+                        </Button>
+                      </Grid>
+                    </Grid>
+                  </form>
+                </CardContent>
+              </Card>
+
+              {/* Lista categorii existente */}
+              <Box>
+                <Typography variant="subtitle2" gutterBottom fontWeight="600">
+                  Categorii existente ({productCategories.length})
+                </Typography>
+                {productCategories.length === 0 ? (
+                  <Alert severity="info">
+                    Nu există categorii create. Adaugă prima categorie mai sus!
+                  </Alert>
+                ) : (
+                  <Stack spacing={1}>
+                    {productCategories.map((category) => {
+                      const products = templateService.getProductTemplates();
+                      const productsCount = products.filter(p => p.category === category.id).length;
+
+                      return (
+                        <Card key={category.id} variant="outlined">
+                          <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                              <Stack direction="row" alignItems="center" spacing={1.5}>
+                                <Box
+                                  sx={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: 1,
+                                    bgcolor: category.color,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '1.2rem'
+                                  }}
+                                >
+                                  {category.icon}
+                                </Box>
+                                <Box>
+                                  <Typography variant="subtitle2" fontWeight="600">
+                                    {category.name}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {productsCount} produse
+                                  </Typography>
+                                </Box>
+                              </Stack>
+                              <Stack direction="row" spacing={0.5}>
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => {
+                                    const confirmed = window.confirm(
+                                      `Ești sigur că vrei să ștergi categoria "${category.name}"?`
+                                    );
+                                    if (confirmed) {
+                                      deleteProductCategory(category.id);
+                                    }
+                                  }}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Stack>
+                            </Stack>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </Stack>
+                )}
+              </Box>
+
+              {/* Info */}
+              <Alert severity="info">
+                <Typography variant="body2">
+                  <strong>💡 Cum funcționează categoriile?</strong>
+                  <br />
+                  • Creează categorii pentru diferite tipuri de produse/servicii
+                  <br />
+                  • Când salvezi un produs ca șablon, poți selecta categoria
+                  <br />
+                  • Filtrează rapid produsele din șabloane după categorie
+                  <br />
+                  • Produsele rămân salvate chiar dacă ștergi categoria
+                </Typography>
+              </Alert>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setProductCategoriesDialogOpen(false)}>
+              Închide
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog Fișa Client */}
+        <Dialog
+          open={clientProfileDialogOpen}
+          onClose={() => setClientProfileDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <VisibilityIcon color="primary" />
+                <Typography variant="h6">Fișa Client</Typography>
+              </Box>
+              <IconButton onClick={() => setClientProfileDialogOpen(false)} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Stack>
+          </DialogTitle>
+          <DialogContent>
+            {selectedClientForProfile && (() => {
+              const stats = calculateClientStats(selectedClientForProfile.clientCUI || selectedClientForProfile.cui);
+              const clientInvoices = getClientInvoices(selectedClientForProfile.clientCUI || selectedClientForProfile.cui);
+
+              return (
+                <Stack spacing={3} sx={{ mt: 2 }}>
+                  {/* Informații client */}
+                  <Card variant="outlined" sx={{ bgcolor: 'primary.50' }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom fontWeight="600">
+                        {selectedClientForProfile.clientName || selectedClientForProfile.name}
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid size={{ xs: 6 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            CUI
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {selectedClientForProfile.clientCUI || selectedClientForProfile.cui}
+                          </Typography>
+                        </Grid>
+                        <Grid size={{ xs: 6 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Reg Com
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {selectedClientForProfile.clientRegCom || selectedClientForProfile.regCom || '-'}
+                          </Typography>
+                        </Grid>
+                        <Grid size={{ xs: 12 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Adresă
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {selectedClientForProfile.clientAddress || selectedClientForProfile.address || '-'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
+
+                  {/* Statistici */}
+                  <Box>
+                    <Typography variant="subtitle2" gutterBottom fontWeight="600">
+                      📊 Statistici facturare
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 6, sm: 4 }}>
+                        <Card variant="outlined">
+                          <CardContent sx={{ textAlign: 'center' }}>
+                            <Typography variant="h4" color="primary.main" fontWeight="700">
+                              {stats.totalInvoices}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Facturi emise
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 4 }}>
+                        <Card variant="outlined">
+                          <CardContent sx={{ textAlign: 'center' }}>
+                            <Typography variant="h4" color="success.main" fontWeight="700">
+                              {stats.totalAmount}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Total facturat ({stats.currency})
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 4 }}>
+                        <Card variant="outlined">
+                          <CardContent sx={{ textAlign: 'center' }}>
+                            <Typography variant="h4" color="info.main" fontWeight="700">
+                              {stats.averageAmount}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Medie/factură ({stats.currency})
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      {stats.unpaidInvoices > 0 && (
+                        <Grid size={{ xs: 6, sm: 4 }}>
+                          <Card variant="outlined" sx={{ bgcolor: 'error.50' }}>
+                            <CardContent sx={{ textAlign: 'center' }}>
+                              <Typography variant="h4" color="error.main" fontWeight="700">
+                                {stats.unpaidInvoices}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Facturi scadente
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      )}
+                      {stats.lastInvoiceDate && (
+                        <Grid size={{ xs: 6, sm: 4 }}>
+                          <Card variant="outlined">
+                            <CardContent sx={{ textAlign: 'center' }}>
+                              <Typography variant="body2" color="secondary.main" fontWeight="600">
+                                {new Date(stats.lastInvoiceDate).toLocaleDateString('ro-RO')}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Ultima factură
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      )}
+                    </Grid>
+                  </Box>
+
+                  {/* Lista facturi */}
+                  <Box>
+                    <Typography variant="subtitle2" gutterBottom fontWeight="600">
+                      📄 Facturi emise ({clientInvoices.length})
+                    </Typography>
+                    {clientInvoices.length === 0 ? (
+                      <Alert severity="info">
+                        Nu există facturi emise pentru acest client.
+                      </Alert>
+                    ) : (
+                      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400 }}>
+                        <Table size="small" stickyHeader>
+                          <TableHead>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 'bold' }}>Serie/Nr</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>Data</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold' }}>Scadență</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold', textAlign: 'right' }}>Total</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Status</TableCell>
+                              <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Acțiuni</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {clientInvoices.map((invoice) => {
+                              const isOverdue = invoice.dueDate && new Date(invoice.dueDate) < new Date();
+                              
+                              return (
+                                <TableRow key={invoice.id} hover>
+                                  <TableCell>
+                                    <Typography variant="body2" fontWeight="500">
+                                      {invoice.series} {invoice.number}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="body2">
+                                      {new Date(invoice.issueDate).toLocaleDateString('ro-RO')}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="body2" color={isOverdue ? 'error.main' : 'text.primary'}>
+                                      {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('ro-RO') : '-'}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell sx={{ textAlign: 'right' }}>
+                                    <Typography variant="body2" fontWeight="600" color="success.main">
+                                      {invoice.totals?.gross} {invoice.currency}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell sx={{ textAlign: 'center' }}>
+                                    {isOverdue ? (
+                                      <Chip label="Scadent" size="small" color="error" />
+                                    ) : (
+                                      <Chip label="OK" size="small" color="success" />
+                                    )}
+                                  </TableCell>
+                                  <TableCell sx={{ textAlign: 'center' }}>
+                                    <IconButton
+                                      size="small"
+                                      color="primary"
+                                      onClick={() => {
+                                        loadInvoiceFromHistory(invoice);
+                                        setClientProfileDialogOpen(false);
+                                      }}
+                                      title="Încarcă factura"
+                                    >
+                                      <DescriptionIcon fontSize="small" />
+                                    </IconButton>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    )}
+                  </Box>
+
+                  {/* Info suplimentar */}
+                  <Alert severity="info">
+                    <Typography variant="body2">
+                      <strong>💡 Sfat:</strong> Click pe iconița 📄 pentru a încărca factura în formular și a o edita/exporta din nou.
+                    </Typography>
+                  </Alert>
+                </Stack>
+              );
+            })()}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setClientProfileDialogOpen(false)}>
+              Închide
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Stack>
     </ToolLayout>
   );

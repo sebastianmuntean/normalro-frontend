@@ -27,6 +27,7 @@ import {
   Grid
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import AddIcon from '@mui/icons-material/Add';
@@ -36,21 +37,29 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import templateService from '../services/templateService';
 
-const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
+const ProductTemplateDialog = ({ 
+  open, 
+  onClose, 
+  onSelectProduct,
+  categories = [],
+  selectedCategory: propSelectedCategory = 'all',
+  onCategoryChange
+}) => {
   // Citește cota TVA implicită din .env (default: 21)
   const DEFAULT_VAT_RATE = process.env.REACT_APP_DEFAULT_TVA || '21';
   
   const [templates, setTemplates] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState(propSelectedCategory);
   const [showFavorites, setShowFavorites] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editingProductId, setEditingProductId] = useState(null);
   
   // Form state pentru adăugare produs
   const [newProduct, setNewProduct] = useState({
     name: '',
-    category: 'General',
+    category: categories.length > 0 ? categories[0].id : null,
     purchasePrice: '',
     markup: '',
     unitNetPrice: '',
@@ -62,16 +71,35 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
   useEffect(() => {
     if (open) {
       loadTemplates();
-      setCategories(templateService.getAllCategories());
     }
   }, [open, search, selectedCategory, showFavorites]);
 
+  useEffect(() => {
+    setSelectedCategory(propSelectedCategory);
+  }, [propSelectedCategory]);
+
   const loadTemplates = () => {
-    const result = templateService.getProductTemplates({
-      search,
-      category: selectedCategory,
-      onlyFavorites: showFavorites
-    });
+    let result = templateService.getProductTemplates();
+    
+    // Filtrare după categorie
+    if (selectedCategory !== 'all') {
+      result = result.filter(t => t.category === selectedCategory);
+    }
+    
+    // Filtrare după search
+    if (search) {
+      const searchLower = search.toLowerCase();
+      result = result.filter(t => 
+        t.name?.toLowerCase().includes(searchLower) ||
+        t.description?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Filtrare după favorite
+    if (showFavorites) {
+      result = result.filter(t => t.isFavorite);
+    }
+    
     setTemplates(result);
   };
 
@@ -87,6 +115,38 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
     loadTemplates();
   };
 
+  const handleStartEdit = (template) => {
+    setNewProduct({
+      name: template.name || '',
+      category: template.category || (categories.length > 0 ? categories[0].id : null),
+      purchasePrice: template.purchasePrice || '',
+      markup: template.markup || '',
+      unitNetPrice: template.unitNetPrice || '',
+      vatRate: template.vatRate || DEFAULT_VAT_RATE,
+      description: template.description || '',
+      defaultQuantity: template.defaultQuantity || '1'
+    });
+    setEditingProductId(template.id);
+    setEditMode(true);
+    setShowAddForm(true);
+  };
+
+  const handleCancelEdit = () => {
+    setNewProduct({
+      name: '',
+      category: categories.length > 0 ? categories[0].id : null,
+      purchasePrice: '',
+      markup: '',
+      unitNetPrice: '',
+      vatRate: DEFAULT_VAT_RATE,
+      description: '',
+      defaultQuantity: '1'
+    });
+    setShowAddForm(false);
+    setEditMode(false);
+    setEditingProductId(null);
+  };
+
   const handleAddProduct = () => {
     if (!newProduct.name) {
       alert('Introdu denumirea produsului!');
@@ -97,17 +157,25 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
     const vat = parseFloat(newProduct.vatRate) || 0;
     const grossPrice = netPrice * (1 + vat / 100);
 
-    templateService.saveProductTemplate({
+    const productToSave = {
       ...newProduct,
       purchasePrice: newProduct.purchasePrice || '0.00',
       markup: newProduct.markup || '0.00',
       unitGrossPrice: grossPrice.toFixed(2)
-    });
+    };
+
+    if (editMode && editingProductId) {
+      // Modifică produs existent
+      templateService.updateProductTemplate(editingProductId, productToSave);
+    } else {
+      // Adaugă produs nou
+      templateService.saveProductTemplate(productToSave);
+    }
 
     // Reset form
     setNewProduct({
       name: '',
-      category: 'General',
+      category: categories.length > 0 ? categories[0].id : null,
       purchasePrice: '',
       markup: '',
       unitNetPrice: '',
@@ -117,6 +185,8 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
     });
 
     setShowAddForm(false);
+    setEditMode(false);
+    setEditingProductId(null);
     loadTemplates();
   };
 
@@ -161,7 +231,6 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
         if (window.confirm('Importul va înlocui template-urile existente. Continui?')) {
           templateService.importTemplates(data);
           loadTemplates();
-          setCategories(templateService.getAllCategories());
           alert('Template-uri importate cu succes!');
         }
       } catch (error) {
@@ -172,12 +241,10 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
     e.target.value = '';
   };
 
-  const handleAddCategory = () => {
-    const categoryName = prompt('Introdu numele noii categorii:');
-    if (categoryName && categoryName.trim()) {
-      templateService.addCategory(categoryName.trim());
-      setCategories(templateService.getAllCategories());
-      setNewProduct({ ...newProduct, category: categoryName.trim() });
+  const handleCategoryChange = (newCategory) => {
+    setSelectedCategory(newCategory);
+    if (onCategoryChange) {
+      onCategoryChange(newCategory);
     }
   };
 
@@ -243,12 +310,14 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
                 <InputLabel>Categorie</InputLabel>
                 <Select
                   value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
                   label="Categorie"
                 >
-                  <MenuItem value="all">Toate</MenuItem>
+                  <MenuItem value="all">Toate categoriile</MenuItem>
                   {categories.map(cat => (
-                    <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+                    <MenuItem key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.name}
+                    </MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -269,9 +338,9 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
 
           {/* Formular adăugare produs */}
           {showAddForm ? (
-            <Paper sx={{ p: 2, bgcolor: 'success.lighter' }}>
+            <Paper sx={{ p: 2, bgcolor: editMode ? 'warning.50' : 'success.lighter', border: editMode ? '2px solid' : 'none', borderColor: editMode ? 'warning.main' : 'transparent' }}>
               <Typography variant="h6" gutterBottom>
-                Adaugă produs/serviciu nou
+                {editMode ? '✏️ Modifică produs/serviciu' : 'Adaugă produs/serviciu nou'}
               </Typography>
               <Grid container spacing={2} sx={{ pt: 2 }}>
                 <Grid item xs={12} sm={6}>
@@ -284,23 +353,26 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <Stack direction="row" spacing={1}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Categorie</InputLabel>
-                      <Select
-                        value={newProduct.category}
-                        onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                        label="Categorie"
-                      >
-                        {categories.map(cat => (
-                          <MenuItem key={cat} value={cat}>{cat}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <IconButton onClick={handleAddCategory} size="small" color="primary">
-                      <CategoryIcon />
-                    </IconButton>
-                  </Stack>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Categorie</InputLabel>
+                    <Select
+                      value={newProduct.category || ''}
+                      onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                      label="Categorie"
+                    >
+                      {categories.length === 0 ? (
+                        <MenuItem value="" disabled>
+                          Creează mai întâi o categorie
+                        </MenuItem>
+                      ) : (
+                        categories.map(cat => (
+                          <MenuItem key={cat.id} value={cat.id}>
+                            {cat.icon} {cat.name}
+                          </MenuItem>
+                        ))
+                      )}
+                    </Select>
+                  </FormControl>
                 </Grid>
                 <Grid item xs={6} sm={3}>
                   <TextField
@@ -406,10 +478,10 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
                 </Grid>
                 <Grid item xs={12}>
                   <Stack direction="row" spacing={1}>
-                    <Button variant="contained" onClick={handleAddProduct}>
-                      Salvează
+                    <Button variant="contained" onClick={handleAddProduct} color={editMode ? 'warning' : 'primary'}>
+                      {editMode ? 'Actualizează' : 'Salvează'}
                     </Button>
-                    <Button onClick={() => setShowAddForm(false)}>
+                    <Button onClick={handleCancelEdit}>
                       Anulează
                     </Button>
                   </Stack>
@@ -490,7 +562,24 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Chip label={template.category} size="small" color="primary" variant="outlined" />
+                        {(() => {
+                          const category = categories.find(c => c.id === template.category);
+                          if (category) {
+                            return (
+                              <Chip 
+                                label={`${category.icon} ${category.name}`} 
+                                size="small" 
+                                sx={{ 
+                                  bgcolor: category.color + '20',
+                                  color: category.color,
+                                  borderColor: category.color
+                                }}
+                                variant="outlined" 
+                              />
+                            );
+                          }
+                          return <Chip label="Fără categorie" size="small" variant="outlined" />;
+                        })()}
                       </TableCell>
                       <TableCell align="right">
                         {template.purchasePrice && parseFloat(template.purchasePrice) > 0 ? (
@@ -517,16 +606,30 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
                       <TableCell align="right">{template.vatRate}%</TableCell>
                       <TableCell align="right">{template.unitGrossPrice}</TableCell>
                       <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(template.id);
-                          }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        <Stack direction="row" spacing={0.5} justifyContent="center">
+                          <IconButton
+                            size="small"
+                            color="warning"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartEdit(template);
+                            }}
+                            title="Modifică produs"
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(template.id);
+                            }}
+                            title="Șterge produs"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
                       </TableCell>
                     </TableRow>
                   ))}

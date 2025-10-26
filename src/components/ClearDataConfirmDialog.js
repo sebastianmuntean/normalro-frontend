@@ -61,22 +61,22 @@ const ClearDataConfirmDialog = ({ open, onClose, onConfirm, dataSummary }) => {
             )}
           </Box>
 
-          {/* Template-uri */}
+          {/* Șabloane */}
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" color="primary" gutterBottom>
-              📦 Template-uri Produse
+              📦 Șabloane Produse
             </Typography>
             <Typography variant="body2" sx={{ pl: 2 }}>
-              {dataSummary.templates?.products || 0} template-uri produse vor fi șterse
+              {dataSummary.sabloane?.products || 0} șabloane produse vor fi șterse
             </Typography>
           </Box>
 
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" color="primary" gutterBottom>
-              👥 Template-uri Clienți
+              👥 Șabloane Clienți
             </Typography>
             <Typography variant="body2" sx={{ pl: 2 }}>
-              {dataSummary.templates?.clients || 0} template-uri clienți vor fi șterse
+              {dataSummary.sabloane?.clients || 0} șabloane clienți vor fi șterse
             </Typography>
           </Box>
 

@@ -41,6 +41,7 @@ const JUDETE_ROMANIA = [
  * @param {function} onSearch - Handler pentru căutare ANAF
  * @param {boolean} loading - Status loading pentru căutare ANAF
  * @param {string} type - Tipul formularului: 'supplier' sau 'client'
+ * @param {string} bgColor - Culoare de fundal pentru Card (ex: 'info.50', '#e3f2fd')
  * @param {boolean} showBankDetails - Afișează câmpuri bancare (IBAN, Bancă)
  * @param {boolean} showTemplateButtons - Afișează butoane pentru template-uri
  * @param {function} onTemplateSelect - Handler pentru selectare din template-uri
@@ -55,6 +56,7 @@ const CompanyForm = ({
   onSearch,
   loading = false,
   type = 'supplier', // 'supplier' sau 'client'
+  bgColor = null, // Culoare de fundal personalizată
   showBankDetails = false,
   showTemplateButtons = false,
   onTemplateSelect,
@@ -86,14 +88,17 @@ const CompanyForm = ({
   };
 
   const c = config[type];
+  
+  // Folosește bgColor custom sau fallback la bgcolor din config
+  const cardBgColor = bgColor || c.bgcolor;
 
   return (
-    <Card variant="outlined">
+    <Card variant="outlined" sx={{ bgcolor: bgColor || 'transparent' }}>
       <CardContent>
         <Typography variant="h6" gutterBottom color={c.color}>
           {c.title}
         </Typography>
-        <Paper sx={{ p: 1, mb: 2, bgcolor: c.bgcolor, borderLeft: 3, borderColor: `${c.color}.main` }}>
+        <Paper sx={{ p: 1, mb: 2, bgcolor: cardBgColor, borderLeft: 3, borderColor: `${c.color}.main` }}>
           <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
             🔍 <strong>Auto-completare ANAF:</strong> Introdu CUI-ul și apasă pe 🔍 pentru date automate.
           </Typography>
