@@ -10,12 +10,18 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AdSenseAd from '../components/AdSenseAd';
 import { tools as catalog } from '../data/tools';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 import '../App.css';
 
 const Home = () => {
   const { t } = useTranslation();
   const [tools] = useState(catalog);
   const theme = useTheme();
+  
+  useDocumentTitle(
+    'Instrumente Online Utile',
+    'Colecție de instrumente online: generatoare, convertoare, calculatoare și multe altele. Toate gratuite și ușor de folosit.'
+  );
 
   const preparedTools = useMemo(
     () =>

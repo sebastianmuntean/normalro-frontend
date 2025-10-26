@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { formatCompactDate } from '../services/dateService';
 import axios from 'axios';
 import API_BASE_URL from '../config/api';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const Page = () => {
   const { t, i18n } = useTranslation();
@@ -13,6 +14,12 @@ const Page = () => {
   const [page, setPage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Set document title and description when page loads
+  useDocumentTitle(
+    page?.title || 'Articol',
+    page?.content ? page.content.replace(/<[^>]*>/g, '').substring(0, 155) : null
+  );
 
   useEffect(() => {
     const fetchPage = async () => {

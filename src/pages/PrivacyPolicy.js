@@ -1,7 +1,13 @@
 import React from 'react';
 import { Container, Typography, Box, Paper, Stack, Divider } from '@mui/material';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const PrivacyPolicy = () => {
+  useDocumentTitle(
+    'Politica de Confidențialitate',
+    'Politica de confidențialitate normal.ro - cum colectăm, utilizăm și protejăm informațiile tale personale conform GDPR.'
+  );
+  
   return (
     <Container maxWidth="md" sx={{ py: 8 }}>
       <Paper sx={{ p: 4 }}>

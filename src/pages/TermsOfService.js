@@ -1,7 +1,13 @@
 import React from 'react';
 import { Container, Typography, Box, Paper, Stack, Divider } from '@mui/material';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const TermsOfService = () => {
+  useDocumentTitle(
+    'Termeni și Condiții',
+    'Termeni și condiții de utilizare normal.ro - instrumente online gratuite. Condiții de utilizare, proprietate intelectuală și limitări de răspundere.'
+  );
+  
   return (
     <Container maxWidth="md" sx={{ py: 8 }}>
       <Paper sx={{ p: 4 }}>

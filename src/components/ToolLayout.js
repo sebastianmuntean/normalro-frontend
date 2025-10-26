@@ -3,9 +3,13 @@ import { Box, Container, Paper, Stack, Typography } from '@mui/material';
 import SeoFooter from './SeoFooter';
 import AdSenseAd from './AdSenseAd';
 import { getSeoContent } from '../data/seoContent';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const ToolLayout = ({ title, description, maxWidth = 'md', seoSlug, showAd = true, children }) => {
   const seoData = seoSlug ? getSeoContent(seoSlug) : null;
+  
+  // Set document title and meta description for SEO
+  useDocumentTitle(title, description);
 
   return (
     <Container maxWidth={maxWidth} sx={{ py: { xs: 6, md: 10 } }}>
