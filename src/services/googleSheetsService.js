@@ -31,9 +31,23 @@ class GoogleSheetsService {
   generateGUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
       const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      const v = c === 'x' ? r : ((r & 0x3) | 0x8);
       return v.toString(16);
     });
+  }
+
+  /**
+   * Formatează numele sheet-ului pentru a fi folosit în API calls
+   * Sheet-urile cu spații sau caractere speciale trebuie wrapped în ghilimele simple
+   */
+  formatSheetName(sheetName) {
+    // Dacă sheet name conține spații sau caractere speciale, wrap în ghilimele simple
+    if (sheetName.includes(' ') || sheetName.includes('!') || sheetName.includes("'")) {
+      // Escape single quotes existente
+      const escaped = sheetName.replace(/'/g, "''");
+      return `'${escaped}'`;
+    }
+    return sheetName;
   }
 
   /**
@@ -45,9 +59,10 @@ class GoogleSheetsService {
   async findRowByGUID(sheetName, guid) {
     try {
       // Citește toate datele din coloana A (GUID)
+      const formattedSheetName = this.formatSheetName(sheetName);
       const response = await window.gapi.client.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${sheetName}!A:A`
+        range: `${formattedSheetName}!A:A`
       });
 
       const values = response.result.values || [];
@@ -234,7 +249,7 @@ class GoogleSheetsService {
     const updates = [
       // Headers pentru Date Furnizor (16 coloane: A-P) - GUID adăugat ca primă coloană
       {
-        range: `${this.SHEET_NAMES.SUPPLIER}!A1:P1`,
+        range: `${this.formatSheetName(this.SHEET_NAMES.SUPPLIER)}!A1:P1`,
         values: [[
           'GUID', 'Serie', 'Număr', 'Monedă', 'TVA Implicit (%)',
           'Nume', 'CUI', 'Reg Com', 'Adresă', 'Oraș', 'Județ',
@@ -243,14 +258,14 @@ class GoogleSheetsService {
       },
       // Headers pentru Template Produse (7 coloane: A-G) - GUID adăugat
       {
-        range: `${this.SHEET_NAMES.PRODUCTS}!A1:G1`,
+        range: `${this.formatSheetName(this.SHEET_NAMES.PRODUCTS)}!A1:G1`,
         values: [[
           'GUID', 'ID', 'Produs/Serviciu', 'Cantitate', 'Preț Net Unitar', 'Cotă TVA (%)', 'Data Creare'
         ]]
       },
       // Headers pentru Template Clienți (13 coloane: A-M) - GUID adăugat
       {
-        range: `${this.SHEET_NAMES.CLIENTS}!A1:M1`,
+        range: `${this.formatSheetName(this.SHEET_NAMES.CLIENTS)}!A1:M1`,
         values: [[
           'GUID', 'ID', 'Nume', 'CUI', 'Reg Com', 'Adresă', 'Oraș', 
           'Județ', 'Țară', 'Telefon', 'Email', 'Prefix TVA', 'Data Creare'
@@ -258,7 +273,7 @@ class GoogleSheetsService {
       },
       // Headers pentru Istoric Facturi (21 coloane: A-U) - GUID adăugat
       {
-        range: `${this.SHEET_NAMES.INVOICES}!A1:U1`,
+        range: `${this.formatSheetName(this.SHEET_NAMES.INVOICES)}!A1:U1`,
         values: [[
           'GUID', 'ID', 'Serie', 'Număr', 'Data Emitere', 'Data Scadență', 'Monedă',
           'Furnizor', 'CUI Furnizor', 'Client', 'CUI Client',
@@ -359,7 +374,7 @@ class GoogleSheetsService {
       // Update rândul existent
       await window.gapi.client.sheets.spreadsheets.values.update({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.SHEET_NAMES.SUPPLIER}!A${existingRow}:P${existingRow}`,
+        range: `${this.formatSheetName(this.SHEET_NAMES.SUPPLIER)}!A${existingRow}:P${existingRow}`,
         valueInputOption: 'RAW',
         resource: {
           values: [row]
@@ -370,7 +385,7 @@ class GoogleSheetsService {
       // Adaugă rând nou
       await window.gapi.client.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.SHEET_NAMES.SUPPLIER}!A:P`,
+        range: `${this.formatSheetName(this.SHEET_NAMES.SUPPLIER)}!A:P`,
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -395,7 +410,7 @@ class GoogleSheetsService {
     try {
       const response = await window.gapi.client.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.SHEET_NAMES.SUPPLIER}!A2:P2`
+        range: `${this.formatSheetName(this.SHEET_NAMES.SUPPLIER)}!A2:P2`
       });
 
       const row = response.result.values?.[0];
@@ -461,7 +476,7 @@ class GoogleSheetsService {
       // Update rândul existent
       await window.gapi.client.sheets.spreadsheets.values.update({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.SHEET_NAMES.PRODUCTS}!A${existingRow}:G${existingRow}`,
+        range: `${this.formatSheetName(this.SHEET_NAMES.PRODUCTS)}!A${existingRow}:G${existingRow}`,
         valueInputOption: 'RAW',
         resource: {
           values: [row]
@@ -472,7 +487,7 @@ class GoogleSheetsService {
       // Adaugă rând nou
       await window.gapi.client.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.SHEET_NAMES.PRODUCTS}!A:G`,
+        range: `${this.formatSheetName(this.SHEET_NAMES.PRODUCTS)}!A:G`,
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -496,7 +511,7 @@ class GoogleSheetsService {
     try {
       const response = await window.gapi.client.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.SHEET_NAMES.PRODUCTS}!A2:G`
+        range: `${this.formatSheetName(this.SHEET_NAMES.PRODUCTS)}!A2:G`
       });
 
       const rows = response.result.values || [];
@@ -526,7 +541,7 @@ class GoogleSheetsService {
     // Găsește rândul cu ID-ul respectiv
     const response = await window.gapi.client.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${this.SHEET_NAMES.PRODUCTS}!A:A`
+      range: `${this.formatSheetName(this.SHEET_NAMES.PRODUCTS)}!A:A`
     });
 
     const rows = response.result.values || [];
@@ -597,7 +612,7 @@ class GoogleSheetsService {
       // Update rândul existent
       await window.gapi.client.sheets.spreadsheets.values.update({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.SHEET_NAMES.CLIENTS}!A${existingRow}:M${existingRow}`,
+        range: `${this.formatSheetName(this.SHEET_NAMES.CLIENTS)}!A${existingRow}:M${existingRow}`,
         valueInputOption: 'RAW',
         resource: {
           values: [row]
@@ -608,7 +623,7 @@ class GoogleSheetsService {
       // Adaugă rând nou
       await window.gapi.client.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.SHEET_NAMES.CLIENTS}!A:M`,
+        range: `${this.formatSheetName(this.SHEET_NAMES.CLIENTS)}!A:M`,
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -632,7 +647,7 @@ class GoogleSheetsService {
     try {
       const response = await window.gapi.client.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.SHEET_NAMES.CLIENTS}!A2:M`
+        range: `${this.formatSheetName(this.SHEET_NAMES.CLIENTS)}!A2:M`
       });
 
       const rows = response.result.values || [];
@@ -667,7 +682,7 @@ class GoogleSheetsService {
 
     const response = await window.gapi.client.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${this.SHEET_NAMES.CLIENTS}!A:A`
+      range: `${this.formatSheetName(this.SHEET_NAMES.CLIENTS)}!A:A`
     });
 
     const rows = response.result.values || [];
@@ -745,7 +760,7 @@ class GoogleSheetsService {
       // Update rândul existent
       await window.gapi.client.sheets.spreadsheets.values.update({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.SHEET_NAMES.INVOICES}!A${existingRow}:U${existingRow}`,
+        range: `${this.formatSheetName(this.SHEET_NAMES.INVOICES)}!A${existingRow}:U${existingRow}`,
         valueInputOption: 'RAW',
         resource: {
           values: [row]
@@ -756,7 +771,7 @@ class GoogleSheetsService {
       // Adaugă rând nou
       await window.gapi.client.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.SHEET_NAMES.INVOICES}!A:U`,
+        range: `${this.formatSheetName(this.SHEET_NAMES.INVOICES)}!A:U`,
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         resource: {
@@ -780,7 +795,7 @@ class GoogleSheetsService {
     try {
       const response = await window.gapi.client.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.SHEET_NAMES.INVOICES}!A2:U`
+        range: `${this.formatSheetName(this.SHEET_NAMES.INVOICES)}!A2:U`
       });
 
       const rows = response.result.values || [];
