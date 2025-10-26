@@ -392,3 +392,4 @@ Probleme cu configurarea? Contactează-ne:
 **Ultima actualizare**: Octombrie 2024  
 **Versiune documentație**: 1.0
 
+

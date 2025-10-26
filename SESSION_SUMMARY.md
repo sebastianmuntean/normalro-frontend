@@ -268,3 +268,4 @@ document.cookie.split(";").forEach(c => {
 - ✅ Documentația e completă
 
 **Aplicația e gata de producție!** 🎊
+

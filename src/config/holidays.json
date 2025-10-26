@@ -1,0 +1,160 @@
+{
+  "description": "Configurare sărbători legale România - actualizat 2024",
+  "version": "1.0.0",
+  "lastUpdate": "2025-10-26",
+  
+  "fixedHolidays": [
+    {
+      "name": "Anul Nou",
+      "day": 1,
+      "month": 1,
+      "since": 1990,
+      "note": "Zi liberă naționala"
+    },
+    {
+      "name": "Anul Nou (a doua zi)",
+      "day": 2,
+      "month": 1,
+      "since": 1990,
+      "note": "Zi liberă naționala"
+    },
+    {
+      "name": "Unirea Principatelor Române / Ziua Unirii",
+      "day": 24,
+      "month": 1,
+      "since": 2015,
+      "note": "Zi liberă naționala - Legea 147/2015"
+    },
+    {
+      "name": "Ziua Muncii",
+      "day": 1,
+      "month": 5,
+      "since": 1990,
+      "note": "Zi liberă internațională"
+    },
+    {
+      "name": "Ziua Copilului",
+      "day": 1,
+      "month": 6,
+      "since": 2017,
+      "note": "Zi liberă naționala - Legea 220/2016"
+    },
+    {
+      "name": "Adormirea Maicii Domnului / Sfânta Maria",
+      "day": 15,
+      "month": 8,
+      "since": 2008,
+      "note": "Zi liberă religioasă - Legea 202/2008"
+    },
+    {
+      "name": "Sfântul Andrei (Ocrotitorul României)",
+      "day": 30,
+      "month": 11,
+      "since": 2012,
+      "note": "Zi liberă religioasă - Legea 147/2012"
+    },
+    {
+      "name": "Ziua Națională a României / Ziua Marii Uniri",
+      "day": 1,
+      "month": 12,
+      "since": 1990,
+      "note": "Zi liberă naționala"
+    },
+    {
+      "name": "Crăciunul",
+      "day": 25,
+      "month": 12,
+      "since": 1990,
+      "note": "Zi liberă religioasă"
+    },
+    {
+      "name": "Crăciunul (a doua zi)",
+      "day": 26,
+      "month": 12,
+      "since": 1990,
+      "note": "Zi liberă religioasă"
+    }
+  ],
+
+  "mobileHolidays": {
+    "description": "Sărbători mobile calculate automat (dependente de data Paștelui Ortodox)",
+    "note": "Paștele Ortodox se calculează după calendar Iulian (formula Gauss) + 13 zile (conversie Gregorian)",
+    
+    "orthodoxEaster": {
+      "name": "Paștele Ortodox",
+      "offsetDays": 0,
+      "duration": 2,
+      "note": "Duminică + Luni (2 zile libere)",
+      "since": 1990
+    },
+    "goodFriday": {
+      "name": "Vinerea Mare",
+      "offsetDays": -2,
+      "duration": 1,
+      "note": "Vinerea dinaintea Paștelui (1 zi liberă)",
+      "since": 2018,
+      "addedBy": "Legea 177/2018"
+    },
+    "pentecost": {
+      "name": "Rusaliile (Pogorârea Sfântului Duh)",
+      "offsetDays": 49,
+      "duration": 2,
+      "note": "Duminică + Luni, 50 zile după Paște (2 zile libere)",
+      "since": 2008,
+      "addedBy": "Legea 202/2008"
+    }
+  },
+
+  "precomputedEaster": {
+    "description": "Date Paște Ortodox precalculate pentru verificare rapidă (opțional)",
+    "note": "Dacă vrei să eviți calculul matematic, poți folosi aceste valori",
+    "dates": {
+      "2023": "2023-04-16",
+      "2024": "2024-05-05",
+      "2025": "2025-04-20",
+      "2026": "2026-04-12",
+      "2027": "2027-05-02",
+      "2028": "2028-04-16",
+      "2029": "2029-04-08",
+      "2030": "2030-04-28",
+      "2031": "2031-04-13",
+      "2032": "2032-05-02",
+      "2033": "2033-04-24",
+      "2034": "2034-04-09",
+      "2035": "2035-04-29"
+    }
+  },
+
+  "futureHolidays": {
+    "description": "Sărbători propuse sau viitoare (nu sunt încă în vigoare)",
+    "note": "Actualizați acest fișier când apar noi sărbători legale",
+    "candidates": [
+      {
+        "name": "2 Mai - Ziua Veteranilor de Război",
+        "day": 2,
+        "month": 5,
+        "status": "propus",
+        "note": "În discuție în Parlament (2024)"
+      }
+    ]
+  },
+
+  "specialRules": {
+    "description": "Reguli speciale pentru calculul zilelor lucrătoare",
+    "weekendDays": [0, 6],
+    "weekendNames": ["Duminică", "Sâmbătă"],
+    "note": "0 = Duminică, 6 = Sâmbătă (standard JavaScript Date.getDay())"
+  },
+
+  "sources": [
+    "Legea 53/2003 - Codul Muncii (art. 139)",
+    "Legea 202/2008 - zilele de sărbătoare legală",
+    "Legea 147/2012 - Sfântul Andrei",
+    "Legea 147/2015 - Unirea Principatelor",
+    "Legea 220/2016 - Ziua Copilului",
+    "Legea 177/2018 - Vinerea Mare",
+    "https://legislatie.just.ro/",
+    "https://www.bnr.ro/Calendarul-zilelor-nelucratoare-pentru-operatiuni-ale-BNR-13869-Mobile.aspx"
+  ]
+}
+

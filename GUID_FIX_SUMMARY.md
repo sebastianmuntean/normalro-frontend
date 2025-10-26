@@ -272,3 +272,4 @@ Sistemul GUID este acum **complet funcțional** cu:
 - ✅ Prevenire dublări
 
 **Nu se vor mai crea înregistrări duplicate!** 🎉
+

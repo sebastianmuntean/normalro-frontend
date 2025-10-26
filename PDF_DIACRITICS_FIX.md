@@ -181,3 +181,4 @@ npm install pdfmake
 - Performance: ~1-2 secunde pentru generare (acceptabil)
 
 
+

@@ -51,6 +51,10 @@ import StarIcon from '@mui/icons-material/Star';
 import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
+import DownloadIcon from '@mui/icons-material/Download';
 import ToolLayout from '../../components/ToolLayout';
 import InvoiceHistoryDialog from '../../components/InvoiceHistoryDialog';
 import ProductTemplateDialog from '../../components/ProductTemplateDialog';
@@ -64,6 +68,8 @@ import googleDriveService from '../../services/googleDriveService';
 import googleSheetsService from '../../services/googleSheetsService';
 import invoiceHistoryService from '../../services/invoiceHistoryService';
 import templateService from '../../services/templateService';
+import bnrService from '../../services/bnrService';
+import paymentService from '../../services/paymentService';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
@@ -148,6 +154,20 @@ const InvoiceGenerator = () => {
   // State pentru template-uri
   const [productTemplateDialogOpen, setProductTemplateDialogOpen] = useState(false);
   const [clientTemplateDialogOpen, setClientTemplateDialogOpen] = useState(false);
+
+  // State pentru funcționalități RO specifice
+  const [bnrRates, setBnrRates] = useState(null);
+  const [bnrLoading, setBnrLoading] = useState(false);
+  const [bnrError, setBnrError] = useState('');
+  const [workingDaysCalculator, setWorkingDaysCalculator] = useState({
+    days: 30,
+    showDetails: false
+  });
+  const [qrCodeDialog, setQrCodeDialog] = useState({
+    open: false,
+    qrDataUrl: '',
+    loading: false
+  });
 
   // State pentru import Excel
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -320,6 +340,7 @@ const InvoiceGenerator = () => {
   // Încarcă datele la mount
   useEffect(() => {
     loadSupplierDataFromCookie();
+    loadBNRRates(); // Încarcă cursurile BNR la inițializare
     
     // Inițializează Google Drive API
     const initGoogleDrive = async () => {
@@ -1500,6 +1521,24 @@ const InvoiceGenerator = () => {
   const totals = calculateTotals();
 
   const exportToPDF = async () => {
+    // Generează QR Code dacă există IBAN
+    let qrCodeImg = '';
+    if (invoiceData.supplierBankAccounts[0]?.iban && invoiceData.supplierName) {
+      try {
+        const qrDataUrl = await paymentService.generatePaymentQR({
+          iban: invoiceData.supplierBankAccounts[0].iban,
+          amount: parseFloat(totals.gross),
+          currency: invoiceData.currency,
+          beneficiary: invoiceData.supplierName,
+          reference: `Factura ${invoiceData.series || ''}${invoiceData.number || ''}`,
+          bic: ''
+        });
+        qrCodeImg = `<img src="${qrDataUrl}" style="width: 150px; height: 150px; display: block; margin: 0 auto;" />`;
+      } catch (error) {
+        console.warn('Nu s-a putut genera QR Code pentru PDF:', error);
+      }
+    }
+
     // Creează un element temporar cu factura HTML (cu diacritice corecte!)
     const invoiceElement = document.createElement('div');
     invoiceElement.style.position = 'absolute';
@@ -1589,6 +1628,18 @@ const InvoiceGenerator = () => {
           <strong style="font-size: 11px;">Note:</strong><br/>
           <div style="margin-top: 8px; font-size: 10px; line-height: 1.6; white-space: pre-wrap;">${invoiceData.notes}</div>
         </div>` : ''}
+        
+        ${qrCodeImg ? `
+        <div style="margin-top: 30px; padding: 20px; background-color: #f5f5f5; border-radius: 8px; text-align: center;">
+          <strong style="font-size: 12px; color: #1976d2;">💳 PLATĂ RAPIDĂ CU COD QR</strong><br/>
+          <div style="margin-top: 10px;">
+            ${qrCodeImg}
+          </div>
+          <div style="margin-top: 10px; font-size: 10px; color: #666;">
+            Scanează codul QR cu aplicația de banking<br/>
+            pentru a plăti factura instant!
+          </div>
+        </div>` : ''}
       </div>
     `;
     
@@ -1645,7 +1696,7 @@ const InvoiceGenerator = () => {
     }
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     const excelData = [];
     
     // Header factură
@@ -1724,7 +1775,7 @@ const InvoiceGenerator = () => {
       });
     }
     
-    // Creează worksheet
+    // Creează worksheet principal
     const worksheet = XLSX.utils.aoa_to_sheet(excelData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Factură');
@@ -1742,6 +1793,42 @@ const InvoiceGenerator = () => {
       { wch: 15 },  // Total TVA
       { wch: 15 }   // Total brut
     ];
+
+    // Dacă există IBAN, adaugă QR Code într-un sheet separat
+    if (invoiceData.supplierBankAccounts[0]?.iban && invoiceData.supplierName) {
+      try {
+        const qrDataUrl = await paymentService.generatePaymentQR({
+          iban: invoiceData.supplierBankAccounts[0].iban,
+          amount: parseFloat(totals.gross),
+          currency: invoiceData.currency,
+          beneficiary: invoiceData.supplierName,
+          reference: `Factura ${invoiceData.series || ''}${invoiceData.number || ''}`,
+          bic: ''
+        });
+
+        // Notă pentru utilizator
+        const qrNote = [
+          ['COD QR PLATĂ'],
+          [],
+          ['Beneficiar:', invoiceData.supplierName],
+          ['IBAN:', paymentService.formatIBAN(invoiceData.supplierBankAccounts[0].iban)],
+          ['Sumă:', `${totals.gross} ${invoiceData.currency}`],
+          ['Referință:', `Factura ${invoiceData.series || ''}${invoiceData.number || ''}`],
+          [],
+          ['Scanează codul QR de mai jos cu aplicația de banking pentru a plăti factura instant!'],
+          [],
+          ['NOTA: Codul QR este inclus în PDF și poate fi escanat din acela.'],
+          ['În Excel, acest sheet conține datele pentru generare manuală a QR-ului.']
+        ];
+
+        const qrWorksheet = XLSX.utils.aoa_to_sheet(qrNote);
+        XLSX.utils.book_append_sheet(workbook, qrWorksheet, 'Cod QR Plată');
+        
+        console.log('✅ Sheet "Cod QR Plată" adăugat în Excel');
+      } catch (error) {
+        console.warn('Nu s-a putut genera QR Code pentru Excel:', error);
+      }
+    }
 
     XLSX.writeFile(workbook, `factura_${invoiceData.series || 'FAC'}_${invoiceData.number || '001'}_${invoiceData.issueDate}.xlsx`);
     
@@ -2250,6 +2337,272 @@ const InvoiceGenerator = () => {
     setExpandedAccordion(isExpanded ? panel : false);
   };
 
+  // ===== Funcții BNR (Cursuri Valutare) =====
+
+  /**
+   * Încarcă cursurile valutare de la BNR
+   */
+  const loadBNRRates = async () => {
+    setBnrLoading(true);
+    setBnrError('');
+    
+    try {
+      const data = await bnrService.getExchangeRates();
+      setBnrRates(data);
+      
+      if (data.fallback) {
+        setBnrError('⚠️ Folosesc cursuri statice (eroare conectare BNR)');
+      } else if (data.cached) {
+        console.log('✅ Cursuri BNR din cache');
+      } else {
+        console.log('✅ Cursuri BNR actualizate');
+      }
+    } catch (error) {
+      setBnrError(`Eroare preluare cursuri BNR: ${error.message}`);
+      console.error('Eroare BNR:', error);
+    } finally {
+      setBnrLoading(false);
+    }
+  };
+
+  /**
+   * Reîmprospătează cursurile BNR (golește cache-ul și reîncarcă)
+   */
+  const refreshBNRRates = async () => {
+    bnrService.clearCache();
+    await loadBNRRates();
+  };
+
+  /**
+   * Convertește suma totală în altă monedă folosind cursul BNR
+   */
+  const convertTotalToCurrency = async (targetCurrency) => {
+    if (!bnrRates || !bnrRates.rates[targetCurrency]) {
+      alert(`Moneda ${targetCurrency} nu este disponibilă în cursurile BNR`);
+      return;
+    }
+
+    try {
+      const totalInRON = await bnrService.convertCurrency(
+        parseFloat(totals.gross),
+        invoiceData.currency,
+        targetCurrency
+      );
+
+      alert(
+        `💱 Conversie BNR (${bnrRates.date}):\n\n` +
+        `${totals.gross} ${invoiceData.currency} = ${totalInRON.toFixed(2)} ${targetCurrency}\n\n` +
+        `Curs ${invoiceData.currency}: ${bnrRates.rates[invoiceData.currency]}\n` +
+        `Curs ${targetCurrency}: ${bnrRates.rates[targetCurrency]}`
+      );
+    } catch (error) {
+      alert(`Eroare conversie: ${error.message}`);
+    }
+  };
+
+  // ===== Funcții Calculator Zile Lucrătoare =====
+
+  /**
+   * Calculează data scadenței bazată pe zile lucrătoare
+   */
+  const calculateDueDateByWorkingDays = (days) => {
+    const startDate = new Date(invoiceData.issueDate);
+    const dueDate = paymentService.addWorkingDays(startDate, days);
+    
+    setInvoiceData({
+      ...invoiceData,
+      dueDate: dueDate.toISOString().split('T')[0]
+    });
+
+    // Afișează detalii
+    const skippedDays = [];
+    let tempDate = new Date(startDate);
+    tempDate.setDate(tempDate.getDate() + 1);
+    
+    while (tempDate <= dueDate) {
+      if (!paymentService.isWorkingDay(tempDate)) {
+        const holidayName = paymentService.getHolidayName(tempDate);
+        const reason = holidayName || (paymentService.isWeekend(tempDate) ? 'Weekend' : 'Sărbătoare');
+        skippedDays.push({
+          date: tempDate.toLocaleDateString('ro-RO'),
+          reason: reason,
+          isHoliday: !!holidayName,
+          isWeekend: paymentService.isWeekend(tempDate)
+        });
+      }
+      tempDate.setDate(tempDate.getDate() + 1);
+    }
+
+    // Setează detaliile pentru afișare (mereu, chiar dacă nu sunt zile sărite)
+    setWorkingDaysCalculator({
+      days,
+      showDetails: true,
+      skippedDays,
+      dueDate: dueDate.toLocaleDateString('ro-RO'),
+      startDate: startDate.toLocaleDateString('ro-RO')
+    });
+
+    // Afișează notificare rapidă
+    const holidaysCount = skippedDays.filter(d => d.isHoliday).length;
+    const weekendsCount = skippedDays.filter(d => d.isWeekend && !d.isHoliday).length;
+    
+    if (skippedDays.length > 0) {
+      console.log(
+        `✅ Scadență: ${dueDate.toLocaleDateString('ro-RO')} | ` +
+        `Sărite: ${skippedDays.length} zile (${holidaysCount} sărbători + ${weekendsCount} weekend-uri)`
+      );
+    } else {
+      console.log(
+        `✅ Scadență: ${dueDate.toLocaleDateString('ro-RO')} | ` +
+        `Nu există zile sărite în interval`
+      );
+    }
+  };
+
+  /**
+   * Afișează detaliile calculului zilelor lucrătoare
+   */
+  const showWorkingDaysDetails = () => {
+    if (!workingDaysCalculator.showDetails || !workingDaysCalculator.skippedDays) {
+      return null;
+    }
+
+    const { skippedDays, dueDate, days } = workingDaysCalculator;
+    
+    // Separă sărbătorile de weekend-uri
+    const holidays = skippedDays.filter(day => day.reason !== 'Weekend');
+    const weekends = skippedDays.filter(day => day.reason === 'Weekend');
+    
+    // Obține toate sărbătorile din interval (inclusiv cele în weekend)
+    const startDate = new Date(invoiceData.issueDate);
+    const endDate = new Date(dueDate.split('.').reverse().join('-')); // Convert "DD.MM.YYYY" to Date
+    const allHolidays = paymentService.getHolidaysInRange(startDate, endDate);
+    
+    let message = `📅 CALCULUL ZILELOR LUCRĂTOARE\n`;
+    message += `${'='.repeat(50)}\n\n`;
+    message += `📍 Perioada: ${startDate.toLocaleDateString('ro-RO')} → ${dueDate}\n`;
+    message += `🎯 Scadență: ${dueDate}\n`;
+    message += `📆 Zile lucrătoare solicitate: ${days} zile\n`;
+    message += `⏭️ Total zile sărite: ${skippedDays.length} zile\n`;
+    message += `   └─ Weekend-uri: ${weekends.length} zile\n`;
+    message += `   └─ Sărbători legale: ${holidays.length} zile\n\n`;
+    
+    // Afișează toate sărbătorile legale din interval
+    if (allHolidays.length > 0) {
+      message += `🎊 SĂRBĂTORI LEGALE ÎN INTERVAL (${allHolidays.length}):\n`;
+      message += `${'-'.repeat(50)}\n`;
+      
+      allHolidays.forEach(holiday => {
+        const date = new Date(holiday.date);
+        const dayName = ['Dum', 'Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm'][date.getDay()];
+        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+        const emoji = isWeekend ? '📅' : '🎉';
+        const suffix = isWeekend ? ' (în weekend)' : '';
+        
+        message += `${emoji} ${holiday.formatted} (${dayName}) - ${holiday.name}${suffix}\n`;
+      });
+      message += `\n`;
+    }
+    
+    // Afișează detalii weekend-uri (grupat)
+    if (weekends.length > 0) {
+      message += `📆 WEEKEND-URI SĂRITE (${weekends.length} zile):\n`;
+      message += `${'-'.repeat(50)}\n`;
+      
+      // Grupează weekend-urile consecutive
+      let currentWeekend = [];
+      const weekendGroups = [];
+      
+      weekends.forEach((day, index) => {
+        currentWeekend.push(day.date);
+        
+        // Verifică dacă e ultimul sau dacă următorul nu e consecutiv
+        if (index === weekends.length - 1 || 
+            new Date(weekends[index + 1].date.split('.').reverse().join('-')).getTime() - 
+            new Date(day.date.split('.').reverse().join('-')).getTime() > 86400000 * 2) {
+          weekendGroups.push([...currentWeekend]);
+          currentWeekend = [];
+        }
+      });
+      
+      weekendGroups.forEach((group, index) => {
+        if (group.length === 1) {
+          message += `• ${group[0]}\n`;
+        } else if (group.length === 2) {
+          message += `• ${group[0]} & ${group[1]}\n`;
+        } else {
+          message += `• ${group[0]} → ${group[group.length - 1]} (${group.length} zile)\n`;
+        }
+      });
+      message += `\n`;
+    }
+    
+    // Footer informativ
+    message += `${'-'.repeat(50)}\n`;
+    message += `ℹ️ Conform legislației române (Codul Muncii)\n`;
+    message += `📚 Surse: Legea 53/2003, Legea 202/2008, BOR Calendar\n`;
+    
+    alert(message);
+  };
+
+  // ===== Funcții Generator Cod QR Plată =====
+
+  /**
+   * Generează cod QR pentru plată
+   */
+  const generatePaymentQRCode = async () => {
+    // Validări
+    if (!invoiceData.supplierBankAccounts[0]?.iban) {
+      alert('❌ Introdu IBAN-ul furnizorului pentru a genera codul QR de plată!');
+      return;
+    }
+
+    if (!invoiceData.supplierName) {
+      alert('❌ Introdu numele furnizorului pentru a genera codul QR de plată!');
+      return;
+    }
+
+    setQrCodeDialog({ ...qrCodeDialog, loading: true, open: true });
+
+    try {
+      const qrDataUrl = await paymentService.generatePaymentQR({
+        iban: invoiceData.supplierBankAccounts[0].iban,
+        amount: parseFloat(totals.gross),
+        currency: invoiceData.currency,
+        beneficiary: invoiceData.supplierName,
+        reference: `Factura ${invoiceData.series || ''}${invoiceData.number || ''}`,
+        bic: '' // Opțional
+      });
+
+      setQrCodeDialog({
+        open: true,
+        qrDataUrl: qrDataUrl,
+        loading: false
+      });
+
+    } catch (error) {
+      alert(`❌ Eroare generare cod QR:\n\n${error.message}`);
+      setQrCodeDialog({ open: false, qrDataUrl: '', loading: false });
+    }
+  };
+
+  /**
+   * Descarcă codul QR ca imagine
+   */
+  const downloadPaymentQR = () => {
+    if (!qrCodeDialog.qrDataUrl) return;
+    
+    const filename = `payment-qr_${invoiceData.series || 'FAC'}_${invoiceData.number || '001'}.png`;
+    paymentService.downloadQRCode(qrCodeDialog.qrDataUrl, filename);
+  };
+
+  /**
+   * Închide dialogul QR
+   */
+  const closeQRDialog = () => {
+    setQrCodeDialog({ open: false, qrDataUrl: '', loading: false });
+  };
+
   return (
     <ToolLayout
       title="Generator Factură Completă"
@@ -2334,6 +2687,62 @@ const InvoiceGenerator = () => {
                   onChange={handleInvoiceChange('dueDate')}
                   InputLabelProps={{ shrink: true }}
                 />
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
+                  <FormControl 
+                    size="small" 
+                    variant="standard"
+                    sx={{ minWidth: 90 }}
+                  >
+                    <Select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          calculateDueDateByWorkingDays(parseInt(e.target.value));
+                        }
+                      }}
+                      displayEmpty
+                      sx={{
+                        fontSize: '0.75rem',
+                        '& .MuiSelect-select': {
+                          py: 0.5,
+                          pr: 3
+                        }
+                      }}
+                    >
+                      <MenuItem value="" disabled sx={{ fontSize: '0.8rem' }}>
+                        <em>Zile lucr.</em>
+                      </MenuItem>
+                      <MenuItem value="7" sx={{ fontSize: '0.8rem' }}>7 zile</MenuItem>
+                      <MenuItem value="10" sx={{ fontSize: '0.8rem' }}>10 zile</MenuItem>
+                      <MenuItem value="15" sx={{ fontSize: '0.8rem' }}>15 zile</MenuItem>
+                      <MenuItem value="20" sx={{ fontSize: '0.8rem' }}>20 zile</MenuItem>
+                      <MenuItem value="30" sx={{ fontSize: '0.8rem' }}>30 zile</MenuItem>
+                      <MenuItem value="45" sx={{ fontSize: '0.8rem' }}>45 zile</MenuItem>
+                      <MenuItem value="60" sx={{ fontSize: '0.8rem' }}>60 zile</MenuItem>
+                      <MenuItem value="90" sx={{ fontSize: '0.8rem' }}>90 zile</MenuItem>
+                    </Select>
+                  </FormControl>
+                  {workingDaysCalculator.showDetails && (
+                    <Button
+                      size="small"
+                      variant="text"
+                      color="info"
+                      onClick={showWorkingDaysDetails}
+                      sx={{ 
+                        fontSize: '0.7rem',
+                        px: 1,
+                        py: 0.3,
+                        minWidth: 'auto',
+                        textTransform: 'none'
+                      }}
+                    >
+                      Detalii
+                    </Button>
+                  )}
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                    (exclude weekend + sărbători)
+                  </Typography>
+                </Stack>
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                 <FormControl fullWidth size="small">
@@ -2355,6 +2764,68 @@ const InvoiceGenerator = () => {
             </Grid>
           </CardContent>
         </Card>
+
+        {/* Cursuri Valutare BNR - Widget Informativ */}
+        {bnrRates && (
+          <Card variant="outlined" sx={{ bgcolor: 'info.50', borderColor: 'info.main' }}>
+            <CardContent sx={{ py: 1.5 }}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
+                <Box>
+                  <Typography variant="subtitle2" color="info.main" fontWeight="600">
+                    💱 Cursuri Valutare BNR ({bnrRates.date})
+                  </Typography>
+                  <Stack direction="row" spacing={2} sx={{ mt: 0.5 }}>
+                    {['EUR', 'USD', 'GBP'].map(currency => (
+                      bnrRates.rates[currency] && (
+                        <Chip
+                          key={currency}
+                          label={`${currency}: ${bnrRates.rates[currency]} RON`}
+                          size="small"
+                          color="info"
+                          variant="outlined"
+                          onClick={() => convertTotalToCurrency(currency)}
+                          sx={{ cursor: 'pointer', fontWeight: 500 }}
+                        />
+                      )
+                    ))}
+                  </Stack>
+                </Box>
+                <Stack direction="row" spacing={1}>
+                  {invoiceData.currency !== 'RON' && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="info"
+                      onClick={() => convertTotalToCurrency('RON')}
+                      disabled={bnrLoading}
+                    >
+                      Conversie → RON
+                    </Button>
+                  )}
+                  <IconButton 
+                    size="small" 
+                    color="info" 
+                    onClick={refreshBNRRates}
+                    disabled={bnrLoading}
+                    title="Reîmprospătează cursurile BNR"
+                  >
+                    {bnrLoading ? <CircularProgress size={20} /> : <RefreshIcon />}
+                  </IconButton>
+                </Stack>
+              </Stack>
+              {bnrError && (
+                <Alert severity="warning" sx={{ mt: 1, py: 0.5 }}>
+                  {bnrError}
+                </Alert>
+              )}
+              {bnrRates.cached && (
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                  ℹ️ Cursuri din cache (actualizare automată la 6 ore)
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Furnizor și Beneficiar */}
         <Grid container spacing={2}>
@@ -2827,75 +3298,202 @@ const InvoiceGenerator = () => {
         </Card>
 
         {/* Butoane Export */}
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Stack spacing={1.5}>
+        <Paper sx={{ p: 3, bgcolor: 'grey.50' }}>
+          <Typography variant="h6" gutterBottom textAlign="center" color="primary">
+            Export & Descărcare
+          </Typography>
+          
+          {/* Butoane principale de export - pătrate pe un rând */}
+          <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap" sx={{ mb: 3 }}>
+            <Box sx={{ textAlign: 'center' }}>
               <Button
                 variant="contained"
                 color="error"
-                startIcon={<PictureAsPdfIcon />}
                 onClick={exportToPDF}
-                fullWidth
+                sx={{
+                  minWidth: 100,
+                  minHeight: 100,
+                  width: 100,
+                  height: 100,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  p: 1.5
+                }}
               >
-                Descarcă PDF
+                <PictureAsPdfIcon sx={{ fontSize: 40, mb: 0.5 }} />
+                <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
+                  Descarcă PDF
+                </Typography>
               </Button>
-                <Button
-                  variant="contained"
-                  color="success"
-                  startIcon={<DescriptionIcon />}
-                  onClick={exportToExcel}
-                  fullWidth
-                >
+            </Box>
+
+            <Box sx={{ textAlign: 'center' }}>
+              <Button
+                variant="contained"
+                color="success"
+                onClick={exportToExcel}
+                sx={{
+                  minWidth: 100,
+                  minHeight: 100,
+                  width: 100,
+                  height: 100,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  p: 1.5
+                }}
+              >
+                <DescriptionIcon sx={{ fontSize: 40, mb: 0.5 }} />
+                <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
                   Descarcă Excel
-                </Button>
-                <Button
-                  variant="contained"
-                  color="info"
-                  startIcon={<CodeIcon />}
-                  onClick={exportToXML}
-                  fullWidth
-                >
-                  Descarcă XML (e-Factura)
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="warning"
-                  startIcon={<CheckCircleOutlineIcon />}
-                  onClick={validateOnANAF}
-                  fullWidth
-                >
-                  Validează XML pe ANAF
-                </Button>
-                
-                <Divider sx={{ my: 1.5 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Google Drive
-                  </Typography>
-                </Divider>
-                
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  startIcon={<CloudUploadIcon />}
-                  onClick={() => saveToGoogleDrive('pdf')}
-                  fullWidth
-                  disabled={isUploadingToDrive}
-                >
-                  {isUploadingToDrive ? 'Procesare...' : 'Salvează PDF în Drive'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="success"
-                  startIcon={<CloudUploadIcon />}
-                  onClick={() => saveToGoogleDrive('excel')}
-                  fullWidth
-                  disabled={isUploadingToDrive}
-                >
-                  {isUploadingToDrive ? 'Procesare...' : 'Salvează Excel în Drive'}
-                </Button>
+                </Typography>
+              </Button>
+            </Box>
+
+            <Box sx={{ textAlign: 'center' }}>
+              <Button
+                variant="contained"
+                color="info"
+                onClick={exportToXML}
+                sx={{
+                  minWidth: 100,
+                  minHeight: 100,
+                  width: 100,
+                  height: 100,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  p: 1.5
+                }}
+              >
+                <CodeIcon sx={{ fontSize: 40, mb: 0.5 }} />
+                <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
+                  Descarcă XML
+                </Typography>
+              </Button>
+            </Box>
+
+            <Box sx={{ textAlign: 'center' }}>
+              <Button
+                variant="outlined"
+                color="warning"
+                onClick={validateOnANAF}
+                sx={{
+                  minWidth: 100,
+                  minHeight: 100,
+                  width: 100,
+                  height: 100,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  p: 1.5,
+                  bgcolor: 'background.paper'
+                }}
+              >
+                <CheckCircleOutlineIcon sx={{ fontSize: 40, mb: 0.5 }} />
+                <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
+                  Validează ANAF
+                </Typography>
+              </Button>
+            </Box>
+          </Stack>
+
+          <Divider sx={{ my: 2 }}>
+            <Typography variant="caption" color="text.secondary">
+              Acțiuni rapide
+            </Typography>
+          </Divider>
+
+          {/* Butoane secundare - Google Drive + QR */}
+          <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap">
+            <Box sx={{ textAlign: 'center' }}>
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={() => saveToGoogleDrive('pdf')}
+                disabled={isUploadingToDrive}
+                sx={{
+                  minWidth: 90,
+                  minHeight: 90,
+                  width: 90,
+                  height: 90,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  p: 1
+                }}
+              >
+                <CloudUploadIcon sx={{ fontSize: 36, mb: 0.5 }} />
+                <Typography variant="caption" sx={{ fontSize: '0.65rem', lineHeight: 1.2 }}>
+                  PDF Drive
+                </Typography>
+              </Button>
+            </Box>
+
+            <Box sx={{ textAlign: 'center' }}>
+              <Button
+                variant="outlined"
+                color="success"
+                onClick={() => saveToGoogleDrive('excel')}
+                disabled={isUploadingToDrive}
+                sx={{
+                  minWidth: 90,
+                  minHeight: 90,
+                  width: 90,
+                  height: 90,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  p: 1
+                }}
+              >
+                <CloudUploadIcon sx={{ fontSize: 36, mb: 0.5 }} />
+                <Typography variant="caption" sx={{ fontSize: '0.65rem', lineHeight: 1.2 }}>
+                  Excel Drive
+                </Typography>
+              </Button>
+            </Box>
+
+            <Box sx={{ textAlign: 'center' }}>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={generatePaymentQRCode}
+                disabled={!invoiceData.supplierBankAccounts[0]?.iban}
+                sx={{
+                  minWidth: 90,
+                  minHeight: 90,
+                  width: 90,
+                  height: 90,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  p: 1
+                }}
+              >
+                <QrCode2Icon sx={{ fontSize: 36, mb: 0.5 }} />
+                <Typography variant="caption" sx={{ fontSize: '0.65rem', lineHeight: 1.2 }}>
+                  Cod QR Plată
+                </Typography>
+              </Button>
+              {!invoiceData.supplierBankAccounts[0]?.iban && (
+                <Typography variant="caption" color="error" display="block" sx={{ mt: 0.5, fontSize: '0.65rem' }}>
+                  Lipsește IBAN
+                </Typography>
+              )}
+            </Box>
+          </Stack>
+
+          {isUploadingToDrive && (
+            <Typography variant="caption" color="primary" display="block" textAlign="center" sx={{ mt: 2 }}>
+              Procesare...
+            </Typography>
+          )}
+        </Paper>
+
+        {/* Eliminăm secțiunea duplicată de mai jos */}
+        <Box sx={{ display: 'none' }}>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Stack spacing={1.5}>
               </Stack>
             </Grid>
           </Grid>
+        </Box>
 
         {/* Info */}
         <Paper sx={{ p: 1.5, bgcolor: 'grey.50' }}>
@@ -3029,6 +3627,108 @@ const InvoiceGenerator = () => {
           onConnect={handleSheetsPromptConnect}
           onNever={handleSheetsPromptNever}
         />
+
+        {/* Dialog Cod QR Plată */}
+        <Dialog
+          open={qrCodeDialog.open}
+          onClose={closeQRDialog}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <QrCode2Icon color="primary" />
+                <Typography variant="h6">Cod QR Plată</Typography>
+              </Box>
+              <IconButton onClick={closeQRDialog} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Stack>
+          </DialogTitle>
+          <DialogContent>
+            {qrCodeDialog.loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+                <CircularProgress />
+              </Box>
+            ) : qrCodeDialog.qrDataUrl ? (
+              <Stack spacing={2} alignItems="center">
+                <Alert severity="success" sx={{ width: '100%' }}>
+                  <strong>Cod QR generat cu succes!</strong>
+                  <br />
+                  Clientul poate scana acest cod QR cu aplicația de banking pentru a plăti factura automat.
+                </Alert>
+
+                <Box
+                  component="img"
+                  src={qrCodeDialog.qrDataUrl}
+                  alt="QR Code Plată"
+                  sx={{
+                    width: 300,
+                    height: 300,
+                    border: '2px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    p: 2,
+                    bgcolor: 'white'
+                  }}
+                />
+
+                <Paper sx={{ p: 2, width: '100%', bgcolor: 'grey.50' }}>
+                  <Typography variant="subtitle2" gutterBottom fontWeight="600">
+                    Detalii plată:
+                  </Typography>
+                  <Stack spacing={0.5}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">Beneficiar:</Typography>
+                      <Typography variant="body2" fontWeight="500">{invoiceData.supplierName}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">IBAN:</Typography>
+                      <Typography variant="body2" fontWeight="500" sx={{ fontFamily: 'monospace' }}>
+                        {paymentService.formatIBAN(invoiceData.supplierBankAccounts[0]?.iban || '')}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">Sumă:</Typography>
+                      <Typography variant="body2" fontWeight="700" color="success.main">
+                        {totals.gross} {invoiceData.currency}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">Referință:</Typography>
+                      <Typography variant="body2" fontWeight="500">
+                        Factura {invoiceData.series}{invoiceData.number}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+
+                <Alert severity="info" sx={{ width: '100%' }}>
+                  <Typography variant="body2">
+                    <strong>Format:</strong> EPC QR Code (standard european pentru plăți SEPA)
+                    <br />
+                    <strong>Compatibilitate:</strong> Majoritatea aplicațiilor de banking din România și UE
+                  </Typography>
+                </Alert>
+              </Stack>
+            ) : null}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeQRDialog}>
+              Închide
+            </Button>
+            {qrCodeDialog.qrDataUrl && (
+              <Button
+                onClick={downloadPaymentQR}
+                variant="contained"
+                startIcon={<DownloadIcon />}
+              >
+                Descarcă QR Code
+              </Button>
+            )}
+          </DialogActions>
+        </Dialog>
       </Stack>
     </ToolLayout>
   );

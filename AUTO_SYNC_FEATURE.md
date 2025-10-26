@@ -173,3 +173,4 @@ Pentru a dezactiva sincronizarea automată, deconectează spreadsheet-ul Google 
 - Pentru sincronizare completă (produse, clienți, facturi), folosește "Sincronizare Manuală"
 - Erorile de sincronizare automată nu sunt afișate utilizatorului
 - Sincronizarea se oprește automat când utilizatorul se deconectează de la Google Sheets
+

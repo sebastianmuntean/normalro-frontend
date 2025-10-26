@@ -362,3 +362,4 @@ Refactorizarea oferă:
 - 🔄 Custom hooks pentru logică (useGoogleSheets, useClearData)
 - 🔄 PropTypes sau TypeScript pentru type safety
 - 🔄 Unit tests pentru fiecare componentă
+

@@ -392,3 +392,4 @@ Funcționalitatea oferă:
 - ✅ Conformitate GDPR
 
 **Utilizatorul are acum control complet și transparent asupra datelor sale!** 🎉
+
