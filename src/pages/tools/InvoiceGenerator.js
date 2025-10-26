@@ -115,7 +115,7 @@ const InvoiceGenerator = () => {
     supplierCountry: 'Romania',
     supplierPhone: '',
     supplierEmail: '',
-    supplierBankAccounts: [{ bank: '', iban: '' }],
+    supplierBankAccounts: [{ bank: '', iban: '', currency: 'RON' }],
     supplierVatPrefix: '-',
     
     // Beneficiar
@@ -128,7 +128,7 @@ const InvoiceGenerator = () => {
     clientCountry: 'Romania',
     clientPhone: '',
     clientEmail: '',
-    clientBankAccounts: [{ bank: '', iban: '' }],
+    clientBankAccounts: [{ bank: '', iban: '', currency: 'RON' }],
     clientVatPrefix: '-'
   });
 
@@ -315,7 +315,13 @@ const InvoiceGenerator = () => {
         supplierPhone: data.supplierPhone || '',
         supplierEmail: data.supplierEmail || '',
         supplierVatPrefix: data.supplierVatPrefix || '-',
-        supplierBankAccounts: data.supplierBankAccounts || [{ bank: '', iban: '' }]
+        supplierBankAccounts: data.supplierBankAccounts 
+          ? data.supplierBankAccounts.map(acc => ({
+              bank: acc.bank || '',
+              iban: acc.iban || '',
+              currency: acc.currency || 'RON'
+            }))
+          : [{ bank: '', iban: '', currency: 'RON' }]
       }));
       
       // Log pentru debugging
@@ -454,7 +460,7 @@ const InvoiceGenerator = () => {
   const handleAddSupplierBankAccount = () => {
     setInvoiceData({
       ...invoiceData,
-      supplierBankAccounts: [...invoiceData.supplierBankAccounts, { bank: '', iban: '' }]
+      supplierBankAccounts: [...invoiceData.supplierBankAccounts, { bank: '', iban: '', currency: 'RON' }]
     });
   };
 
@@ -462,7 +468,7 @@ const InvoiceGenerator = () => {
     const updatedAccounts = invoiceData.supplierBankAccounts.filter((_, i) => i !== index);
     setInvoiceData({
       ...invoiceData,
-      supplierBankAccounts: updatedAccounts.length > 0 ? updatedAccounts : [{ bank: '', iban: '' }]
+      supplierBankAccounts: updatedAccounts.length > 0 ? updatedAccounts : [{ bank: '', iban: '', currency: 'RON' }]
     });
   };
 
@@ -479,7 +485,7 @@ const InvoiceGenerator = () => {
   const handleAddClientBankAccount = () => {
     setInvoiceData({
       ...invoiceData,
-      clientBankAccounts: [...invoiceData.clientBankAccounts, { bank: '', iban: '' }]
+      clientBankAccounts: [...invoiceData.clientBankAccounts, { bank: '', iban: '', currency: 'RON' }]
     });
   };
 
@@ -487,7 +493,7 @@ const InvoiceGenerator = () => {
     const updatedAccounts = invoiceData.clientBankAccounts.filter((_, i) => i !== index);
     setInvoiceData({
       ...invoiceData,
-      clientBankAccounts: updatedAccounts.length > 0 ? updatedAccounts : [{ bank: '', iban: '' }]
+      clientBankAccounts: updatedAccounts.length > 0 ? updatedAccounts : [{ bank: '', iban: '', currency: 'RON' }]
     });
   };
 
@@ -1333,7 +1339,13 @@ const InvoiceGenerator = () => {
           supplierPhone: data.supplierPhone || '',
           supplierEmail: data.supplierEmail || '',
           supplierVatPrefix: data.supplierVatPrefix || 'RO',
-          supplierBankAccounts: data.supplierBankAccounts || [{ bank: '', iban: '' }]
+          supplierBankAccounts: data.supplierBankAccounts 
+            ? data.supplierBankAccounts.map(acc => ({
+                bank: acc.bank || '',
+                iban: acc.iban || '',
+                currency: acc.currency || 'RON'
+              }))
+            : [{ bank: '', iban: '', currency: 'RON' }]
         }));
 
         const savedVatRate = data.defaultVatRate || DEFAULT_VAT_RATE;
@@ -1568,6 +1580,10 @@ const InvoiceGenerator = () => {
                 ${invoiceData.supplierRegCom ? `Reg Com: ${invoiceData.supplierRegCom}<br/>` : ''}
                 ${invoiceData.supplierAddress || '-'}<br/>
                 ${invoiceData.supplierCity || '-'}
+                ${invoiceData.supplierPhone ? `<br/>Tel: ${invoiceData.supplierPhone}` : ''}
+                ${invoiceData.supplierEmail ? `<br/>Email: ${invoiceData.supplierEmail}` : ''}
+                ${invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0 && invoiceData.supplierBankAccounts[0].iban ? `<br/><strong>IBAN (${invoiceData.supplierBankAccounts[0].currency || 'RON'}):</strong> ${invoiceData.supplierBankAccounts[0].iban}` : ''}
+                ${invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0 && invoiceData.supplierBankAccounts[0].bank ? `<br/>Banca: ${invoiceData.supplierBankAccounts[0].bank}` : ''}
               </div>
             </td>
             <td style="width: 50%; vertical-align: top; padding-left: 15px;">
@@ -1578,6 +1594,10 @@ const InvoiceGenerator = () => {
                 ${invoiceData.clientRegCom ? `Reg Com: ${invoiceData.clientRegCom}<br/>` : ''}
                 ${invoiceData.clientAddress || '-'}<br/>
                 ${invoiceData.clientCity || '-'}
+                ${invoiceData.clientPhone ? `<br/>Tel: ${invoiceData.clientPhone}` : ''}
+                ${invoiceData.clientEmail ? `<br/>Email: ${invoiceData.clientEmail}` : ''}
+                ${invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0 && invoiceData.clientBankAccounts[0].iban ? `<br/><strong>IBAN (${invoiceData.clientBankAccounts[0].currency || 'RON'}):</strong> ${invoiceData.clientBankAccounts[0].iban}` : ''}
+                ${invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0 && invoiceData.clientBankAccounts[0].bank ? `<br/>Banca: ${invoiceData.clientBankAccounts[0].bank}` : ''}
               </div>
             </td>
           </tr>
@@ -1716,8 +1736,18 @@ const InvoiceGenerator = () => {
     excelData.push(['Oraș', invoiceData.supplierCity || '-']);
     excelData.push(['Telefon', invoiceData.supplierPhone || '-']);
     excelData.push(['Email', invoiceData.supplierEmail || '-']);
-    excelData.push(['Bancă', invoiceData.supplierBank || '-']);
-    excelData.push(['IBAN', invoiceData.supplierIBAN || '-']);
+    
+    // Adaugă conturi bancare furnizor (poate fi mai multe)
+    if (invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0) {
+      invoiceData.supplierBankAccounts.forEach((account, index) => {
+        if (account.iban || account.bank) {
+          const label = invoiceData.supplierBankAccounts.length > 1 ? `Cont bancar ${index + 1}` : 'Cont bancar';
+          if (account.bank) excelData.push([`${label} - Banca`, account.bank]);
+          if (account.iban) excelData.push([`${label} - IBAN`, account.iban]);
+          if (account.currency) excelData.push([`${label} - Valută`, account.currency]);
+        }
+      });
+    }
     excelData.push([]);
     
     // Date client
@@ -1729,6 +1759,18 @@ const InvoiceGenerator = () => {
     excelData.push(['Oraș', invoiceData.clientCity || '-']);
     excelData.push(['Telefon', invoiceData.clientPhone || '-']);
     excelData.push(['Email', invoiceData.clientEmail || '-']);
+    
+    // Adaugă conturi bancare client (poate fi mai multe)
+    if (invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0) {
+      invoiceData.clientBankAccounts.forEach((account, index) => {
+        if (account.iban || account.bank) {
+          const label = invoiceData.clientBankAccounts.length > 1 ? `Cont bancar ${index + 1}` : 'Cont bancar';
+          if (account.bank) excelData.push([`${label} - Banca`, account.bank]);
+          if (account.iban) excelData.push([`${label} - IBAN`, account.iban]);
+          if (account.currency) excelData.push([`${label} - Valută`, account.currency]);
+        }
+      });
+    }
     excelData.push([]);
     
     // Linii produse - Header

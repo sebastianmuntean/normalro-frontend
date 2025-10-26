@@ -6,6 +6,7 @@ import {
   CardContent,
   CircularProgress,
   Divider,
+  FormControl,
   Grid,
   IconButton,
   InputAdornment,
@@ -245,7 +246,7 @@ const CompanyForm = ({
                 <>
                   {data[`${prefix}BankAccounts`].map((account, index) => (
                     <Grid container spacing={1} key={index} sx={{ mb: 1 }}>
-                      <Grid size={{ xs: 12, sm: 5 }}>
+                      <Grid size={{ xs: 12, sm: 4 }}>
                         <TextField
                           fullWidth
                           size="small"
@@ -254,7 +255,7 @@ const CompanyForm = ({
                           onChange={(e) => onBankAccountChange && onBankAccountChange(index, 'bank', e.target.value)}
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, sm: index === 0 ? 7 : 6 }}>
+                      <Grid size={{ xs: 10, sm: index === 0 ? 6 : 5.5 }}>
                         <TextField
                           fullWidth
                           size="small"
@@ -262,6 +263,29 @@ const CompanyForm = ({
                           value={account.iban || ''}
                           onChange={(e) => onBankAccountChange && onBankAccountChange(index, 'iban', e.target.value)}
                         />
+                      </Grid>
+                      <Grid size={{ xs: 2, sm: index === 0 ? 2 : 1.5 }}>
+                        <Select
+                          fullWidth
+                          size="small"
+                          value={account.currency || 'RON'}
+                          onChange={(e) => onBankAccountChange && onBankAccountChange(index, 'currency', e.target.value)}
+                          sx={{ 
+                            '& .MuiSelect-select': { 
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              textAlign: 'center',
+                              paddingLeft: 0.5,
+                              paddingRight: 2
+                            } 
+                          }}
+                        >
+                          <MenuItem value="RON">RON</MenuItem>
+                          <MenuItem value="EUR">EUR</MenuItem>
+                          <MenuItem value="USD">USD</MenuItem>
+                          <MenuItem value="GBP">GBP</MenuItem>
+                          <MenuItem value="CHF">CHF</MenuItem>
+                        </Select>
                       </Grid>
                       {index > 0 && (
                         <Grid size={{ xs: 12, sm: 1 }} sx={{ display: 'flex', alignItems: 'center' }}>

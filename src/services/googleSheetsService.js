@@ -208,10 +208,14 @@ class GoogleSheetsService {
       });
 
       const spreadsheetId = response.result.spreadsheetId;
+      const sheets = response.result.sheets;
       this.setSpreadsheetId(spreadsheetId);
 
-      // Inițializează header-ele pentru fiecare sheet
-      await this.initializeSheetHeaders(spreadsheetId);
+      console.log('✅ Spreadsheet creat:', spreadsheetId);
+      console.log('📊 Sheets create:', sheets.map(s => ({ id: s.properties.sheetId, title: s.properties.title })));
+
+      // Inițializează header-ele pentru fiecare sheet (folosind ID-urile reale)
+      await this.initializeSheetHeaders(spreadsheetId, sheets);
 
       return {
         id: spreadsheetId,
@@ -226,7 +230,7 @@ class GoogleSheetsService {
   /**
    * Inițializează header-ele pentru toate sheet-urile
    */
-  async initializeSheetHeaders(spreadsheetId) {
+  async initializeSheetHeaders(spreadsheetId, sheets) {
     const updates = [
       // Headers pentru Date Furnizor (16 coloane: A-P) - GUID adăugat ca primă coloană
       {
@@ -273,16 +277,24 @@ class GoogleSheetsService {
       }
     });
 
-    // Formatare header-e (bold + background)
+    // Creează mapping între nume sheet și ID real
+    const sheetIdMap = {};
+    sheets.forEach(sheet => {
+      sheetIdMap[sheet.properties.title] = sheet.properties.sheetId;
+    });
+
+    console.log('📊 Sheet ID Map:', sheetIdMap);
+
+    // Formatare header-e (bold + background) - folosind ID-urile REALE
     const requests = [
       this.SHEET_NAMES.SUPPLIER,
       this.SHEET_NAMES.PRODUCTS,
       this.SHEET_NAMES.CLIENTS,
       this.SHEET_NAMES.INVOICES
-    ].map((sheetName, index) => ({
+    ].map((sheetName) => ({
       repeatCell: {
         range: {
-          sheetId: index,
+          sheetId: sheetIdMap[sheetName], // Folosește ID-ul REAL din response
           startRowIndex: 0,
           endRowIndex: 1
         },
@@ -300,6 +312,8 @@ class GoogleSheetsService {
       spreadsheetId: spreadsheetId,
       resource: { requests }
     });
+
+    console.log('✅ Headers inițializate cu succes pentru toate sheet-urile');
   }
 
   /**
