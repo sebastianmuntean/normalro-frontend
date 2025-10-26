@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Accordion,
   AccordionDetails,
@@ -25,7 +25,12 @@ import {
   MenuItem,
   Paper,
   Select,
+  Snackbar,
+  SpeedDial,
+  SpeedDialAction,
+  SpeedDialIcon,
   Stack,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -33,6 +38,7 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
@@ -55,6 +61,14 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import QrCode2Icon from '@mui/icons-material/QrCode2';
 import DownloadIcon from '@mui/icons-material/Download';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import SaveIcon from '@mui/icons-material/Save';
+import PrintIcon from '@mui/icons-material/Print';
+import KeyboardIcon from '@mui/icons-material/Keyboard';
 import ToolLayout from '../../components/ToolLayout';
 import InvoiceHistoryDialog from '../../components/InvoiceHistoryDialog';
 import ProductTemplateDialog from '../../components/ProductTemplateDialog';
@@ -180,6 +194,26 @@ const InvoiceGenerator = () => {
     unitNetPrice: ''
   });
   const [previewData, setPreviewData] = useState([]);
+
+  // ===== State pentru UI/UX îmbunătățiri =====
+  
+  // Preview Dialog
+  const [previewDialog, setPreviewDialog] = useState({
+    open: false,
+    type: null, // 'pdf' | 'excel'
+    content: null
+  });
+  
+  // Keyboard Shortcuts Dialog
+  const [shortcutsDialogOpen, setShortcutsDialogOpen] = useState(false);
+  
+  // Autosave
+  const [lastAutosave, setLastAutosave] = useState(null);
+  const [autosaveSnackbar, setAutosaveSnackbar] = useState(false);
+  const autosaveTimerRef = useRef(null);
+  
+  // Drag state pentru reorder
+  const [draggedLineId, setDraggedLineId] = useState(null);
 
   const [lines, setLines] = useState([
     {
@@ -1511,6 +1545,304 @@ const InvoiceGenerator = () => {
       console.log('🏁 Sincronizare finalizată (finally)');
     }
   };
+
+  // ===== Funcții UI/UX îmbunătățiri =====
+  
+  /**
+   * Duplicate line - clonează o linie existentă
+   */
+  const duplicateLine = (lineId) => {
+    const lineToDuplicate = lines.find(l => l.id === lineId);
+    if (!lineToDuplicate) return;
+    
+    const newLine = {
+      ...lineToDuplicate,
+      id: Date.now() + Math.random()
+    };
+    
+    // Inserează duplicatul imediat după linia originală
+    const lineIndex = lines.findIndex(l => l.id === lineId);
+    const newLines = [
+      ...lines.slice(0, lineIndex + 1),
+      newLine,
+      ...lines.slice(lineIndex + 1)
+    ];
+    
+    setLines(newLines);
+    console.log('📋 Linie duplicată:', lineId);
+  };
+  
+  /**
+   * Move line up
+   */
+  const moveLineUp = (lineId) => {
+    const lineIndex = lines.findIndex(l => l.id === lineId);
+    if (lineIndex <= 0) return; // Deja primul
+    
+    const newLines = [...lines];
+    [newLines[lineIndex - 1], newLines[lineIndex]] = [newLines[lineIndex], newLines[lineIndex - 1]];
+    setLines(newLines);
+  };
+  
+  /**
+   * Move line down
+   */
+  const moveLineDown = (lineId) => {
+    const lineIndex = lines.findIndex(l => l.id === lineId);
+    if (lineIndex >= lines.length - 1) return; // Deja ultimul
+    
+    const newLines = [...lines];
+    [newLines[lineIndex], newLines[lineIndex + 1]] = [newLines[lineIndex + 1], newLines[lineIndex]];
+    setLines(newLines);
+  };
+  
+  /**
+   * Autosave draft - salvează automat datele la fiecare 30 secunde
+   */
+  const autosaveDraft = useCallback(() => {
+    try {
+      const draft = {
+        invoiceData,
+        lines,
+        attachedFiles: attachedFiles.map(f => ({
+          id: f.id,
+          name: f.name,
+          size: f.size,
+          mimeType: f.mimeType
+          // Nu salvăm base64 în autosave pentru a economisi spațiu
+        })),
+        timestamp: new Date().toISOString()
+      };
+      
+      localStorage.setItem('normalro_invoice_draft', JSON.stringify(draft));
+      setLastAutosave(new Date());
+      setAutosaveSnackbar(true);
+      console.log('💾 Autosave executat:', new Date().toLocaleTimeString('ro-RO'));
+    } catch (error) {
+      console.error('Eroare autosave:', error);
+    }
+  }, [invoiceData, lines, attachedFiles]);
+  
+  /**
+   * Load draft - încarcă draft salvat automat
+   */
+  const loadDraft = () => {
+    try {
+      const draftStr = localStorage.getItem('normalro_invoice_draft');
+      if (!draftStr) {
+        alert('Nu există niciun draft salvat!');
+        return;
+      }
+      
+      const draft = JSON.parse(draftStr);
+      
+      const confirmed = window.confirm(
+        `Ai un draft salvat la ${new Date(draft.timestamp).toLocaleString('ro-RO')}.\n\n` +
+        `Vrei să încarci acest draft?\n` +
+        `(Atenție: Datele curente vor fi înlocuite!)`
+      );
+      
+      if (!confirmed) return;
+      
+      setInvoiceData(draft.invoiceData);
+      setLines(draft.lines);
+      // Nu încărcăm fișierele atașate (nu au base64)
+      setAttachedFiles([]);
+      
+      alert('✅ Draft încărcat cu succes!');
+      console.log('📂 Draft încărcat din autosave');
+    } catch (error) {
+      console.error('Eroare încărcare draft:', error);
+      alert('❌ Eroare la încărcarea draft-ului!');
+    }
+  };
+  
+  /**
+   * Preview PDF/Excel înainte de descărcare
+   */
+  const showPreview = async (type) => {
+    setPreviewDialog({ open: true, type, content: 'loading' });
+    
+    try {
+      if (type === 'pdf') {
+        // Generează preview HTML al PDF-ului
+        const previewHTML = generateInvoiceHTML();
+        setPreviewDialog({ open: true, type: 'pdf', content: previewHTML });
+      } else if (type === 'excel') {
+        // Generează preview table pentru Excel
+        const previewTable = generateExcelPreview();
+        setPreviewDialog({ open: true, type: 'excel', content: previewTable });
+      }
+    } catch (error) {
+      console.error('Eroare generare preview:', error);
+      setPreviewDialog({ open: false, type: null, content: null });
+      alert('Eroare la generarea preview-ului!');
+    }
+  };
+  
+  /**
+   * Generează HTML pentru preview PDF
+   */
+  const generateInvoiceHTML = () => {
+    const totals = calculateTotals();
+    
+    return `
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
+        <h1 style="text-align: center; color: #1976d2;">FACTURĂ</h1>
+        <div style="text-align: center; margin-bottom: 20px;">
+          <div>Seria: ${invoiceData.series || '-'} Nr: ${invoiceData.number || '-'}</div>
+          <div>Data: ${invoiceData.issueDate || '-'}</div>
+          ${invoiceData.dueDate ? `<div>Scadență: ${invoiceData.dueDate}</div>` : ''}
+        </div>
+        
+        <table style="width: 100%; margin-bottom: 20px;">
+          <tr>
+            <td style="width: 50%; vertical-align: top; padding-right: 10px;">
+              <strong>FURNIZOR:</strong><br/>
+              ${invoiceData.supplierName || '-'}<br/>
+              CUI: ${invoiceData.supplierCUI || '-'}<br/>
+              ${invoiceData.supplierAddress || '-'}<br/>
+              ${invoiceData.supplierCity || '-'}
+            </td>
+            <td style="width: 50%; vertical-align: top; padding-left: 10px;">
+              <strong>BENEFICIAR:</strong><br/>
+              ${invoiceData.clientName || '-'}<br/>
+              CUI: ${invoiceData.clientCUI || '-'}<br/>
+              ${invoiceData.clientAddress || '-'}<br/>
+              ${invoiceData.clientCity || '-'}
+            </td>
+          </tr>
+        </table>
+        
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background-color: #2196F3; color: white;">
+              <th style="border: 1px solid #ddd; padding: 8px;">Nr.</th>
+              <th style="border: 1px solid #ddd; padding: 8px;">Produs/Serviciu</th>
+              <th style="border: 1px solid #ddd; padding: 8px;">Cant.</th>
+              <th style="border: 1px solid #ddd; padding: 8px;">Preț Net</th>
+              <th style="border: 1px solid #ddd; padding: 8px;">TVA%</th>
+              <th style="border: 1px solid #ddd; padding: 8px;">Total Brut</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lines.map((line, index) => `
+              <tr>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${index + 1}</td>
+                <td style="border: 1px solid #ddd; padding: 6px;">${line.product || '-'}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${line.quantity}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">${line.unitNetPrice} ${invoiceData.currency}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${line.vatRate}%</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">${calculateLineTotal(line, 'gross')} ${invoiceData.currency}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background-color: #f5f5f5; font-weight: bold;">
+              <td colspan="5" style="border: 1px solid #ddd; padding: 8px;">TOTAL</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${totals.gross} ${invoiceData.currency}</td>
+            </tr>
+          </tfoot>
+        </table>
+        
+        ${invoiceData.notes ? `
+          <div style="margin-top: 20px; padding: 10px; background-color: #f5f5f5; border-left: 4px solid #2196F3;">
+            <strong>Note:</strong><br/>
+            ${invoiceData.notes}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  };
+  
+  /**
+   * Generează preview pentru Excel
+   */
+  const generateExcelPreview = () => {
+    const totals = calculateTotals();
+    
+    return {
+      header: ['Nr.', 'Produs/Serviciu', 'Cantitate', 'Preț Net', 'TVA %', 'Total Net', 'Total TVA', 'Total Brut'],
+      rows: lines.map((line, index) => [
+        index + 1,
+        line.product || '-',
+        line.quantity,
+        `${line.unitNetPrice} ${invoiceData.currency}`,
+        `${line.vatRate}%`,
+        `${calculateLineTotal(line, 'net')} ${invoiceData.currency}`,
+        `${calculateLineTotal(line, 'vat')} ${invoiceData.currency}`,
+        `${calculateLineTotal(line, 'gross')} ${invoiceData.currency}`
+      ]),
+      totals: {
+        net: `${totals.net} ${invoiceData.currency}`,
+        vat: `${totals.vat} ${invoiceData.currency}`,
+        gross: `${totals.gross} ${invoiceData.currency}`
+      }
+    };
+  };
+  
+  /**
+   * Keyboard shortcuts handler
+   */
+  const handleKeyboardShortcut = useCallback((event) => {
+    // Ctrl+S sau Cmd+S - Salvează (autosave)
+    if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+      event.preventDefault();
+      autosaveDraft();
+      alert('💾 Draft salvat!');
+    }
+    
+    // Ctrl+P sau Cmd+P - Preview PDF
+    if ((event.ctrlKey || event.metaKey) && event.key === 'p') {
+      event.preventDefault();
+      showPreview('pdf');
+    }
+    
+    // Ctrl+E sau Cmd+E - Preview Excel
+    if ((event.ctrlKey || event.metaKey) && event.key === 'e') {
+      event.preventDefault();
+      showPreview('excel');
+    }
+    
+    // Ctrl+D sau Cmd+D - Descarcă PDF
+    if ((event.ctrlKey || event.metaKey) && event.key === 'd') {
+      event.preventDefault();
+      exportToPDF();
+    }
+    
+    // Ctrl+Shift+? - Arată shortcuts
+    if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === '?') {
+      event.preventDefault();
+      setShortcutsDialogOpen(true);
+    }
+    
+    // Escape - Închide dialoguri
+    if (event.key === 'Escape') {
+      setPreviewDialog({ open: false, type: null, content: null });
+      setShortcutsDialogOpen(false);
+    }
+  }, [autosaveDraft]);
+  
+  // useEffect pentru keyboard shortcuts
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyboardShortcut);
+    return () => window.removeEventListener('keydown', handleKeyboardShortcut);
+  }, [handleKeyboardShortcut]);
+  
+  // useEffect pentru autosave timer (30 secunde)
+  useEffect(() => {
+    // Pornește timer-ul autosave
+    autosaveTimerRef.current = setInterval(() => {
+      autosaveDraft();
+    }, 30000); // 30 secunde
+    
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearInterval(autosaveTimerRef.current);
+      }
+    };
+  }, [autosaveDraft]);
+  
 
   const calculateTotals = () => {
     let totalNet = 0;
@@ -2913,16 +3245,77 @@ const InvoiceGenerator = () => {
             </Typography>
 
             {lines.map((line, index) => (
-              <Box key={line.id} sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+              <Box 
+                key={line.id} 
+                sx={{ 
+                  mb: 2, 
+                  p: 2, 
+                  bgcolor: 'grey.50', 
+                  borderRadius: 1
+                }}
+              >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                  <Typography variant="subtitle2" fontWeight="600">
-                    Linia {index + 1}
-                  </Typography>
-                  {lines.length > 1 && (
-                    <IconButton size="small" color="error" onClick={() => deleteLine(line.id)}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  )}
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <DragIndicatorIcon 
+                      sx={{ cursor: 'grab', color: 'text.secondary' }} 
+                      fontSize="small"
+                    />
+                    <Typography variant="subtitle2" fontWeight="600">
+                      Linia {index + 1}
+                    </Typography>
+                  </Stack>
+                  
+                  <Stack direction="row" spacing={0.5}>
+                    {/* Buton Duplicate */}
+                    <Tooltip title="Duplică linia">
+                      <IconButton 
+                        size="small" 
+                        color="info" 
+                        onClick={() => duplicateLine(line.id)}
+                      >
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    
+                    {/* Buton Move Up */}
+                    {index > 0 && (
+                      <Tooltip title="Mută sus">
+                        <IconButton 
+                          size="small" 
+                          color="primary" 
+                          onClick={() => moveLineUp(line.id)}
+                        >
+                          <ArrowUpwardIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    
+                    {/* Buton Move Down */}
+                    {index < lines.length - 1 && (
+                      <Tooltip title="Mută jos">
+                        <IconButton 
+                          size="small" 
+                          color="primary" 
+                          onClick={() => moveLineDown(line.id)}
+                        >
+                          <ArrowDownwardIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    
+                    {/* Buton Delete */}
+                    {lines.length > 1 && (
+                      <Tooltip title="Șterge linia">
+                        <IconButton 
+                          size="small" 
+                          color="error" 
+                          onClick={() => deleteLine(line.id)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Stack>
                 </Box>
 
                 <Grid container spacing={1}>
@@ -3348,47 +3741,71 @@ const InvoiceGenerator = () => {
           {/* Butoane principale de export - pătrate pe un rând */}
           <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap" sx={{ mb: 3 }}>
             <Box sx={{ textAlign: 'center' }}>
-              <Button
-                variant="contained"
-                color="error"
-                onClick={exportToPDF}
-                sx={{
-                  minWidth: 100,
-                  minHeight: 100,
-                  width: 100,
-                  height: 100,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  p: 1.5
-                }}
-              >
-                <PictureAsPdfIcon sx={{ fontSize: 40, mb: 0.5 }} />
-                <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
-                  Descarcă PDF
-                </Typography>
-              </Button>
+              <Stack spacing={1}>
+                <Button
+                  variant="contained"
+                  color="error"
+                  onClick={exportToPDF}
+                  sx={{
+                    minWidth: 100,
+                    minHeight: 100,
+                    width: 100,
+                    height: 100,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    p: 1.5
+                  }}
+                >
+                  <PictureAsPdfIcon sx={{ fontSize: 40, mb: 0.5 }} />
+                  <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
+                    Descarcă PDF
+                  </Typography>
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  onClick={() => showPreview('pdf')}
+                  startIcon={<VisibilityIcon />}
+                  sx={{ fontSize: '0.7rem' }}
+                >
+                  Preview
+                </Button>
+              </Stack>
             </Box>
 
             <Box sx={{ textAlign: 'center' }}>
-              <Button
-                variant="contained"
-                color="success"
-                onClick={exportToExcel}
-                sx={{
-                  minWidth: 100,
-                  minHeight: 100,
-                  width: 100,
-                  height: 100,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  p: 1.5
-                }}
-              >
-                <DescriptionIcon sx={{ fontSize: 40, mb: 0.5 }} />
-                <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
-                  Descarcă Excel
-                </Typography>
-              </Button>
+              <Stack spacing={1}>
+                <Button
+                  variant="contained"
+                  color="success"
+                  onClick={exportToExcel}
+                  sx={{
+                    minWidth: 100,
+                    minHeight: 100,
+                    width: 100,
+                    height: 100,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    p: 1.5
+                  }}
+                >
+                  <DescriptionIcon sx={{ fontSize: 40, mb: 0.5 }} />
+                  <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
+                    Descarcă Excel
+                  </Typography>
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="success"
+                  onClick={() => showPreview('excel')}
+                  startIcon={<VisibilityIcon />}
+                  sx={{ fontSize: '0.7rem' }}
+                >
+                  Preview
+                </Button>
+              </Stack>
             </Box>
 
             <Box sx={{ textAlign: 'center' }}>
@@ -3771,6 +4188,194 @@ const InvoiceGenerator = () => {
             )}
           </DialogActions>
         </Dialog>
+
+        {/* Dialog Preview PDF/Excel */}
+        <Dialog
+          open={previewDialog.open}
+          onClose={() => setPreviewDialog({ open: false, type: null, content: null })}
+          maxWidth="lg"
+          fullWidth
+        >
+          <DialogTitle>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {previewDialog.type === 'pdf' ? <PictureAsPdfIcon color="error" /> : <DescriptionIcon color="success" />}
+                <Typography variant="h6">
+                  Preview {previewDialog.type === 'pdf' ? 'PDF' : 'Excel'}
+                </Typography>
+              </Box>
+              <IconButton onClick={() => setPreviewDialog({ open: false, type: null, content: null })} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Stack>
+          </DialogTitle>
+          <DialogContent>
+            {previewDialog.content === 'loading' ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+                <CircularProgress />
+              </Box>
+            ) : previewDialog.type === 'pdf' && previewDialog.content ? (
+              <Box 
+                dangerouslySetInnerHTML={{ __html: previewDialog.content }}
+                sx={{ 
+                  bgcolor: 'background.paper',
+                  borderRadius: 1,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  maxHeight: 600,
+                  overflow: 'auto'
+                }}
+              />
+            ) : previewDialog.type === 'excel' && previewDialog.content ? (
+              <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
+                <Table stickyHeader size="small">
+                  <TableHead>
+                    <TableRow>
+                      {previewDialog.content.header.map((col, idx) => (
+                        <TableCell key={idx} sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: 'white' }}>
+                          {col}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {previewDialog.content.rows.map((row, rowIdx) => (
+                      <TableRow key={rowIdx}>
+                        {row.map((cell, cellIdx) => (
+                          <TableCell key={cellIdx}>{cell}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                    <TableRow sx={{ bgcolor: 'grey.100' }}>
+                      <TableCell colSpan={5} sx={{ fontWeight: 'bold' }}>TOTAL</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>{previewDialog.content.totals.net}</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>{previewDialog.content.totals.vat}</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>{previewDialog.content.totals.gross}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : null}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setPreviewDialog({ open: false, type: null, content: null })}>
+              Închide
+            </Button>
+            <Button
+              onClick={() => {
+                setPreviewDialog({ open: false, type: null, content: null });
+                if (previewDialog.type === 'pdf') {
+                  exportToPDF();
+                } else {
+                  exportToExcel();
+                }
+              }}
+              variant="contained"
+              color={previewDialog.type === 'pdf' ? 'error' : 'success'}
+              startIcon={<DownloadIcon />}
+            >
+              Descarcă {previewDialog.type === 'pdf' ? 'PDF' : 'Excel'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog Keyboard Shortcuts */}
+        <Dialog
+          open={shortcutsDialogOpen}
+          onClose={() => setShortcutsDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <KeyboardIcon color="primary" />
+                <Typography variant="h6">Scurtături Tastatură</Typography>
+              </Box>
+              <IconButton onClick={() => setShortcutsDialogOpen(false)} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Stack>
+          </DialogTitle>
+          <DialogContent>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Combinație</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Acțiune</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>
+                      <Chip label="Ctrl + S" size="small" color="primary" variant="outlined" />
+                    </TableCell>
+                    <TableCell>Salvează draft manual</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>
+                      <Chip label="Ctrl + P" size="small" color="error" variant="outlined" />
+                    </TableCell>
+                    <TableCell>Preview PDF</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>
+                      <Chip label="Ctrl + E" size="small" color="success" variant="outlined" />
+                    </TableCell>
+                    <TableCell>Preview Excel</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>
+                      <Chip label="Ctrl + D" size="small" color="error" variant="outlined" />
+                    </TableCell>
+                    <TableCell>Descarcă PDF</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>
+                      <Chip label="Ctrl + Shift + ?" size="small" color="primary" variant="outlined" />
+                    </TableCell>
+                    <TableCell>Arată acest dialog</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>
+                      <Chip label="Escape" size="small" variant="outlined" />
+                    </TableCell>
+                    <TableCell>Închide dialoguri</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+            
+            <Alert severity="info" sx={{ mt: 2 }}>
+              <Typography variant="body2">
+                💡 <strong>Sfat:</strong> Pe Mac, folosește <strong>Cmd</strong> în loc de <strong>Ctrl</strong>
+              </Typography>
+            </Alert>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShortcutsDialogOpen(false)} variant="contained">
+              Am înțeles
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Snackbar Autosave */}
+        <Snackbar
+          open={autosaveSnackbar}
+          autoHideDuration={2000}
+          onClose={() => setAutosaveSnackbar(false)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        >
+          <Alert 
+            onClose={() => setAutosaveSnackbar(false)} 
+            severity="success" 
+            variant="filled"
+            sx={{ width: '100%' }}
+          >
+            💾 Draft salvat automat!
+          </Alert>
+        </Snackbar>
       </Stack>
     </ToolLayout>
   );
