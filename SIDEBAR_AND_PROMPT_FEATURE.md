@@ -396,3 +396,4 @@ Implementarea oferă:
 
 **Utilizatorul are acum toate informațiile și instrumentele pentru a decide dacă vrea să folosească Google Sheets!** 🎉
 
+

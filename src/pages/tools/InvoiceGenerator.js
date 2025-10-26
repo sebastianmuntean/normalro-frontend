@@ -94,24 +94,24 @@ import CryptoJS from 'crypto-js';
 const InvoiceGenerator = () => {
   // Citește cota TVA implicită din .env (default: 21)
   const DEFAULT_VAT_RATE = process.env.REACT_APP_DEFAULT_TVA || '21';
-  
+
   const [loadingSupplier, setLoadingSupplier] = useState(false);
   const [loadingClient, setLoadingClient] = useState(false);
   const [anafError, setAnafError] = useState('');
   const [saveDataConsent, setSaveDataConsent] = useState(true);
   const [clearDataDialogOpen, setClearDataDialogOpen] = useState(false);
   const [dataSummary, setDataSummary] = useState({});
-  
+
   // State pentru Accordion-uri Sidebar
   const [expandedAccordion, setExpandedAccordion] = useState('why-sheets'); // Prima secțiune deschisă
-  
+
   // State pentru popup sugestie Google Sheets
   const [showSheetsPrompt, setShowSheetsPrompt] = useState(false);
-  
+
   const [invoiceData, setInvoiceData] = useState({
     // Identificare unică
     guid: '',
-    
+
     // Date factură
     series: '',
     number: '',
@@ -119,7 +119,7 @@ const InvoiceGenerator = () => {
     dueDate: '',
     currency: 'RON',
     notes: '',
-    
+
     // Furnizor
     supplierName: '',
     supplierCUI: '',
@@ -132,7 +132,7 @@ const InvoiceGenerator = () => {
     supplierEmail: '',
     supplierBankAccounts: [{ bank: '', iban: '', currency: 'RON' }],
     supplierVatPrefix: '-',
-    
+
     // Beneficiar
     clientName: '',
     clientCUI: '',
@@ -197,22 +197,22 @@ const InvoiceGenerator = () => {
   const [previewData, setPreviewData] = useState([]);
 
   // ===== State pentru UI/UX îmbunătățiri =====
-  
+
   // Preview Dialog
   const [previewDialog, setPreviewDialog] = useState({
     open: false,
     type: null, // 'pdf' | 'excel'
     content: null
   });
-  
+
   // Keyboard Shortcuts Dialog
   const [shortcutsDialogOpen, setShortcutsDialogOpen] = useState(false);
-  
+
   // Autosave
   const [lastAutosave, setLastAutosave] = useState(null);
   const [autosaveSnackbar, setAutosaveSnackbar] = useState(false);
   const autosaveTimerRef = useRef(null);
-  
+
   // Drag state pentru reorder
   const [draggedLineId, setDraggedLineId] = useState(null);
 
@@ -291,7 +291,7 @@ const InvoiceGenerator = () => {
       number: invoiceData.number,
       currency: invoiceData.currency,
       defaultVatRate: defaultVatRate,
-      
+
       // Date furnizor (complete)
       supplierName: invoiceData.supplierName,
       supplierCUI: invoiceData.supplierCUI,
@@ -304,20 +304,20 @@ const InvoiceGenerator = () => {
       supplierEmail: invoiceData.supplierEmail,
       supplierVatPrefix: invoiceData.supplierVatPrefix,
       supplierBankAccounts: invoiceData.supplierBankAccounts,
-      
+
       // Timestamp pentru urmărire
       lastSaved: new Date().toISOString()
     };
 
     const encryptedData = encryptData(dataToSave);
     setCookie(COOKIE_NAME, encryptedData, 90); // Resetează la 90 zile de fiecare dată
-    
+
     console.log('✅ Date furnizor salvate în cookie (expirare resetată la 90 zile)');
   };
 
   const incrementInvoiceNumber = (numberStr) => {
     if (!numberStr) return '1';
-    
+
     // Încearcă să parseze numărul
     const parsed = parseInt(numberStr, 10);
     if (!isNaN(parsed)) {
@@ -326,7 +326,7 @@ const InvoiceGenerator = () => {
       // Păstrează numărul de zerouri din față (ex: 001 -> 002)
       return incremented.toString().padStart(numberStr.length, '0');
     }
-    
+
     // Dacă numărul conține caractere non-numerice, încearcă să găsești partea numerică la final
     const match = numberStr.match(/^(.*?)(\d+)$/);
     if (match) {
@@ -335,7 +335,7 @@ const InvoiceGenerator = () => {
       const incremented = parseInt(numPart, 10) + 1;
       return prefix + incremented.toString().padStart(numPart.length, '0');
     }
-    
+
     // Dacă nu găsește niciun număr, returnează string-ul original + '1'
     return numberStr + '1';
   };
@@ -352,7 +352,7 @@ const InvoiceGenerator = () => {
         series: data.series || '',
         number: incrementInvoiceNumber(data.number), // Incrementează numărul automat
         currency: data.currency || 'RON',
-        
+
         // Date furnizor (complete)
         supplierName: data.supplierName || '',
         supplierCUI: data.supplierCUI || '',
@@ -364,30 +364,30 @@ const InvoiceGenerator = () => {
         supplierPhone: data.supplierPhone || '',
         supplierEmail: data.supplierEmail || '',
         supplierVatPrefix: data.supplierVatPrefix || '-',
-        supplierBankAccounts: data.supplierBankAccounts 
+        supplierBankAccounts: data.supplierBankAccounts
           ? data.supplierBankAccounts.map(acc => ({
-              bank: acc.bank || '',
-              iban: acc.iban || '',
-              currency: acc.currency || 'RON'
-            }))
+            bank: acc.bank || '',
+            iban: acc.iban || '',
+            currency: acc.currency || 'RON'
+          }))
           : [{ bank: '', iban: '', currency: 'RON' }]
       }));
-      
+
       // Log pentru debugging
       if (data.lastSaved) {
         console.log(`✅ Date furnizor încărcate din cookie (ultima salvare: ${new Date(data.lastSaved).toLocaleDateString('ro-RO')})`);
       }
-      
+
       // Restaurează cota de TVA din cookie (fallback la .env)
       const savedVatRate = data.defaultVatRate || DEFAULT_VAT_RATE;
-      setLines(prevLines => 
-        prevLines.map((line, index) => 
-          index === 0 
+      setLines(prevLines =>
+        prevLines.map((line, index) =>
+          index === 0
             ? { ...line, vatRate: savedVatRate }
             : line
         )
       );
-      
+
       setSaveDataConsent(true); // Bifează automat checkbox-ul dacă există date salvate
     }
   };
@@ -396,13 +396,13 @@ const InvoiceGenerator = () => {
   useEffect(() => {
     loadSupplierDataFromCookie();
     loadBNRRates(); // Încarcă cursurile BNR la inițializare
-    
+
     // Inițializează Google Drive API
     const initGoogleDrive = async () => {
       try {
         await googleDriveService.initializeGapi();
         googleDriveService.initializeGis();
-        
+
         if (googleDriveService.isConfigured()) {
           setGoogleDriveReady(true);
         } else {
@@ -418,17 +418,17 @@ const InvoiceGenerator = () => {
       try {
         await googleSheetsService.initializeGapi();
         googleSheetsService.initializeGis();
-        
+
         if (googleSheetsService.isConfigured()) {
           setGoogleSheetsReady(true);
-          
+
           // Încarcă Spreadsheet ID salvat
           const savedId = googleSheetsService.loadSpreadsheetId();
           if (savedId) {
             setGoogleSheetsId(savedId);
             setGoogleSheetsConnected(true);
             console.log('✅ Google Sheets conectat:', savedId);
-            
+
             // Sincronizare automată în background (fără UI blocking)
             syncInBackground();
           }
@@ -558,7 +558,7 @@ const InvoiceGenerator = () => {
   const handleFileAttachment = async (e) => {
     const files = Array.from(e.target.files || []);
     setFileError('');
-    
+
     // Constante conform ANAF
     // IMPORTANT: Fișierele în Base64 cresc cu ~37% (factor 1.37)
     // Plus overhead XML (~5%), deci folosim factor de siguranță 1.45
@@ -566,7 +566,7 @@ const InvoiceGenerator = () => {
     const MAX_TOTAL_SIZE_ANAF = 5 * 1024 * 1024; // 5 MB limita ANAF
     const MAX_TOTAL_SIZE = MAX_TOTAL_SIZE_ANAF / BASE64_OVERHEAD; // ~3.45 MB în fișiere originale
     const MAX_FILE_SIZE = MAX_TOTAL_SIZE; // Același limit per fișier
-    
+
     // Verifică dimensiunea fiecărui fișier (înainte de Base64)
     const oversizedFiles = files.filter(file => file.size > MAX_FILE_SIZE);
     if (oversizedFiles.length > 0) {
@@ -579,12 +579,12 @@ const InvoiceGenerator = () => {
       e.target.value = ''; // Reset input
       return;
     }
-    
+
     // Calculează dimensiunea curentă totală (fișiere originale)
     const currentTotalSize = attachedFiles.reduce((sum, file) => sum + file.size, 0);
     const newFilesSize = files.reduce((sum, file) => sum + file.size, 0);
     const totalSize = currentTotalSize + newFilesSize;
-    
+
     // Verifică dimensiunea totală (cu estimare Base64)
     if (totalSize > MAX_TOTAL_SIZE) {
       const remainingSpace = MAX_TOTAL_SIZE - currentTotalSize;
@@ -592,7 +592,7 @@ const InvoiceGenerator = () => {
       const remainingMB = (remainingSpace / 1024 / 1024).toFixed(2);
       const newMB = (newFilesSize / 1024 / 1024).toFixed(2);
       const estimatedXmlMB = (totalSize * BASE64_OVERHEAD / 1024 / 1024).toFixed(2);
-      
+
       setFileError(
         `Depășești limita pentru fișiere atașate! ` +
         `Dimensiune curentă: ${currentMB} MB (~${(currentTotalSize * BASE64_OVERHEAD / 1024 / 1024).toFixed(2)} MB în XML). ` +
@@ -603,7 +603,7 @@ const InvoiceGenerator = () => {
       e.target.value = ''; // Reset input
       return;
     }
-    
+
     const filePromises = files.map(file => {
       return new Promise((resolve) => {
         const reader = new FileReader();
@@ -623,15 +623,15 @@ const InvoiceGenerator = () => {
     });
 
     const loadedFiles = await Promise.all(filePromises);
-    
+
     // Verificare finală cu dimensiunea Base64 reală
     const currentBase64Size = attachedFiles.reduce((sum, file) => sum + (file.base64Size || file.base64.length), 0);
     const newBase64Size = loadedFiles.reduce((sum, file) => sum + file.base64Size, 0);
     const totalBase64Size = currentBase64Size + newBase64Size;
-    
+
     // Adăugăm 10% overhead pentru structura XML
     const estimatedXmlSize = totalBase64Size * 1.1;
-    
+
     if (estimatedXmlSize > MAX_TOTAL_SIZE_ANAF) {
       setFileError(
         `Dimensiunea finală în XML (${(estimatedXmlSize / 1024 / 1024).toFixed(2)} MB) depășește limita ANAF de 5 MB! ` +
@@ -640,7 +640,7 @@ const InvoiceGenerator = () => {
       e.target.value = ''; // Reset input
       return;
     }
-    
+
     setAttachedFiles(prev => [...prev, ...loadedFiles]);
     e.target.value = ''; // Reset input pentru a permite re-upload același fișier
   };
@@ -673,7 +673,7 @@ const InvoiceGenerator = () => {
         setExcelColumns(headers);
         setExcelData(data.slice(1)); // Restul sunt datele
         setImportDialogOpen(true);
-        
+
         // Reset mapare
         setColumnMapping({
           product: '',
@@ -693,7 +693,7 @@ const InvoiceGenerator = () => {
   const handleMappingChange = (field, columnName) => {
     const newMapping = { ...columnMapping, [field]: columnName };
     setColumnMapping(newMapping);
-    
+
     // Actualizează preview
     if (excelData && excelColumns.length > 0) {
       updatePreview(newMapping);
@@ -787,7 +787,7 @@ const InvoiceGenerator = () => {
       if (result.success) {
         // Verifică dacă compania este plătitoare de TVA
         const isVatPayer = result.data.platitorTVA === true || result.data.platitorTVA === 'true';
-        
+
         setInvoiceData(prev => ({
           ...prev,
           supplierName: result.data.denumire,
@@ -824,7 +824,7 @@ const InvoiceGenerator = () => {
       if (result.success) {
         // Verifică dacă compania este plătitoare de TVA
         const isVatPayer = result.data.platitorTVA === true || result.data.platitorTVA === 'true';
-        
+
         setInvoiceData(prev => ({
           ...prev,
           clientName: result.data.denumire,
@@ -850,7 +850,26 @@ const InvoiceGenerator = () => {
     setVisibleDiscounts(prev => {
       const newSet = new Set(prev);
       if (newSet.has(lineId)) {
+        // Ascunde secțiunea și resetează valorile
         newSet.delete(lineId);
+
+        // Resetează valorile reducerii pentru această linie și recalculează prețul brut
+        setLines(lines.map(line => {
+          if (line.id === lineId) {
+            const net = parseFloat(line.unitNetPrice) || 0;
+            const vat = parseFloat(line.vatRate) || 0;
+            const vatAmount = Math.round(net * vat * 10000) / 1000000;
+            const gross = net + vatAmount;
+
+            return {
+              ...line,
+              discountPercent: '0.00',
+              discountAmount: '0.00',
+              unitGrossPrice: formatNumber(gross)
+            };
+          }
+          return line;
+        }));
       } else {
         newSet.add(lineId);
       }
@@ -890,7 +909,7 @@ const InvoiceGenerator = () => {
       if (field === 'purchasePrice' || field === 'markup') {
         const purchasePrice = parseFloat(updated.purchasePrice) || 0;
         const markup = parseFloat(updated.markup) || 0;
-        
+
         if (purchasePrice > 0) {
           // Preț Net = Preț Intrare * (1 + Adaos%)
           const calculatedNetPrice = purchasePrice * (1 + markup / 100);
@@ -898,20 +917,15 @@ const InvoiceGenerator = () => {
         }
       }
 
-      if (field === 'unitNetPrice' || field === 'vatRate' || field === 'discountPercent' || field === 'discountAmount' || 
-          field === 'purchasePrice' || field === 'markup') {
+      if (field === 'unitNetPrice' || field === 'vatRate' || field === 'purchasePrice' || field === 'markup' ||
+        field === 'discountPercent' || field === 'discountAmount') {
         const net = parseFloat(updated.unitNetPrice);
         const vat = parseFloat(updated.vatRate);
-        const discountPercent = parseFloat(updated.discountPercent) || 0;
-        const discountAmount = parseFloat(updated.discountAmount) || 0;
-        
+
         if (!isNaN(net) && !isNaN(vat)) {
-          // Aplică reducerile pe linie
-          const discountedNet = net * (1 - discountPercent / 100) - (discountAmount / parseFloat(updated.quantity) || 1);
-          const finalNet = Math.max(0, discountedNet);
-          
-          const vatAmount = Math.round(finalNet * vat * 10000) / 1000000;
-          const gross = finalNet + vatAmount;
+          // Calculează preț brut FĂRĂ reducere (reducerea va fi linie separată)
+          const vatAmount = Math.round(net * vat * 10000) / 1000000;
+          const gross = net + vatAmount;
           updated.unitGrossPrice = formatNumber(gross);
         }
       } else if (field === 'unitGrossPrice') {
@@ -926,23 +940,15 @@ const InvoiceGenerator = () => {
         const totalGross = parseFloat(value);
         const quantity = parseFloat(updated.quantity);
         const vat = parseFloat(updated.vatRate);
-        
+
         if (!isNaN(totalGross) && !isNaN(quantity) && quantity > 0 && !isNaN(vat)) {
           // Calculează preț brut unitar = Total Brut / Cantitate
           const unitGross = totalGross / quantity;
           updated.unitGrossPrice = formatNumber(unitGross);
-          
+
           // Recalculează preț net unitar
           const unitNet = Math.round((unitGross / (1 + vat / 100)) * 10000) / 10000;
           updated.unitNetPrice = formatNumber(unitNet);
-          
-          // Dacă există preț de intrare, recalculează adaosul
-          const purchasePrice = parseFloat(updated.purchasePrice) || 0;
-          if (purchasePrice > 0) {
-            // Calculează noul adaos: Adaos% = ((Preț Net / Preț Intrare) - 1) × 100
-            const newMarkup = ((unitNet / purchasePrice) - 1) * 100;
-            updated.markup = formatNumber(Math.max(0, newMarkup)); // Nu permite adaos negativ
-          }
         }
       }
 
@@ -960,17 +966,36 @@ const InvoiceGenerator = () => {
     return '0.00';
   };
 
+  // Calculează suma efectivă de reducere pe linie
+  const calculateLineDiscount = (line) => {
+    const net = parseFloat(line.unitNetPrice) || 0;
+    const qty = parseFloat(line.quantity) || 0;
+    const discountPercent = parseFloat(line.discountPercent) || 0;
+    const discountAmount = parseFloat(line.discountAmount) || 0;
+
+    // Reducere procentuală din preț net unitar
+    const percentDiscount = (net * discountPercent / 100) * qty;
+    // Reducere sumă fixă totală
+    const fixedDiscount = discountAmount;
+
+    const totalDiscount = percentDiscount + fixedDiscount;
+    return totalDiscount.toFixed(2);
+  };
+
   const calculateLineTotal = (line, type) => {
     const qty = parseFloat(line.quantity) || 0;
 
     if (type === 'net') {
       const net = parseFloat(line.unitNetPrice) || 0;
+      // Total FĂRĂ reducere (reducerea e linie separată)
       return (net * qty).toFixed(2);
     } else if (type === 'vat') {
       const vat = parseFloat(calculateLineVat(line)) || 0;
+      // Total TVA FĂRĂ reducere (reducerea e linie separată)
       return (vat * qty).toFixed(2);
     } else if (type === 'gross') {
       const gross = parseFloat(line.unitGrossPrice) || 0;
+      // Total brut FĂRĂ reducere (reducerea e linie separată)
       return (gross * qty).toFixed(2);
     }
     return '0.00';
@@ -990,7 +1015,7 @@ const InvoiceGenerator = () => {
       discountPercent: '0.00',
       discountAmount: '0.00'
     };
-    
+
     setLines([...lines, newLine]);
   };
 
@@ -1044,7 +1069,7 @@ const InvoiceGenerator = () => {
       dueDate: invoice.dueDate || '',
       currency: invoice.currency || 'RON',
       notes: invoice.notes || '',
-      
+
       // Furnizor
       supplierName: invoice.supplier.name || '',
       supplierCUI: invoice.supplier.cui || '',
@@ -1058,7 +1083,7 @@ const InvoiceGenerator = () => {
       supplierBank: invoice.supplier.bank || '',
       supplierIBAN: invoice.supplier.iban || '',
       supplierVatPrefix: invoice.supplier.vatPrefix || 'RO',
-      
+
       // Client
       clientName: invoice.client.name || '',
       clientCUI: invoice.client.cui || '',
@@ -1089,7 +1114,7 @@ const InvoiceGenerator = () => {
   };
 
   // ===== Funcții Popup Sugestie Google Sheets =====
-  
+
   /**
    * Gestionează "Mai târziu" - închide popup-ul
    */
@@ -1115,13 +1140,13 @@ const InvoiceGenerator = () => {
     const expires = new Date();
     expires.setDate(expires.getDate() + 365);
     document.cookie = `normalro_dont_show_sheets_prompt=true; expires=${expires.toUTCString()}; path=/`;
-    
+
     setShowSheetsPrompt(false);
     console.log('🚫 Utilizatorul a ales "Nu îmi mai aminti" - cookie salvat');
   };
 
   // ===== Funcții Gestionare Date Salvate =====
-  
+
   /**
    * Calculează sumarul datelor salvate în localStorage și cookie
    */
@@ -1181,7 +1206,7 @@ const InvoiceGenerator = () => {
       // Calculează sumarul datelor
       const summary = calculateDataSummary();
       setDataSummary(summary);
-      
+
       // Afișează dialogul de confirmare
       setClearDataDialogOpen(true);
     } else {
@@ -1238,31 +1263,31 @@ const InvoiceGenerator = () => {
   };
 
   // ===== Funcții Google Sheets =====
-  
+
   /**
    * Sincronizare automată în background (fără UI blocking)
    */
   const syncInBackground = async () => {
     try {
       console.log('🔄 Sincronizare automată în background...');
-      
+
       // Verifică dacă există token valid (fără să forțeze autorizarea)
       const token = window.gapi.client.getToken();
       if (!token || !token.access_token) {
         console.log('⏭️ Nu există token valid, sări peste sincronizare automată');
         return;
       }
-      
+
       // Sincronizează doar date furnizor (nu toate datele pentru a fi mai rapid)
       await saveSupplierDataToSheets();
       console.log('✅ Sincronizare automată completă (date furnizor)');
-      
+
     } catch (error) {
       // Nu afișa erori pentru sincronizarea automată (nu vrem să deranjăm utilizatorul)
       console.log('ℹ️ Sincronizare automată eșuată (normal dacă nu e autorizat):', error.message);
     }
   };
-  
+
   /**
    * Creează un nou Google Spreadsheet pentru Invoice Generator
    */
@@ -1278,14 +1303,14 @@ const InvoiceGenerator = () => {
     try {
       // Solicită autorizare
       await googleSheetsService.requestAuthorization();
-      
+
       // Creează spreadsheet-ul
       const result = await googleSheetsService.createInvoiceSpreadsheet();
-      
+
       setGoogleSheetsId(result.id);
       setGoogleSheetsConnected(true);
       setSyncStatus('');
-      
+
       alert(
         `✅ Spreadsheet creat cu succes!\n\n` +
         `📄 ID: ${result.id}\n\n` +
@@ -1296,9 +1321,9 @@ const InvoiceGenerator = () => {
         `• Istoric Facturi\n\n` +
         `Vrei să deschizi spreadsheet-ul în Google Sheets?`
       );
-      
+
       window.open(result.url, '_blank');
-      
+
     } catch (error) {
       console.error('Eroare creare spreadsheet:', error);
       setSyncStatus('');
@@ -1327,25 +1352,25 @@ const InvoiceGenerator = () => {
     try {
       // Solicită autorizare
       await googleSheetsService.requestAuthorization();
-      
+
       // Validează spreadsheet-ul
       const isValid = await googleSheetsService.validateSpreadsheet(spreadsheetId);
-      
+
       if (!isValid) {
         throw new Error('Spreadsheet-ul nu este valid sau nu ai acces la el.');
       }
-      
+
       googleSheetsService.setSpreadsheetId(spreadsheetId);
       setGoogleSheetsId(spreadsheetId);
       setGoogleSheetsConnected(true);
       setSyncStatus('');
-      
+
       alert(
         `✅ Conectat cu succes!\n\n` +
         `📄 Spreadsheet ID: ${spreadsheetId}\n\n` +
         `Acum poți sincroniza datele cu acest spreadsheet.`
       );
-      
+
     } catch (error) {
       console.error('Eroare conectare spreadsheet:', error);
       setSyncStatus('');
@@ -1377,7 +1402,7 @@ const InvoiceGenerator = () => {
 
     try {
       await googleSheetsService.requestAuthorization();
-      
+
       const dataToSave = {
         guid: invoiceData.guid, // Include GUID existent dacă există
         series: invoiceData.series,
@@ -1398,15 +1423,15 @@ const InvoiceGenerator = () => {
       };
 
       const savedGuid = await googleSheetsService.saveSupplierData(dataToSave);
-      
+
       // Salvează GUID-ul în invoiceData pentru următoarele salvari
       if (savedGuid && !invoiceData.guid) {
         setInvoiceData(prev => ({ ...prev, guid: savedGuid }));
         console.log('🆔 GUID salvat în invoiceData:', savedGuid);
       }
-      
+
       console.log('✅ Date furnizor salvate în Google Sheets');
-      
+
     } catch (error) {
       console.error('Eroare salvare date furnizor în Sheets:', error);
     }
@@ -1420,9 +1445,9 @@ const InvoiceGenerator = () => {
 
     try {
       await googleSheetsService.requestAuthorization();
-      
+
       const data = await googleSheetsService.loadSupplierData();
-      
+
       if (data) {
         setInvoiceData(prev => ({
           ...prev,
@@ -1440,19 +1465,19 @@ const InvoiceGenerator = () => {
           supplierPhone: data.supplierPhone || '',
           supplierEmail: data.supplierEmail || '',
           supplierVatPrefix: data.supplierVatPrefix || 'RO',
-          supplierBankAccounts: data.supplierBankAccounts 
+          supplierBankAccounts: data.supplierBankAccounts
             ? data.supplierBankAccounts.map(acc => ({
-                bank: acc.bank || '',
-                iban: acc.iban || '',
-                currency: acc.currency || 'RON'
-              }))
+              bank: acc.bank || '',
+              iban: acc.iban || '',
+              currency: acc.currency || 'RON'
+            }))
             : [{ bank: '', iban: '', currency: 'RON' }]
         }));
 
         const savedVatRate = data.defaultVatRate || DEFAULT_VAT_RATE;
-        setLines(prevLines => 
-          prevLines.map((line, index) => 
-            index === 0 
+        setLines(prevLines =>
+          prevLines.map((line, index) =>
+            index === 0
               ? { ...line, vatRate: savedVatRate }
               : line
           )
@@ -1482,70 +1507,70 @@ const InvoiceGenerator = () => {
       console.log('🔑 Solicit autorizare...');
       await googleSheetsService.requestAuthorization();
       console.log('✅ Autorizare obținută');
-      
+
       let stats = {
         supplier: false,
         products: 0,
         clients: 0,
         invoices: 0
       };
-      
+
       // 1. Salvează date furnizor
       console.log('💾 Salvez date furnizor...');
       setSyncStatus('Salvare date furnizor...');
       await saveSupplierDataToSheets();
       stats.supplier = true;
       console.log('✅ Date furnizor salvate');
-      
+
       // 2. Sincronizează template-uri produse
       console.log('📦 Sincronizare template-uri produse...');
       setSyncStatus('Sincronizare template-uri produse...');
       const products = templateService.getProductTemplates();
       console.log(`📦 Am găsit ${products.length} produse în localStorage`);
-      
+
       for (const product of products) {
         console.log(`📦 Salvez produs: ${product.name || product.product}`);
         const savedGuid = await googleSheetsService.saveProductTemplate(product);
-        
+
         // Salvează GUID-ul înapoi în localStorage
         if (savedGuid && !product.guid) {
           templateService.updateProductGuid(product.id, savedGuid);
           console.log(`🆔 GUID salvat în localStorage pentru produs ${product.id}: ${savedGuid}`);
         }
-        
+
         stats.products++;
       }
       console.log(`✅ ${stats.products} produse salvate`);
-      
+
       // 3. Sincronizează template-uri clienți
       console.log('👥 Sincronizare template-uri clienți...');
       setSyncStatus('Sincronizare template-uri clienți...');
       const clients = templateService.getClientTemplates();
       console.log(`👥 Am găsit ${clients.length} clienți în localStorage`);
-      
+
       for (const client of clients) {
         console.log(`👥 Salvez client: ${client.clientName || client.name}`);
         const savedGuid = await googleSheetsService.saveClientTemplate(client);
-        
+
         // Salvează GUID-ul înapoi în localStorage
         if (savedGuid && !client.guid) {
           templateService.updateClientGuid(client.id, savedGuid);
           console.log(`🆔 GUID salvat în localStorage pentru client ${client.id}: ${savedGuid}`);
         }
-        
+
         stats.clients++;
       }
       console.log(`✅ ${stats.clients} clienți salvați`);
-      
+
       // 4. Sincronizează istoric facturi
       console.log('📄 Sincronizare istoric facturi...');
       setSyncStatus('Sincronizare istoric facturi...');
       const invoices = invoiceHistoryService.getAllInvoices();
       console.log(`📄 Am găsit ${invoices.length} facturi în localStorage`);
-      
+
       for (const invoice of invoices) {
         console.log(`📄 Salvez factură: ${invoice.series} ${invoice.number}`);
-        
+
         // Convertește formatul din localStorage la formatul Google Sheets
         const invoiceForSheets = {
           guid: invoice.guid, // Include GUID-ul existent
@@ -1559,45 +1584,45 @@ const InvoiceGenerator = () => {
           clientName: invoice.client?.name || '',
           clientCUI: invoice.client?.cui || ''
         };
-        
+
         const totalsForSheets = {
           net: invoice.totals?.net || '0.00',
           vat: invoice.totals?.vat || '0.00',
           gross: invoice.totals?.gross || '0.00'
         };
-        
+
         const savedGuid = await googleSheetsService.saveInvoiceToHistory(
-          invoiceForSheets, 
-          invoice.lines || [], 
-          totalsForSheets, 
-          invoice.notes || '', 
+          invoiceForSheets,
+          invoice.lines || [],
+          totalsForSheets,
+          invoice.notes || '',
           []
         );
-        
+
         // Salvează GUID-ul înapoi în localStorage
         if (savedGuid && !invoice.guid) {
           invoiceHistoryService.updateInvoiceGuid(invoice.id, savedGuid);
           console.log(`🆔 GUID salvat în localStorage pentru factură ${invoice.id}: ${savedGuid}`);
         }
-        
+
         stats.invoices++;
       }
       console.log(`✅ ${stats.invoices} facturi salvate`);
-      
-           setSyncStatus('');
-           setLastSyncTime(new Date().toLocaleTimeString('ro-RO'));
-           console.log('🎉 Sincronizare completă!', stats);
-           
-           alert(
-             `✅ Sincronizare completă!\n\n` +
-             `• Date furnizor: ${stats.supplier ? 'salvate ✓' : 'nesalvate ✗'}\n` +
-             `• Template produse: ${stats.products} salvate\n` +
-             `• Template clienți: ${stats.clients} salvate\n` +
-             `• Istoric facturi: ${stats.invoices} salvate\n\n` +
-             `Toate datele au fost sincronizate cu Google Sheets.\n` +
-             `Deschide spreadsheet-ul pentru a verifica!`
-           );
-      
+
+      setSyncStatus('');
+      setLastSyncTime(new Date().toLocaleTimeString('ro-RO'));
+      console.log('🎉 Sincronizare completă!', stats);
+
+      alert(
+        `✅ Sincronizare completă!\n\n` +
+        `• Date furnizor: ${stats.supplier ? 'salvate ✓' : 'nesalvate ✗'}\n` +
+        `• Template produse: ${stats.products} salvate\n` +
+        `• Template clienți: ${stats.clients} salvate\n` +
+        `• Istoric facturi: ${stats.invoices} salvate\n\n` +
+        `Toate datele au fost sincronizate cu Google Sheets.\n` +
+        `Deschide spreadsheet-ul pentru a verifica!`
+      );
+
     } catch (error) {
       console.error('❌ Eroare sincronizare:', error);
       console.error('Error details:', error);
@@ -1614,19 +1639,19 @@ const InvoiceGenerator = () => {
   };
 
   // ===== Funcții UI/UX îmbunătățiri =====
-  
+
   /**
    * Duplicate line - clonează o linie existentă
    */
   const duplicateLine = (lineId) => {
     const lineToDuplicate = lines.find(l => l.id === lineId);
     if (!lineToDuplicate) return;
-    
+
     const newLine = {
       ...lineToDuplicate,
       id: Date.now() + Math.random()
     };
-    
+
     // Inserează duplicatul imediat după linia originală
     const lineIndex = lines.findIndex(l => l.id === lineId);
     const newLines = [
@@ -1634,35 +1659,35 @@ const InvoiceGenerator = () => {
       newLine,
       ...lines.slice(lineIndex + 1)
     ];
-    
+
     setLines(newLines);
     console.log('📋 Linie duplicată:', lineId);
   };
-  
+
   /**
    * Move line up
    */
   const moveLineUp = (lineId) => {
     const lineIndex = lines.findIndex(l => l.id === lineId);
     if (lineIndex <= 0) return; // Deja primul
-    
+
     const newLines = [...lines];
     [newLines[lineIndex - 1], newLines[lineIndex]] = [newLines[lineIndex], newLines[lineIndex - 1]];
     setLines(newLines);
   };
-  
+
   /**
    * Move line down
    */
   const moveLineDown = (lineId) => {
     const lineIndex = lines.findIndex(l => l.id === lineId);
     if (lineIndex >= lines.length - 1) return; // Deja ultimul
-    
+
     const newLines = [...lines];
     [newLines[lineIndex], newLines[lineIndex + 1]] = [newLines[lineIndex + 1], newLines[lineIndex]];
     setLines(newLines);
   };
-  
+
   /**
    * Autosave draft - salvează automat datele la fiecare 30 secunde
    */
@@ -1680,7 +1705,7 @@ const InvoiceGenerator = () => {
         })),
         timestamp: new Date().toISOString()
       };
-      
+
       localStorage.setItem('normalro_invoice_draft', JSON.stringify(draft));
       setLastAutosave(new Date());
       setAutosaveSnackbar(true);
@@ -1689,7 +1714,7 @@ const InvoiceGenerator = () => {
       console.error('Eroare autosave:', error);
     }
   }, [invoiceData, lines, attachedFiles]);
-  
+
   /**
    * Load draft - încarcă draft salvat automat
    */
@@ -1700,22 +1725,22 @@ const InvoiceGenerator = () => {
         alert('Nu există niciun draft salvat!');
         return;
       }
-      
+
       const draft = JSON.parse(draftStr);
-      
+
       const confirmed = window.confirm(
         `Ai un draft salvat la ${new Date(draft.timestamp).toLocaleString('ro-RO')}.\n\n` +
         `Vrei să încarci acest draft?\n` +
         `(Atenție: Datele curente vor fi înlocuite!)`
       );
-      
+
       if (!confirmed) return;
-      
+
       setInvoiceData(draft.invoiceData);
       setLines(draft.lines);
       // Nu încărcăm fișierele atașate (nu au base64)
       setAttachedFiles([]);
-      
+
       alert('✅ Draft încărcat cu succes!');
       console.log('📂 Draft încărcat din autosave');
     } catch (error) {
@@ -1723,17 +1748,17 @@ const InvoiceGenerator = () => {
       alert('❌ Eroare la încărcarea draft-ului!');
     }
   };
-  
+
   /**
    * Preview PDF/Excel înainte de descărcare
    */
   const showPreview = async (type) => {
     setPreviewDialog({ open: true, type, content: 'loading' });
-    
+
     try {
       if (type === 'pdf') {
-        // Generează preview HTML al PDF-ului (cu QR Code)
-        const previewHTML = await generateInvoiceHTML();
+        // Generează preview HTML al PDF-ului
+        const previewHTML = generateInvoiceHTML();
         setPreviewDialog({ open: true, type: 'pdf', content: previewHTML });
       } else if (type === 'excel') {
         // Generează preview table pentru Excel
@@ -1746,183 +1771,218 @@ const InvoiceGenerator = () => {
       alert('Eroare la generarea preview-ului!');
     }
   };
-  
+
   /**
    * Generează HTML pentru preview PDF
    */
-  const generateInvoiceHTML = async () => {
+  const generateInvoiceHTML = () => {
     const totals = calculateTotals();
-    
-    // Generează QR Code dacă există IBAN
-    let qrCodeImg = '';
-    if (invoiceData.supplierBankAccounts[0]?.iban && invoiceData.supplierName) {
-      try {
-        const qrDataUrl = await paymentService.generatePaymentQR({
-          iban: invoiceData.supplierBankAccounts[0].iban,
-          amount: parseFloat(totals.gross),
-          currency: invoiceData.currency,
-          beneficiary: invoiceData.supplierName,
-          reference: `Factura ${invoiceData.series || ''}${invoiceData.number || ''}`,
-          bic: ''
-        });
-        qrCodeImg = `<img src="${qrDataUrl}" style="width: 150px; height: 150px; display: block; margin: 0 auto;" />`;
-      } catch (error) {
-        console.warn('Nu s-a putut genera QR Code pentru preview:', error);
-      }
-    }
-    
+
     return `
-      <div style="font-family: Arial, sans-serif; font-size: 11px; padding: 20px; max-width: 800px; margin: 0 auto;">
-        <h1 style="text-align: center; font-size: 24px; margin: 0 0 15px 0; color: #1976d2;">FACTURĂ</h1>
-        <div style="text-align: center; margin-bottom: 25px; font-size: 11px;">
-          <div>Seria: ${invoiceData.series || '-'} Nr: ${invoiceData.number || '-'}</div>
-          <div>Data: ${invoiceData.issueDate || '-'}</div>
-          ${invoiceData.dueDate ? `<div>Scadență: ${invoiceData.dueDate}</div>` : ''}
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; max-width: 900px; margin: 0 auto; background: #ffffff;">
+        <!-- Header modern -->
+        <div style="background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); padding: 30px; border-radius: 12px 12px 0 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <h1 style="margin: 0; color: white; font-size: 32px; font-weight: 600; text-align: center; letter-spacing: 1px;">FACTURĂ</h1>
+          <div style="text-align: center; margin-top: 15px; color: rgba(255,255,255,0.95); font-size: 14px;">
+            <div style="display: inline-block; background: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px; margin: 5px;">
+              <strong>Serie:</strong> ${invoiceData.series || '-'} &nbsp;|&nbsp; <strong>Nr:</strong> ${invoiceData.number || '-'}
+            </div>
+            <div style="display: inline-block; background: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px; margin: 5px;">
+              <strong>Data:</strong> ${invoiceData.issueDate || '-'}${invoiceData.dueDate ? ` &nbsp;|&nbsp; <strong>Scadență:</strong> ${invoiceData.dueDate}` : ''}
+            </div>
+          </div>
         </div>
         
-        <table style="width: 100%; margin-bottom: 25px; border-collapse: collapse;">
+        <!-- Furnizor & Beneficiar cu carduri -->
+        <table style="width: 100%; margin: 25px 0; border-spacing: 15px 0;">
           <tr>
-            <td style="width: 50%; vertical-align: top; padding-right: 15px;">
-              <strong style="font-size: 12px;">FURNIZOR:</strong><br/>
-              <div style="margin-top: 5px; line-height: 1.6;">
-                ${invoiceData.supplierName || '-'}<br/>
-                CUI: ${invoiceData.supplierCUI || '-'}<br/>
-                ${invoiceData.supplierRegCom ? `Reg Com: ${invoiceData.supplierRegCom}<br/>` : ''}
-                ${invoiceData.supplierAddress || '-'}<br/>
-                ${invoiceData.supplierCity || '-'}
-                ${invoiceData.supplierPhone ? `<br/>Tel: ${invoiceData.supplierPhone}` : ''}
-                ${invoiceData.supplierEmail ? `<br/>Email: ${invoiceData.supplierEmail}` : ''}
-                ${invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0 ? 
-                  invoiceData.supplierBankAccounts.map((account, index) => {
-                    if (!account.iban && !account.bank) return '';
-                    const label = invoiceData.supplierBankAccounts.length > 1 ? ` ${index + 1}` : '';
-                    let html = '';
-                    if (account.iban) html += `<br/><strong>IBAN${label} (${account.currency || 'RON'}):</strong> ${account.iban}`;
-                    if (account.bank) html += `<br/>Banca${label}: ${account.bank}`;
-                    return html;
-                  }).join('')
-                : ''}
+            <td style="width: 50%; vertical-align: top;">
+              <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #1976d2; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <div style="color: #1976d2; font-weight: 700; font-size: 13px; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">📤 Furnizor</div>
+                <div style="font-weight: 600; font-size: 15px; color: #212121; margin-bottom: 8px;">${invoiceData.supplierName || '-'}</div>
+                <div style="font-size: 12px; color: #666; line-height: 1.6;">
+                  <div><strong>CUI:</strong> ${invoiceData.supplierCUI || '-'}</div>
+                  ${invoiceData.supplierAddress ? `<div style="margin-top: 4px;">${invoiceData.supplierAddress}</div>` : ''}
+                  ${invoiceData.supplierCity ? `<div>${invoiceData.supplierCity}</div>` : ''}
+                </div>
               </div>
             </td>
-            <td style="width: 50%; vertical-align: top; padding-left: 15px;">
-              <strong style="font-size: 12px;">BENEFICIAR:</strong><br/>
-              <div style="margin-top: 5px; line-height: 1.6;">
-                ${invoiceData.clientName || '-'}<br/>
-                CUI: ${invoiceData.clientCUI || '-'}<br/>
-                ${invoiceData.clientRegCom ? `Reg Com: ${invoiceData.clientRegCom}<br/>` : ''}
-                ${invoiceData.clientAddress || '-'}<br/>
-                ${invoiceData.clientCity || '-'}
-                ${invoiceData.clientPhone ? `<br/>Tel: ${invoiceData.clientPhone}` : ''}
-                ${invoiceData.clientEmail ? `<br/>Email: ${invoiceData.clientEmail}` : ''}
-                ${invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0 ? 
-                  invoiceData.clientBankAccounts.map((account, index) => {
-                    if (!account.iban && !account.bank) return '';
-                    const label = invoiceData.clientBankAccounts.length > 1 ? ` ${index + 1}` : '';
-                    let html = '';
-                    if (account.iban) html += `<br/><strong>IBAN${label} (${account.currency || 'RON'}):</strong> ${account.iban}`;
-                    if (account.bank) html += `<br/>Banca${label}: ${account.bank}`;
-                    return html;
-                  }).join('')
-                : ''}
+            <td style="width: 50%; vertical-align: top;">
+              <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #4caf50; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <div style="color: #4caf50; font-weight: 700; font-size: 13px; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">📥 Beneficiar</div>
+                <div style="font-weight: 600; font-size: 15px; color: #212121; margin-bottom: 8px;">${invoiceData.clientName || '-'}</div>
+                <div style="font-size: 12px; color: #666; line-height: 1.6;">
+                  <div><strong>CUI:</strong> ${invoiceData.clientCUI || '-'}</div>
+                  ${invoiceData.clientAddress ? `<div style="margin-top: 4px;">${invoiceData.clientAddress}</div>` : ''}
+                  ${invoiceData.clientCity ? `<div>${invoiceData.clientCity}</div>` : ''}
+                </div>
               </div>
             </td>
           </tr>
         </table>
         
-        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+        <!-- Informație Monedă -->
+        <div style="margin: 25px 0 10px 0; padding: 8px 12px; background: linear-gradient(to right, #fff3e0, #ffffff); border-left: 4px solid #ff9800; border-radius: 4px; display: inline-block;">
+          <span style="color: #e65100; font-weight: 700; font-size: 11px; letter-spacing: 0.5px;">💰 Monedă: ${invoiceData.currency}</span>
+        </div>
+        
+        <!-- Tabel modern -->
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 8px; overflow: hidden;">
           <thead>
-            <tr style="background-color: #2196F3; color: white;">
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Nr.</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Produs/Serviciu</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Cant.</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Preț Net</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">TVA%</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Suma TVA</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Preț Brut</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Total Net</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Total TVA</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Total Brut</th>
+            <tr style="background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); color: white;">
+              <th style="padding: 14px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: none;">Nr.</th>
+              <th style="padding: 14px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; border: none;">Produs/Serviciu</th>
+              <th style="padding: 14px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: none;">Cant.</th>
+              <th style="padding: 14px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Preț Net</th>
+              <th style="padding: 14px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: none;">TVA%</th>
+              <th style="padding: 14px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Total Net</th>
+              <th style="padding: 14px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Total TVA</th>
+              <th style="padding: 14px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Total Brut</th>
             </tr>
           </thead>
           <tbody>
-            ${lines.map((line, index) => `
-              <tr>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${index + 1}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; font-size: 9px;">${line.product || '-'}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${line.quantity}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${line.unitNetPrice} ${invoiceData.currency}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${line.vatRate}%</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineVat(line)} ${invoiceData.currency}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${line.unitGrossPrice} ${invoiceData.currency}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'net')} ${invoiceData.currency}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'vat')} ${invoiceData.currency}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'gross')} ${invoiceData.currency}</td>
+            ${lines.map((line, index) => {
+      const discountPercent = parseFloat(line.discountPercent) || 0;
+      const discountAmount = parseFloat(line.discountAmount) || 0;
+      const lineDiscount = parseFloat(calculateLineDiscount(line)) || 0;
+      const hasDiscount = discountPercent > 0 || discountAmount > 0;
+
+      let rows = `
+              <tr style="border-bottom: 1px solid #e0e0e0; transition: background 0.2s;">
+                <td style="padding: 12px 10px; text-align: center; font-size: 12px; color: #757575; border: none;">${index + 1}</td>
+                <td style="padding: 12px 10px; font-size: 12px; color: #212121; border: none;">${line.product || '-'}</td>
+                <td style="padding: 12px 10px; text-align: center; font-size: 12px; color: #212121; border: none;">${line.quantity}</td>
+                <td style="padding: 12px 10px; text-align: right; font-size: 12px; color: #212121; border: none;">${line.unitNetPrice}</td>
+                <td style="padding: 12px 10px; text-align: center; font-size: 12px; color: #1976d2; font-weight: 500; border: none;">${line.vatRate}%</td>
+                <td style="padding: 12px 10px; text-align: right; font-size: 12px; color: #212121; font-weight: 500; border: none;">${calculateLineTotal(line, 'net')}</td>
+                <td style="padding: 12px 10px; text-align: right; font-size: 12px; color: #1976d2; font-weight: 500; border: none;">${calculateLineTotal(line, 'vat')}</td>
+                <td style="padding: 12px 10px; text-align: right; font-size: 13px; color: #212121; font-weight: 600; border: none;">${calculateLineTotal(line, 'gross')}</td>
+              </tr>`;
+
+      // Adaugă linie de discount dacă există
+      if (hasDiscount) {
+        const discountNet = (parseFloat(line.unitNetPrice) * parseFloat(line.quantity) * discountPercent / 100 + discountAmount);
+        const discountVat = discountNet * parseFloat(line.vatRate) / 100;
+        const discountGross = discountNet + discountVat;
+        rows += `
+              <tr style="background: linear-gradient(to right, #fff5f5, #ffffff); border-bottom: 1px solid #ffcdd2;">
+                <td style="padding: 10px; text-align: center; border: none;"></td>
+                <td style="padding: 10px; font-style: italic; font-size: 11px; color: #c62828; border: none;">🏷️ Discount ${discountPercent > 0 ? discountPercent + '%' : ''} ${discountAmount > 0 ? discountAmount : ''} la ${line.product || 'produs'}</td>
+                <td style="padding: 10px; text-align: center; font-size: 11px; color: #757575; border: none;">1</td>
+                <td style="padding: 10px; text-align: right; color: #c62828; font-weight: 600; font-size: 11px; border: none;">-${discountNet.toFixed(2)}</td>
+                <td style="padding: 10px; text-align: center; font-size: 11px; color: #c62828; border: none;">${line.vatRate}%</td>
+                <td style="padding: 10px; text-align: right; color: #c62828; font-weight: 600; font-size: 11px; border: none;">-${discountNet.toFixed(2)}</td>
+                <td style="padding: 10px; text-align: right; color: #c62828; font-weight: 600; font-size: 11px; border: none;">-${discountVat.toFixed(2)}</td>
+                <td style="padding: 10px; text-align: right; color: #c62828; font-weight: 700; font-size: 11px; border: none;">-${discountGross.toFixed(2)}</td>
+              </tr>`;
+      }
+
+      return rows;
+    }).join('')}
+            ${totals.discountAmount && parseFloat(totals.discountAmount) > 0 ? (() => {
+        const originalGross = parseFloat(totals.originalGross) || 0;
+        const finalGross = parseFloat(totals.gross) || 0;
+        const totalDiscountGross = originalGross - finalGross - parseFloat(totals.lineDiscounts || 0);
+        const totalDiscountNet = totalDiscountGross / 1.19; // Aproximativ, depinde de TVA medie
+        const totalDiscountVat = totalDiscountGross - totalDiscountNet;
+        return `
+            <tr style="background: linear-gradient(to right, #ffe8e8, #ffffff); border-bottom: 2px solid #ef5350;">
+              <td style="padding: 10px; text-align: center; border: none;"></td>
+              <td style="padding: 10px; font-style: italic; font-weight: 700; font-size: 11px; color: #b71c1c; border: none;">🎁 Discount factura de ${totalDiscount.type === 'percent' ? totalDiscount.percent + '%' : totalDiscount.amount}</td>
+              <td style="padding: 10px; text-align: center; font-size: 11px; color: #757575; border: none;">1</td>
+              <td style="padding: 10px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 11px; border: none;">-${totalDiscountNet.toFixed(2)}</td>
+              <td style="padding: 10px; text-align: center; border: none;"></td>
+              <td style="padding: 10px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 11px; border: none;">-${totalDiscountNet.toFixed(2)}</td>
+              <td style="padding: 10px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 11px; border: none;">-${totalDiscountVat.toFixed(2)}</td>
+              <td style="padding: 10px; text-align: right; color: #b71c1c; font-weight: 800; font-size: 12px; border: none;">-${totalDiscountGross.toFixed(2)}</td>
               </tr>
-            `).join('')}
+            `;
+      })() : ''}
           </tbody>
           <tfoot>
-            <tr style="background-color: #f5f5f5; font-weight: bold;">
-              <td colspan="7" style="border: 1px solid #ddd; padding: 8px; font-size: 11px; font-weight: bold;">TOTAL FACTURĂ</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.net} ${invoiceData.currency}</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.vat} ${invoiceData.currency}</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.gross} ${invoiceData.currency}</td>
+            <tr style="background: linear-gradient(135deg, #37474f 0%, #263238 100%); color: white;">
+              <td colspan="5" style="padding: 16px 10px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border: none;">💰 TOTAL FACTURĂ</td>
+              <td style="padding: 16px 10px; text-align: right; font-size: 14px; font-weight: 700; border: none;">${totals.net} ${invoiceData.currency}</td>
+              <td style="padding: 16px 10px; text-align: right; font-size: 14px; font-weight: 700; border: none;">${totals.vat} ${invoiceData.currency}</td>
+              <td style="padding: 16px 10px; text-align: right; font-size: 16px; font-weight: 800; background: rgba(76, 175, 80, 0.2); border: none;">${totals.gross} ${invoiceData.currency}</td>
             </tr>
           </tfoot>
         </table>
         
         ${invoiceData.notes ? `
-          <div style="margin-top: 25px; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #2196F3; border-radius: 4px;">
-            <strong style="font-size: 11px;">Note:</strong><br/>
-            <div style="margin-top: 8px; font-size: 10px; line-height: 1.6; white-space: pre-wrap;">${invoiceData.notes}</div>
+          <div style="margin-top: 25px; padding: 20px; background: linear-gradient(to right, #e3f2fd, #ffffff); border-left: 4px solid #1976d2; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="color: #1976d2; font-weight: 700; font-size: 13px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">📝 Note</div>
+            <div style="font-size: 12px; color: #424242; line-height: 1.6;">${invoiceData.notes}</div>
           </div>
         ` : ''}
-        
-        ${qrCodeImg ? `
-          <div style="margin-top: 30px; padding: 20px; background-color: #f5f5f5; border-radius: 8px; text-align: center;">
-            <strong style="font-size: 12px; color: #1976d2;">💳 PLATĂ RAPIDĂ CU COD QR</strong><br/>
-            <div style="margin-top: 10px;">
-              ${qrCodeImg}
-            </div>
-            <div style="margin-top: 10px; font-size: 10px; color: #666;">
-              Scanează codul QR cu aplicația de banking<br/>
-              pentru a plăti factura instant!
-            </div>
-          </div>
-        ` : ''}
-        
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; font-size: 9px; color: #999;">
-          Document generat la ${new Date().toLocaleString('ro-RO', { 
-            year: 'numeric', 
-            month: '2-digit', 
-            day: '2-digit', 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          })} de <strong>Normal.ro - Generator Facturi</strong>
-          <br/>
-          <a href="https://normal.ro" style="color: #999; text-decoration: none;">www.normal.ro</a>
-        </div>
       </div>
     `;
   };
-  
+
   /**
    * Generează preview pentru Excel
    */
   const generateExcelPreview = () => {
     const totals = calculateTotals();
-    
-    return {
-      header: ['Nr.', 'Produs/Serviciu', 'Cantitate', 'Preț Net', 'TVA %', 'Total Net', 'Total TVA', 'Total Brut'],
-      rows: lines.map((line, index) => [
-        index + 1,
+    const rows = [];
+    let lineNumber = 0;
+
+    lines.forEach((line, index) => {
+      const discountPercent = parseFloat(line.discountPercent) || 0;
+      const discountAmount = parseFloat(line.discountAmount) || 0;
+      const hasDiscount = discountPercent > 0 || discountAmount > 0;
+
+      lineNumber++;
+      rows.push([
+        lineNumber,
         line.product || '-',
         line.quantity,
-        `${line.unitNetPrice} ${invoiceData.currency}`,
+        line.unitNetPrice,
         `${line.vatRate}%`,
-        `${calculateLineTotal(line, 'net')} ${invoiceData.currency}`,
-        `${calculateLineTotal(line, 'vat')} ${invoiceData.currency}`,
-        `${calculateLineTotal(line, 'gross')} ${invoiceData.currency}`
-      ]),
+        calculateLineTotal(line, 'net'),
+        calculateLineTotal(line, 'vat'),
+        calculateLineTotal(line, 'gross')
+      ]);
+
+      // Adaugă linie de discount dacă există
+      if (hasDiscount) {
+        lineNumber++;
+        const discountNet = (parseFloat(line.unitNetPrice) * parseFloat(line.quantity) * discountPercent / 100 + discountAmount);
+        const discountVat = discountNet * parseFloat(line.vatRate) / 100;
+        const discountGross = discountNet + discountVat;
+        rows.push([
+          lineNumber,
+          `Discount ${discountPercent > 0 ? discountPercent + '%' : ''} ${discountAmount > 0 ? discountAmount : ''} la ${line.product || 'produs'}`,
+          '1',
+          `-${discountNet.toFixed(2)}`,
+          `${line.vatRate}%`,
+          `-${discountNet.toFixed(2)}`,
+          `-${discountVat.toFixed(2)}`,
+          `-${discountGross.toFixed(2)}`
+        ]);
+      }
+    });
+
+    // Adaugă linie discount factura (dacă există)
+    if (totals.discountAmount && parseFloat(totals.discountAmount) > 0) {
+      lineNumber++;
+      const totalDiscountNet = parseFloat(totals.net) * (parseFloat(totalDiscount.percent) || 0) / 100;
+      const totalDiscountVat = parseFloat(totals.vat) * (parseFloat(totalDiscount.percent) || 0) / 100;
+      rows.push([
+        lineNumber,
+        `Discount factura de ${totalDiscount.type === 'percent' ? totalDiscount.percent + '%' : totalDiscount.amount}`,
+        '1',
+        `-${totalDiscountNet.toFixed(2)}`,
+        '', // TVA% gol
+        `-${totalDiscountNet.toFixed(2)}`,
+        `-${totalDiscountVat.toFixed(2)}`,
+        `-${totals.discountAmount}`
+      ]);
+    }
+
+    return {
+      header: ['Nr.', 'Produs/Serviciu', 'Cantitate', 'Preț Net', 'TVA %', 'Total Net', 'Total TVA', 'Total Brut'],
+      rows: rows,
       totals: {
         net: `${totals.net} ${invoiceData.currency}`,
         vat: `${totals.vat} ${invoiceData.currency}`,
@@ -1930,7 +1990,7 @@ const InvoiceGenerator = () => {
       }
     };
   };
-  
+
   /**
    * Keyboard shortcuts handler
    */
@@ -1941,93 +2001,114 @@ const InvoiceGenerator = () => {
       autosaveDraft();
       alert('💾 Draft salvat!');
     }
-    
+
     // Ctrl+P sau Cmd+P - Preview PDF
     if ((event.ctrlKey || event.metaKey) && event.key === 'p') {
       event.preventDefault();
       showPreview('pdf');
     }
-    
+
     // Ctrl+E sau Cmd+E - Preview Excel
     if ((event.ctrlKey || event.metaKey) && event.key === 'e') {
       event.preventDefault();
       showPreview('excel');
     }
-    
+
     // Ctrl+D sau Cmd+D - Descarcă PDF
     if ((event.ctrlKey || event.metaKey) && event.key === 'd') {
       event.preventDefault();
       exportToPDF();
     }
-    
+
     // Ctrl+Shift+? - Arată shortcuts
     if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === '?') {
       event.preventDefault();
       setShortcutsDialogOpen(true);
     }
-    
+
     // Escape - Închide dialoguri
     if (event.key === 'Escape') {
       setPreviewDialog({ open: false, type: null, content: null });
       setShortcutsDialogOpen(false);
     }
   }, [autosaveDraft]);
-  
+
   // useEffect pentru keyboard shortcuts
   useEffect(() => {
     window.addEventListener('keydown', handleKeyboardShortcut);
     return () => window.removeEventListener('keydown', handleKeyboardShortcut);
   }, [handleKeyboardShortcut]);
-  
+
   // useEffect pentru autosave timer (30 secunde)
   useEffect(() => {
     // Pornește timer-ul autosave
     autosaveTimerRef.current = setInterval(() => {
       autosaveDraft();
     }, 30000); // 30 secunde
-    
+
     return () => {
       if (autosaveTimerRef.current) {
         clearInterval(autosaveTimerRef.current);
       }
     };
   }, [autosaveDraft]);
-  
+
 
   const calculateTotals = () => {
     let totalNet = 0;
     let totalVat = 0;
     let totalGross = 0;
+    let totalLineDiscounts = 0;
 
+    // Calculează totaluri FĂRĂ reduceri (reducerile sunt linii separate)
     lines.forEach(line => {
-      totalNet += parseFloat(calculateLineTotal(line, 'net')) || 0;
-      totalVat += parseFloat(calculateLineTotal(line, 'vat')) || 0;
-      totalGross += parseFloat(calculateLineTotal(line, 'gross')) || 0;
+      const qty = parseFloat(line.quantity) || 0;
+      const unitNetPrice = parseFloat(line.unitNetPrice) || 0;
+
+      // Include doar liniile cu cantitate și preț valide
+      if (qty > 0 && unitNetPrice > 0) {
+        totalNet += parseFloat(calculateLineTotal(line, 'net')) || 0;
+        totalVat += parseFloat(calculateLineTotal(line, 'vat')) || 0;
+        totalGross += parseFloat(calculateLineTotal(line, 'gross')) || 0;
+
+        // Adună reducerile pe linii
+        const discountPercent = parseFloat(line.discountPercent) || 0;
+        const discountAmount = parseFloat(line.discountAmount) || 0;
+        const lineDiscountNet = (unitNetPrice * qty * discountPercent / 100 + discountAmount);
+        const lineDiscountVat = lineDiscountNet * parseFloat(line.vatRate) / 100;
+        totalLineDiscounts += lineDiscountNet + lineDiscountVat;
+      }
     });
 
-    // Aplică reducerea pe total (după calcularea totalurilor pe linii)
-    let discountAmount = 0;
+    // Scade reducerile pe linii
+    const grossAfterLineDiscounts = totalGross - totalLineDiscounts;
+
+    // Aplică reducerea pe total (după scăderea reducerilor pe linii)
+    let totalDiscountAmount = 0;
     if (totalDiscount.type === 'percent') {
       const percent = parseFloat(totalDiscount.percent) || 0;
-      discountAmount = (totalGross * percent / 100);
+      totalDiscountAmount = (grossAfterLineDiscounts * percent / 100);
     } else if (totalDiscount.type === 'amount') {
-      discountAmount = parseFloat(totalDiscount.amount) || 0;
+      totalDiscountAmount = parseFloat(totalDiscount.amount) || 0;
     }
 
-    const finalGross = Math.max(0, totalGross - discountAmount);
-    
-    // Recalculează TVA proporțional cu reducerea aplicată
-    const grossRatio = totalGross > 0 ? finalGross / totalGross : 0;
-    const finalVat = totalVat * grossRatio;
+    const finalGross = Math.max(0, grossAfterLineDiscounts - totalDiscountAmount);
+
+    // Calculează Net și VAT finale
+    // Scade reducerile proporțional
+    const totalDiscounts = totalLineDiscounts + totalDiscountAmount;
+    const grossRatio = totalGross > 0 ? (totalGross - totalDiscounts) / totalGross : 0;
     const finalNet = totalNet * grossRatio;
+    const finalVat = totalVat * grossRatio;
 
     return {
       net: finalNet.toFixed(2),
       vat: finalVat.toFixed(2),
       gross: finalGross.toFixed(2),
       originalGross: totalGross.toFixed(2),
-      discountAmount: discountAmount.toFixed(2),
-      discountType: totalDiscount.type
+      discountAmount: totalDiscountAmount.toFixed(2),
+      discountType: totalDiscount.type,
+      lineDiscounts: totalLineDiscounts.toFixed(2)
     };
   };
 
@@ -2063,137 +2144,174 @@ const InvoiceGenerator = () => {
 
     // Construiește HTML-ul facturii
     invoiceElement.innerHTML = `
-      <div style="font-family: Arial, sans-serif; font-size: 11px;">
-        <h1 style="text-align: center; font-size: 24px; margin: 0 0 15px 0;">FACTURĂ</h1>
-        <div style="text-align: center; margin-bottom: 25px; font-size: 11px;">
-          <div>Seria: ${invoiceData.series || '-'} Nr: ${invoiceData.number || '-'}</div>
-          <div>Data: ${invoiceData.issueDate || '-'}</div>
-          ${invoiceData.dueDate ? `<div>Scadență: ${invoiceData.dueDate}</div>` : ''}
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 10px; background: #ffffff;">
+        <!-- Header modern cu gradient -->
+        <div style="background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); padding: 25px; margin: -40px -40px 30px -40px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <h1 style="margin: 0; color: white; font-size: 28px; font-weight: 600; text-align: center; letter-spacing: 1.5px;">FACTURĂ</h1>
+          <div style="text-align: center; margin-top: 12px; color: rgba(255,255,255,0.95); font-size: 11px;">
+            <div style="display: inline-block; background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 15px; margin: 4px;">
+              <strong>Serie:</strong> ${invoiceData.series || '-'} &nbsp;|&nbsp; <strong>Nr:</strong> ${invoiceData.number || '-'}
+            </div>
+            <div style="display: inline-block; background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 15px; margin: 4px;">
+              <strong>Data:</strong> ${invoiceData.issueDate || '-'}${invoiceData.dueDate ? ` &nbsp;|&nbsp; <strong>Scadență:</strong> ${invoiceData.dueDate}` : ''}
+            </div>
+          </div>
         </div>
         
-        <table style="width: 100%; margin-bottom: 25px; border-collapse: collapse;">
+        <!-- Carduri Furnizor & Beneficiar -->
+        <table style="width: 100%; margin-bottom: 20px; border-spacing: 12px 0;">
           <tr>
-            <td style="width: 50%; vertical-align: top; padding-right: 15px;">
-              <strong style="font-size: 12px;">FURNIZOR:</strong><br/>
-              <div style="margin-top: 5px; line-height: 1.6;">
-                ${invoiceData.supplierName || '-'}<br/>
-                CUI: ${invoiceData.supplierCUI || '-'}<br/>
-                ${invoiceData.supplierRegCom ? `Reg Com: ${invoiceData.supplierRegCom}<br/>` : ''}
-                ${invoiceData.supplierAddress || '-'}<br/>
-                ${invoiceData.supplierCity || '-'}
-                ${invoiceData.supplierPhone ? `<br/>Tel: ${invoiceData.supplierPhone}` : ''}
-                ${invoiceData.supplierEmail ? `<br/>Email: ${invoiceData.supplierEmail}` : ''}
-                ${invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0 ? 
-                  invoiceData.supplierBankAccounts.map((account, index) => {
-                    if (!account.iban && !account.bank) return '';
-                    const label = invoiceData.supplierBankAccounts.length > 1 ? ` ${index + 1}` : '';
-                    let html = '';
-                    if (account.iban) html += `<br/><strong>IBAN${label} (${account.currency || 'RON'}):</strong> ${account.iban}`;
-                    if (account.bank) html += `<br/>Banca${label}: ${account.bank}`;
-                    return html;
-                  }).join('')
-                : ''}
+            <td style="width: 50%; vertical-align: top;">
+              <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; border-left: 4px solid #1976d2; min-height: 140px;">
+                <div style="color: #1976d2; font-weight: 700; font-size: 11px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">📤 FURNIZOR</div>
+                <div style="font-weight: 600; font-size: 12px; color: #212121; margin-bottom: 6px;">${invoiceData.supplierName || '-'}</div>
+                <div style="font-size: 9px; color: #666; line-height: 1.6;">
+                  <div><strong>CUI:</strong> ${invoiceData.supplierCUI || '-'}</div>
+                  ${invoiceData.supplierRegCom ? `<div><strong>Reg Com:</strong> ${invoiceData.supplierRegCom}</div>` : ''}
+                  ${invoiceData.supplierAddress ? `<div style="margin-top: 4px;">${invoiceData.supplierAddress}</div>` : ''}
+                  ${invoiceData.supplierCity ? `<div>${invoiceData.supplierCity}</div>` : ''}
+                  ${invoiceData.supplierPhone ? `<div style="margin-top: 4px;"><strong>Tel:</strong> ${invoiceData.supplierPhone}</div>` : ''}
+                  ${invoiceData.supplierEmail ? `<div><strong>Email:</strong> ${invoiceData.supplierEmail}</div>` : ''}
+                  ${invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0 && invoiceData.supplierBankAccounts[0].iban ? `<div style="margin-top: 4px;"><strong>IBAN (${invoiceData.supplierBankAccounts[0].currency || 'RON'}):</strong> ${invoiceData.supplierBankAccounts[0].iban}</div>` : ''}
+                  ${invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0 && invoiceData.supplierBankAccounts[0].bank ? `<div><strong>Banca:</strong> ${invoiceData.supplierBankAccounts[0].bank}</div>` : ''}
+                </div>
               </div>
             </td>
-            <td style="width: 50%; vertical-align: top; padding-left: 15px;">
-              <strong style="font-size: 12px;">BENEFICIAR:</strong><br/>
-              <div style="margin-top: 5px; line-height: 1.6;">
-                ${invoiceData.clientName || '-'}<br/>
-                CUI: ${invoiceData.clientCUI || '-'}<br/>
-                ${invoiceData.clientRegCom ? `Reg Com: ${invoiceData.clientRegCom}<br/>` : ''}
-                ${invoiceData.clientAddress || '-'}<br/>
-                ${invoiceData.clientCity || '-'}
-                ${invoiceData.clientPhone ? `<br/>Tel: ${invoiceData.clientPhone}` : ''}
-                ${invoiceData.clientEmail ? `<br/>Email: ${invoiceData.clientEmail}` : ''}
-                ${invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0 ? 
-                  invoiceData.clientBankAccounts.map((account, index) => {
-                    if (!account.iban && !account.bank) return '';
-                    const label = invoiceData.clientBankAccounts.length > 1 ? ` ${index + 1}` : '';
-                    let html = '';
-                    if (account.iban) html += `<br/><strong>IBAN${label} (${account.currency || 'RON'}):</strong> ${account.iban}`;
-                    if (account.bank) html += `<br/>Banca${label}: ${account.bank}`;
-                    return html;
-                  }).join('')
-                : ''}
+            <td style="width: 50%; vertical-align: top;">
+              <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; border-left: 4px solid #4caf50; min-height: 140px;">
+                <div style="color: #4caf50; font-weight: 700; font-size: 11px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">📥 BENEFICIAR</div>
+                <div style="font-weight: 600; font-size: 12px; color: #212121; margin-bottom: 6px;">${invoiceData.clientName || '-'}</div>
+                <div style="font-size: 9px; color: #666; line-height: 1.6;">
+                  <div><strong>CUI:</strong> ${invoiceData.clientCUI || '-'}</div>
+                  ${invoiceData.clientRegCom ? `<div><strong>Reg Com:</strong> ${invoiceData.clientRegCom}</div>` : ''}
+                  ${invoiceData.clientAddress ? `<div style="margin-top: 4px;">${invoiceData.clientAddress}</div>` : ''}
+                  ${invoiceData.clientCity ? `<div>${invoiceData.clientCity}</div>` : ''}
+                  ${invoiceData.clientPhone ? `<div style="margin-top: 4px;"><strong>Tel:</strong> ${invoiceData.clientPhone}</div>` : ''}
+                  ${invoiceData.clientEmail ? `<div><strong>Email:</strong> ${invoiceData.clientEmail}</div>` : ''}
+                  ${invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0 && invoiceData.clientBankAccounts[0].iban ? `<div style="margin-top: 4px;"><strong>IBAN (${invoiceData.clientBankAccounts[0].currency || 'RON'}):</strong> ${invoiceData.clientBankAccounts[0].iban}</div>` : ''}
+                  ${invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0 && invoiceData.clientBankAccounts[0].bank ? `<div><strong>Banca:</strong> ${invoiceData.clientBankAccounts[0].bank}</div>` : ''}
+                </div>
               </div>
             </td>
           </tr>
         </table>
         
-        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+        <!-- Informație Monedă -->
+        <div style="margin: 20px 0 8px 0; padding: 6px 12px; background: linear-gradient(to right, #fff3e0, #ffffff); border-left: 4px solid #ff9800; border-radius: 4px; display: inline-block;">
+          <span style="color: #e65100; font-weight: 700; font-size: 9px; letter-spacing: 0.5px;">💰 Monedă: ${invoiceData.currency}</span>
+        </div>
+        
+        <!-- Tabel modern cu shadow -->
+        <table style="width: 100%; border-collapse: collapse; margin-top: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 6px; overflow: hidden;">
           <thead>
-            <tr style="background-color: #2196F3; color: white;">
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Nr.</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Produs/Serviciu</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Cant.</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Preț Net</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">TVA%</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Suma TVA</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Preț Brut</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Total Net</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Total TVA</th>
-              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Total Brut</th>
+            <tr style="background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); color: white;">
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: none;">Nr.</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; border: none;">Produs/Serviciu</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: none;">Cant.</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Preț Net</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border: none;">TVA%</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Suma TVA</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Preț Brut</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Total Net</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Total TVA</th>
+              <th style="padding: 12px 8px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: right; border: none;">Total Brut</th>
             </tr>
           </thead>
           <tbody>
-            ${lines.map((line, index) => `
-              <tr>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${index + 1}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; font-size: 9px;">${line.product || '-'}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${line.quantity}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${line.unitNetPrice} ${invoiceData.currency}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${line.vatRate}%</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineVat(line)} ${invoiceData.currency}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${line.unitGrossPrice} ${invoiceData.currency}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'net')} ${invoiceData.currency}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'vat')} ${invoiceData.currency}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'gross')} ${invoiceData.currency}</td>
+            ${lines.map((line, index) => {
+      const discountPercent = parseFloat(line.discountPercent) || 0;
+      const discountAmount = parseFloat(line.discountAmount) || 0;
+      const hasDiscount = discountPercent > 0 || discountAmount > 0;
+
+      let rows = `
+              <tr style="border-bottom: 1px solid #e0e0e0;">
+                <td style="padding: 10px 8px; text-align: center; font-size: 9px; color: #757575; border: none;">${index + 1}</td>
+                <td style="padding: 10px 8px; font-size: 9px; color: #212121; border: none;">${line.product || '-'}</td>
+                <td style="padding: 10px 8px; text-align: center; font-size: 9px; color: #212121; border: none;">${line.quantity}</td>
+                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #212121; border: none;">${line.unitNetPrice}</td>
+                <td style="padding: 10px 8px; text-align: center; font-size: 9px; color: #1976d2; font-weight: 500; border: none;">${line.vatRate}%</td>
+                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #1976d2; font-weight: 500; border: none;">${calculateLineVat(line)}</td>
+                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #212121; border: none;">${line.unitGrossPrice}</td>
+                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #212121; font-weight: 500; border: none;">${calculateLineTotal(line, 'net')}</td>
+                <td style="padding: 10px 8px; text-align: right; font-size: 9px; color: #1976d2; font-weight: 500; border: none;">${calculateLineTotal(line, 'vat')}</td>
+                <td style="padding: 10px 8px; text-align: right; font-size: 10px; color: #212121; font-weight: 600; border: none;">${calculateLineTotal(line, 'gross')}</td>
+              </tr>`;
+
+      // Adaugă linie de discount dacă există
+      if (hasDiscount) {
+        const discountNet = (parseFloat(line.unitNetPrice) * parseFloat(line.quantity) * discountPercent / 100 + discountAmount);
+        const discountVat = discountNet * parseFloat(line.vatRate) / 100;
+        const discountGross = discountNet + discountVat;
+        rows += `
+              <tr style="background: linear-gradient(to right, #fff5f5, #ffffff); border-bottom: 1px solid #ffcdd2;">
+                <td style="padding: 8px; text-align: center; border: none;"></td>
+                <td style="padding: 8px; font-style: italic; font-size: 9px; color: #c62828; border: none;">🏷️ Discount ${discountPercent > 0 ? discountPercent + '%' : ''} ${discountAmount > 0 ? discountAmount : ''} la ${line.product || 'produs'}</td>
+                <td style="padding: 8px; text-align: center; font-size: 8px; color: #757575; border: none;">1,00</td>
+                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountNet.toFixed(2)}</td>
+                <td style="padding: 8px; text-align: center; font-size: 8px; color: #c62828; border: none;">${line.vatRate}%</td>
+                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountVat.toFixed(2)}</td>
+                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountGross.toFixed(2)}</td>
+                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountNet.toFixed(2)}</td>
+                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 600; font-size: 9px; border: none;">-${discountVat.toFixed(2)}</td>
+                <td style="padding: 8px; text-align: right; color: #c62828; font-weight: 700; font-size: 9px; border: none;">-${discountGross.toFixed(2)}</td>
+              </tr>`;
+      }
+
+      return rows;
+    }).join('')}
+            ${totals.discountAmount && parseFloat(totals.discountAmount) > 0 ? (() => {
+        const originalGross = parseFloat(totals.originalGross) || 0;
+        const finalGross = parseFloat(totals.gross) || 0;
+        const totalDiscountGross = originalGross - finalGross - parseFloat(totals.lineDiscounts || 0);
+        const totalDiscountNet = totalDiscountGross / 1.19;
+        const totalDiscountVat = totalDiscountGross - totalDiscountNet;
+        return `
+            <tr style="background: linear-gradient(to right, #ffe8e8, #ffffff); border-bottom: 2px solid #ef5350;">
+              <td style="padding: 8px; text-align: center; border: none;"></td>
+              <td style="padding: 8px; font-style: italic; font-weight: 700; font-size: 9px; color: #b71c1c; border: none;">🎁 Discount factura de ${totalDiscount.type === 'percent' ? totalDiscount.percent + '%' : totalDiscount.amount}</td>
+              <td style="padding: 8px; text-align: center; font-size: 8px; color: #757575; border: none;">1,00</td>
+              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountNet.toFixed(2)}</td>
+              <td style="padding: 8px; text-align: center; border: none;"></td>
+              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountVat.toFixed(2)}</td>
+              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountGross.toFixed(2)}</td>
+              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountNet.toFixed(2)}</td>
+              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 700; font-size: 9px; border: none;">-${totalDiscountVat.toFixed(2)}</td>
+              <td style="padding: 8px; text-align: right; color: #b71c1c; font-weight: 800; font-size: 10px; border: none;">-${totalDiscountGross.toFixed(2)}</td>
               </tr>
-            `).join('')}
+            `;
+      })() : ''}
           </tbody>
           <tfoot>
-            <tr style="background-color: #f5f5f5; font-weight: bold;">
-              <td colspan="7" style="border: 1px solid #ddd; padding: 8px; font-size: 11px; font-weight: bold;">TOTAL FACTURĂ</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.net} ${invoiceData.currency}</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.vat} ${invoiceData.currency}</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.gross} ${invoiceData.currency}</td>
+            <tr style="background: linear-gradient(135deg, #37474f 0%, #263238 100%); color: white;">
+              <td colspan="7" style="padding: 14px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; border: none;">💰 TOTAL FACTURĂ</td>
+              <td style="padding: 14px 8px; text-align: right; font-size: 11px; font-weight: 700; border: none;">${totals.net} ${invoiceData.currency}</td>
+              <td style="padding: 14px 8px; text-align: right; font-size: 11px; font-weight: 700; border: none;">${totals.vat} ${invoiceData.currency}</td>
+              <td style="padding: 14px 8px; text-align: right; font-size: 12px; font-weight: 800; background: rgba(76, 175, 80, 0.2); border: none;">${totals.gross} ${invoiceData.currency}</td>
             </tr>
           </tfoot>
         </table>
         ${invoiceData.notes ? `
-        <div style="margin-top: 25px; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #2196F3; border-radius: 4px;">
-          <strong style="font-size: 11px;">Note:</strong><br/>
-          <div style="margin-top: 8px; font-size: 10px; line-height: 1.6; white-space: pre-wrap;">${invoiceData.notes}</div>
+        <div style="margin-top: 20px; padding: 16px; background: linear-gradient(to right, #e3f2fd, #ffffff); border-left: 4px solid #1976d2; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+          <div style="color: #1976d2; font-weight: 700; font-size: 10px; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">📝 NOTE</div>
+          <div style="font-size: 9px; color: #424242; line-height: 1.6; white-space: pre-wrap;">${invoiceData.notes}</div>
         </div>` : ''}
         
         ${qrCodeImg ? `
-        <div style="margin-top: 30px; padding: 20px; background-color: #f5f5f5; border-radius: 8px; text-align: center;">
-          <strong style="font-size: 12px; color: #1976d2;">💳 PLATĂ RAPIDĂ CU COD QR</strong><br/>
+        <div style="margin-top: 25px; padding: 20px; background: linear-gradient(to bottom, #f1f8e9, #ffffff); border: 2px solid #4caf50; border-radius: 12px; text-align: center; box-shadow: 0 3px 10px rgba(76, 175, 80, 0.2);">
+          <div style="color: #2e7d32; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">💳 PLATĂ RAPIDĂ CU COD QR</div>
           <div style="margin-top: 10px;">
             ${qrCodeImg}
           </div>
-          <div style="margin-top: 10px; font-size: 10px; color: #666;">
-            Scanează codul QR cu aplicația de banking<br/>
+          <div style="margin-top: 12px; font-size: 9px; color: #558b2f; line-height: 1.5;">
+            <strong>Scanează codul QR</strong> cu aplicația de banking<br/>
             pentru a plăti factura instant!
           </div>
         </div>` : ''}
-        
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; font-size: 9px; color: #999;">
-          Document generat la ${new Date().toLocaleString('ro-RO', { 
-            year: 'numeric', 
-            month: '2-digit', 
-            day: '2-digit', 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          })} de <strong>Normal.ro - Generator Facturi</strong>
-          <br/>
-          www.normal.ro
-        </div>
       </div>
     `;
-    
+
     document.body.appendChild(invoiceElement);
-    
+
     try {
       // Convertește HTML-ul la canvas/imagine
       const canvas = await html2canvas(invoiceElement, {
@@ -2202,28 +2320,28 @@ const InvoiceGenerator = () => {
         logging: false,
         backgroundColor: '#ffffff'
       });
-      
+
       // Creează PDF
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgData = canvas.toDataURL('image/png');
-      
+
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
-      
+
       const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight) * 72 / 96; // Adjust for DPI
       const imgX = (pdfWidth - imgWidth * ratio) / 2;
       const imgY = 10;
-      
+
       pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-      
+
       // Salvează PDF
       pdf.save(`factura_${invoiceData.series || 'X'}_${invoiceData.number || '000'}_${invoiceData.issueDate}.pdf`);
-      
+
       // Salvează datele în cookie dacă este consimțământ
       saveSupplierDataToCookie();
-      
+
       // Salvează în Google Sheets dacă este conectat
       if (googleSheetsConnected) {
         saveSupplierDataToSheets();
@@ -2234,11 +2352,11 @@ const InvoiceGenerator = () => {
           console.error('Eroare salvare factură în Sheets:', err);
         }
       }
-      
+
       // Salvează în istoric
       invoiceHistoryService.setType('invoice');
       invoiceHistoryService.saveInvoice(invoiceData, lines, totals, invoiceData.notes, attachedFiles);
-      
+
     } finally {
       // Șterge elementul temporar
       document.body.removeChild(invoiceElement);
@@ -2247,7 +2365,7 @@ const InvoiceGenerator = () => {
 
   const exportToExcel = async () => {
     const excelData = [];
-    
+
     // Header factură
     excelData.push(['FACTURĂ']);
     excelData.push([]);
@@ -2255,7 +2373,7 @@ const InvoiceGenerator = () => {
     excelData.push(['Data emitere', invoiceData.issueDate || '-', '', 'Data scadență', invoiceData.dueDate || '-']);
     excelData.push(['Monedă', invoiceData.currency || 'RON']);
     excelData.push([]);
-    
+
     // Date furnizor
     excelData.push(['FURNIZOR']);
     excelData.push(['Nume', invoiceData.supplierName || '-']);
@@ -2265,7 +2383,7 @@ const InvoiceGenerator = () => {
     excelData.push(['Oraș', invoiceData.supplierCity || '-']);
     excelData.push(['Telefon', invoiceData.supplierPhone || '-']);
     excelData.push(['Email', invoiceData.supplierEmail || '-']);
-    
+
     // Adaugă conturi bancare furnizor (poate fi mai multe)
     if (invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0) {
       invoiceData.supplierBankAccounts.forEach((account, index) => {
@@ -2278,7 +2396,7 @@ const InvoiceGenerator = () => {
       });
     }
     excelData.push([]);
-    
+
     // Date client
     excelData.push(['BENEFICIAR']);
     excelData.push(['Nume', invoiceData.clientName || '-']);
@@ -2288,7 +2406,7 @@ const InvoiceGenerator = () => {
     excelData.push(['Oraș', invoiceData.clientCity || '-']);
     excelData.push(['Telefon', invoiceData.clientPhone || '-']);
     excelData.push(['Email', invoiceData.clientEmail || '-']);
-    
+
     // Adaugă conturi bancare client (poate fi mai multe)
     if (invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0) {
       invoiceData.clientBankAccounts.forEach((account, index) => {
@@ -2301,15 +2419,21 @@ const InvoiceGenerator = () => {
       });
     }
     excelData.push([]);
-    
+
     // Linii produse - Header
     excelData.push(['PRODUSE ȘI SERVICII']);
     excelData.push(['Nr.', 'Denumire produs/serviciu', 'Cantitate', 'Preț net unitar', 'TVA %', 'Suma TVA', 'Preț brut unitar', 'Total net', 'Total TVA', 'Total brut']);
-    
+
     // Linii produse - Date
+    let lineNumber = 0;
     lines.forEach((line, index) => {
+      const discountPercent = parseFloat(line.discountPercent) || 0;
+      const discountAmount = parseFloat(line.discountAmount) || 0;
+      const hasDiscount = discountPercent > 0 || discountAmount > 0;
+
+      lineNumber++;
       excelData.push([
-        index + 1,
+        lineNumber,
         line.product || '-',
         line.quantity,
         formatNumber(line.unitNetPrice),
@@ -2320,20 +2444,60 @@ const InvoiceGenerator = () => {
         calculateLineTotal(line, 'vat'),
         calculateLineTotal(line, 'gross')
       ]);
+
+      // Adaugă linie de discount dacă există
+      if (hasDiscount) {
+        lineNumber++;
+        const discountNet = (parseFloat(line.unitNetPrice) * parseFloat(line.quantity) * discountPercent / 100 + discountAmount);
+        const discountVat = discountNet * parseFloat(line.vatRate) / 100;
+        const discountGross = discountNet + discountVat;
+        excelData.push([
+          lineNumber,
+          `Discount ${discountPercent > 0 ? discountPercent + '%' : ''} ${discountAmount > 0 ? discountAmount : ''} la ${line.product || 'produs'}`,
+          '1,00',
+          '-' + formatNumber(discountNet),
+          line.vatRate + '%',
+          '-' + formatNumber(discountVat),
+          '-' + formatNumber(discountGross),
+          '-' + formatNumber(discountNet),
+          '-' + formatNumber(discountVat),
+          '-' + formatNumber(discountGross)
+        ]);
+      }
     });
-    
+
+    // Linie discount factura (dacă există)
+    if (totals.discountAmount && parseFloat(totals.discountAmount) > 0) {
+      lineNumber++;
+      const totalDiscountNet = parseFloat(totals.net) * (parseFloat(totalDiscount.percent) || 0) / 100;
+      const totalDiscountVat = parseFloat(totals.vat) * (parseFloat(totalDiscount.percent) || 0) / 100;
+      const totalDiscountGross = parseFloat(totals.discountAmount);
+      excelData.push([
+        lineNumber,
+        `Discount factura de ${totalDiscount.type === 'percent' ? totalDiscount.percent + '%' : totalDiscount.amount}`,
+        '1,00',
+        '-' + formatNumber(totalDiscountNet),
+        '', // TVA% gol pentru discount general
+        '-' + formatNumber(totalDiscountVat),
+        '-' + formatNumber(totalDiscountGross),
+        '-' + formatNumber(totalDiscountNet),
+        '-' + formatNumber(totalDiscountVat),
+        '-' + formatNumber(totalDiscountGross)
+      ]);
+    }
+
     // Totaluri
     excelData.push([]);
     excelData.push(['', 'TOTAL FACTURĂ', '', '', '', '', '', totals.net, totals.vat, totals.gross]);
     excelData.push([]);
-    
+
     // Note (dacă există)
     if (invoiceData.notes) {
       excelData.push(['NOTE']);
       excelData.push([invoiceData.notes]);
       excelData.push([]);
     }
-    
+
     // Fișiere atașate (dacă există)
     if (attachedFiles.length > 0) {
       excelData.push(['FIȘIERE ATAȘATE']);
@@ -2344,21 +2508,8 @@ const InvoiceGenerator = () => {
           file.mimeType
         ]);
       });
-      excelData.push([]);
     }
-    
-    // Footer cu informații generare
-    excelData.push([]);
-    excelData.push(['---']);
-    excelData.push([`Document generat la ${new Date().toLocaleString('ro-RO', { 
-      year: 'numeric', 
-      month: '2-digit', 
-      day: '2-digit', 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    })} de Normal.ro - Generator Facturi`]);
-    excelData.push(['www.normal.ro']);
-    
+
     // Creează worksheet principal
     const worksheet = XLSX.utils.aoa_to_sheet(excelData);
     const workbook = XLSX.utils.book_new();
@@ -2367,15 +2518,15 @@ const InvoiceGenerator = () => {
     // Setează lățimi coloane
     worksheet['!cols'] = [
       { wch: 8 },   // Nr.
-      { wch: 35 },  // Produs/Serviciu
+      { wch: 40 },  // Produs/Serviciu (mai larg pentru "Discount X% la produs")
       { wch: 10 },  // Cantitate
-      { wch: 15 },  // Preț net unitar
+      { wch: 14 },  // Preț net unitar
       { wch: 8 },   // TVA %
       { wch: 12 },  // Suma TVA
-      { wch: 15 },  // Preț brut unitar
-      { wch: 15 },  // Total net
-      { wch: 15 },  // Total TVA
-      { wch: 15 }   // Total brut
+      { wch: 14 },  // Preț brut unitar
+      { wch: 12 },  // Total net
+      { wch: 12 },  // Total TVA
+      { wch: 12 }   // Total brut
     ];
 
     // Dacă există IBAN, adaugă QR Code într-un sheet separat
@@ -2407,7 +2558,7 @@ const InvoiceGenerator = () => {
 
         const qrWorksheet = XLSX.utils.aoa_to_sheet(qrNote);
         XLSX.utils.book_append_sheet(workbook, qrWorksheet, 'Cod QR Plată');
-        
+
         console.log('✅ Sheet "Cod QR Plată" adăugat în Excel');
       } catch (error) {
         console.warn('Nu s-a putut genera QR Code pentru Excel:', error);
@@ -2415,10 +2566,10 @@ const InvoiceGenerator = () => {
     }
 
     XLSX.writeFile(workbook, `factura_${invoiceData.series || 'FAC'}_${invoiceData.number || '001'}_${invoiceData.issueDate}.xlsx`);
-    
+
     // Salvează datele în cookie dacă este consimțământ
     saveSupplierDataToCookie();
-    
+
     // Salvează în Google Sheets dacă este conectat
     if (googleSheetsConnected) {
       saveSupplierDataToSheets();
@@ -2426,7 +2577,7 @@ const InvoiceGenerator = () => {
         .then(() => googleSheetsService.saveInvoiceToHistory(invoiceData, lines, totals, invoiceData.notes, attachedFiles))
         .catch(err => console.error('Eroare salvare factură în Sheets:', err));
     }
-    
+
     // Salvează în istoric
     invoiceHistoryService.setType('invoice');
     invoiceHistoryService.saveInvoice(invoiceData, lines, totals, invoiceData.notes, attachedFiles);
@@ -2435,11 +2586,11 @@ const InvoiceGenerator = () => {
   const validateOnANAF = () => {
     // Generează și descarcă XML-ul
     exportToXML();
-    
+
     // Deschide validatorul ANAF într-un tab nou
     setTimeout(() => {
       window.open('https://www.anaf.ro/uploadxmi/', '_blank');
-      
+
       // Afișează instrucțiuni
       alert(
         '📋 Validare XML pe ANAF:\n\n' +
@@ -2470,7 +2621,7 @@ const InvoiceGenerator = () => {
     }
 
     setIsUploadingToDrive(true);
-    
+
     try {
       // 1. Cere autorizare de la utilizator
       try {
@@ -2488,7 +2639,7 @@ const InvoiceGenerator = () => {
 
       // 2. Generează fișierul
       let blob, filename, mimeType;
-      
+
       if (fileType === 'pdf') {
         // Generează PDF folosind funcția existentă exportToPDF
         // Refolosim logica dar generăm blob în loc de download
@@ -2497,7 +2648,7 @@ const InvoiceGenerator = () => {
         invoiceElement.style.width = '800px';
         invoiceElement.style.padding = '20px';
         invoiceElement.style.backgroundColor = 'white';
-        
+
         // Folosește același HTML ca la exportToPDF (versiune completă)
         invoiceElement.innerHTML = `
           <div style="font-family: Arial, sans-serif; font-size: 11px;">
@@ -2532,38 +2683,44 @@ const InvoiceGenerator = () => {
             </div>
           </div>
         `;
-        
+
         document.body.appendChild(invoiceElement);
-        
+
         const canvas = await html2canvas(invoiceElement, { scale: 2, useCORS: true, logging: false });
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        
+
         blob = pdf.output('blob');
         filename = `factura_${invoiceData.series || 'FAC'}_${invoiceData.number || '001'}_${invoiceData.issueDate}.pdf`;
         mimeType = 'application/pdf';
-        
+
         document.body.removeChild(invoiceElement);
-        
+
       } else if (fileType === 'excel') {
         // Generează Excel ca blob (versiune completă)
         const totals = calculateTotals();
         const excelData = [];
-        
+
         excelData.push(['FACTURĂ']);
         excelData.push([]);
         excelData.push(['Seria', invoiceData.series, 'Nr', invoiceData.number]);
         excelData.push(['Data emitere', invoiceData.issueDate]);
         excelData.push([]);
-        
+
         excelData.push(['Nr.', 'Produs/Serviciu', 'Cantitate', 'Preț net unitar', 'TVA %', 'Total net', 'Total TVA', 'Total brut']);
-        
+
+        let lineNumber = 0;
         lines.forEach((line, index) => {
+          const discountPercent = parseFloat(line.discountPercent) || 0;
+          const discountAmount = parseFloat(line.discountAmount) || 0;
+          const hasDiscount = discountPercent > 0 || discountAmount > 0;
+
+          lineNumber++;
           excelData.push([
-            index + 1,
+            lineNumber,
             line.product || '-',
             line.quantity,
             formatNumber(line.unitNetPrice),
@@ -2572,15 +2729,51 @@ const InvoiceGenerator = () => {
             calculateLineTotal(line, 'vat'),
             calculateLineTotal(line, 'gross')
           ]);
+
+          // Adaugă linie de discount dacă există
+          if (hasDiscount) {
+            lineNumber++;
+            const discountNet = (parseFloat(line.unitNetPrice) * parseFloat(line.quantity) * discountPercent / 100 + discountAmount);
+            const discountVat = discountNet * parseFloat(line.vatRate) / 100;
+            const discountGross = discountNet + discountVat;
+            excelData.push([
+              lineNumber,
+              `Discount ${discountPercent > 0 ? discountPercent + '%' : ''} ${discountAmount > 0 ? discountAmount : ''} la ${line.product || 'produs'}`,
+              '1,00',
+              '-' + formatNumber(discountNet),
+              line.vatRate + '%',
+              '-' + formatNumber(discountNet),
+              '-' + formatNumber(discountVat),
+              '-' + formatNumber(discountGross)
+            ]);
+          }
         });
-        
+
+        // Linie discount factura (dacă există)
+        if (totals.discountAmount && parseFloat(totals.discountAmount) > 0) {
+          lineNumber++;
+          const totalDiscountNet = parseFloat(totals.net) * (parseFloat(totalDiscount.percent) || 0) / 100;
+          const totalDiscountVat = parseFloat(totals.vat) * (parseFloat(totalDiscount.percent) || 0) / 100;
+          const totalDiscountGross = parseFloat(totals.discountAmount);
+          excelData.push([
+            lineNumber,
+            `Discount factura de ${totalDiscount.type === 'percent' ? totalDiscount.percent + '%' : totalDiscount.amount}`,
+            '1,00',
+            '-' + formatNumber(totalDiscountNet),
+            '', // TVA% gol
+            '-' + formatNumber(totalDiscountNet),
+            '-' + formatNumber(totalDiscountVat),
+            '-' + formatNumber(totalDiscountGross)
+          ]);
+        }
+
         excelData.push([]);
         excelData.push(['', '', '', '', 'TOTAL', totals.net, totals.vat, totals.gross]);
-        
+
         const ws = XLSX.utils.aoa_to_sheet(excelData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Factura');
-        
+
         const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
         blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         filename = `factura_${invoiceData.series || 'FAC'}_${invoiceData.number || '001'}_${invoiceData.issueDate}.xlsx`;
@@ -2589,22 +2782,22 @@ const InvoiceGenerator = () => {
 
       // 3. Upload direct în Google Drive
       const result = await googleDriveService.uploadFile(blob, filename, mimeType);
-      
+
       // 4. Succes!
       const fileUrl = `https://drive.google.com/file/d/${result.id}/view`;
-      
+
       alert(
         `✅ Succes! Fișierul a fost salvat în Google Drive!\n\n` +
         `📄 Nume: ${filename}\n` +
         `📂 ID: ${result.id}\n\n` +
         `🔗 Deschide fișierul în Google Drive?`
       );
-      
+
       // Deschide fișierul în Google Drive
       window.open(fileUrl, '_blank');
-      
+
       saveSupplierDataToCookie();
-      
+
     } catch (error) {
       console.error('Eroare salvare Google Drive:', error);
       alert(
@@ -2633,7 +2826,7 @@ const InvoiceGenerator = () => {
     const getCountyCode = (city, address) => {
       const searchText = `${city || ''} ${address || ''}`.toLowerCase();
       if (!searchText.trim()) return '';
-      
+
       // Mapare orașelor principale către coduri județ
       const cityToCounty = {
         'bucuresti': 'RO-B',
@@ -2720,7 +2913,7 @@ const InvoiceGenerator = () => {
     const invoiceNumber = `${invoiceData.series || 'FAC'}${invoiceData.number || '001'}`;
     const issueDate = invoiceData.issueDate || new Date().toISOString().split('T')[0];
     const currencyCode = invoiceData.currency || 'RON';
-    
+
     const supplierCountyCode = getCountyCode(invoiceData.supplierCity, invoiceData.supplierAddress);
     const clientCountyCode = getCountyCode(invoiceData.clientCity, invoiceData.clientAddress);
 
@@ -2730,7 +2923,7 @@ const InvoiceGenerator = () => {
       const vatRate = parseFloat(line.vatRate) || 0;
       const taxableAmount = parseFloat(calculateLineTotal(line, 'net')) || 0;
       const taxAmount = parseFloat(calculateLineTotal(line, 'vat')) || 0;
-      
+
       if (!vatGroups[vatRate]) {
         vatGroups[vatRate] = { taxableAmount: 0, taxAmount: 0 };
       }
@@ -2903,7 +3096,7 @@ const InvoiceGenerator = () => {
 
     // Salvează datele în cookie dacă este consimțământ
     saveSupplierDataToCookie();
-    
+
     // Salvează în Google Sheets dacă este conectat
     if (googleSheetsConnected) {
       saveSupplierDataToSheets();
@@ -2911,7 +3104,7 @@ const InvoiceGenerator = () => {
         .then(() => googleSheetsService.saveInvoiceToHistory(invoiceData, lines, totals, invoiceData.notes, attachedFiles))
         .catch(err => console.error('Eroare salvare factură în Sheets:', err));
     }
-    
+
     // Salvează în istoric
     invoiceHistoryService.setType('invoice');
     invoiceHistoryService.saveInvoice(invoiceData, lines, totals, invoiceData.notes, attachedFiles);
@@ -2929,11 +3122,11 @@ const InvoiceGenerator = () => {
   const loadBNRRates = async () => {
     setBnrLoading(true);
     setBnrError('');
-    
+
     try {
       const data = await bnrService.getExchangeRates();
       setBnrRates(data);
-      
+
       if (data.fallback) {
         setBnrError('⚠️ Folosesc cursuri statice (eroare conectare BNR)');
       } else if (data.cached) {
@@ -2992,7 +3185,7 @@ const InvoiceGenerator = () => {
   const calculateDueDateByWorkingDays = (days) => {
     const startDate = new Date(invoiceData.issueDate);
     const dueDate = paymentService.addWorkingDays(startDate, days);
-    
+
     setInvoiceData({
       ...invoiceData,
       dueDate: dueDate.toISOString().split('T')[0]
@@ -3002,7 +3195,7 @@ const InvoiceGenerator = () => {
     const skippedDays = [];
     let tempDate = new Date(startDate);
     tempDate.setDate(tempDate.getDate() + 1);
-    
+
     while (tempDate <= dueDate) {
       if (!paymentService.isWorkingDay(tempDate)) {
         const holidayName = paymentService.getHolidayName(tempDate);
@@ -3029,7 +3222,7 @@ const InvoiceGenerator = () => {
     // Afișează notificare rapidă
     const holidaysCount = skippedDays.filter(d => d.isHoliday).length;
     const weekendsCount = skippedDays.filter(d => d.isWeekend && !d.isHoliday).length;
-    
+
     if (skippedDays.length > 0) {
       console.log(
         `✅ Scadență: ${dueDate.toLocaleDateString('ro-RO')} | ` +
@@ -3052,16 +3245,16 @@ const InvoiceGenerator = () => {
     }
 
     const { skippedDays, dueDate, days } = workingDaysCalculator;
-    
+
     // Separă sărbătorile de weekend-uri
     const holidays = skippedDays.filter(day => day.reason !== 'Weekend');
     const weekends = skippedDays.filter(day => day.reason === 'Weekend');
-    
+
     // Obține toate sărbătorile din interval (inclusiv cele în weekend)
     const startDate = new Date(invoiceData.issueDate);
     const endDate = new Date(dueDate.split('.').reverse().join('-')); // Convert "DD.MM.YYYY" to Date
     const allHolidays = paymentService.getHolidaysInRange(startDate, endDate);
-    
+
     let message = `📅 CALCULUL ZILELOR LUCRĂTOARE\n`;
     message += `${'='.repeat(50)}\n\n`;
     message += `📍 Perioada: ${startDate.toLocaleDateString('ro-RO')} → ${dueDate}\n`;
@@ -3070,45 +3263,45 @@ const InvoiceGenerator = () => {
     message += `⏭️ Total zile sărite: ${skippedDays.length} zile\n`;
     message += `   └─ Weekend-uri: ${weekends.length} zile\n`;
     message += `   └─ Sărbători legale: ${holidays.length} zile\n\n`;
-    
+
     // Afișează toate sărbătorile legale din interval
     if (allHolidays.length > 0) {
       message += `🎊 SĂRBĂTORI LEGALE ÎN INTERVAL (${allHolidays.length}):\n`;
       message += `${'-'.repeat(50)}\n`;
-      
+
       allHolidays.forEach(holiday => {
         const date = new Date(holiday.date);
         const dayName = ['Dum', 'Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm'][date.getDay()];
         const isWeekend = date.getDay() === 0 || date.getDay() === 6;
         const emoji = isWeekend ? '📅' : '🎉';
         const suffix = isWeekend ? ' (în weekend)' : '';
-        
+
         message += `${emoji} ${holiday.formatted} (${dayName}) - ${holiday.name}${suffix}\n`;
       });
       message += `\n`;
     }
-    
+
     // Afișează detalii weekend-uri (grupat)
     if (weekends.length > 0) {
       message += `📆 WEEKEND-URI SĂRITE (${weekends.length} zile):\n`;
       message += `${'-'.repeat(50)}\n`;
-      
+
       // Grupează weekend-urile consecutive
       let currentWeekend = [];
       const weekendGroups = [];
-      
+
       weekends.forEach((day, index) => {
         currentWeekend.push(day.date);
-        
+
         // Verifică dacă e ultimul sau dacă următorul nu e consecutiv
-        if (index === weekends.length - 1 || 
-            new Date(weekends[index + 1].date.split('.').reverse().join('-')).getTime() - 
-            new Date(day.date.split('.').reverse().join('-')).getTime() > 86400000 * 2) {
+        if (index === weekends.length - 1 ||
+          new Date(weekends[index + 1].date.split('.').reverse().join('-')).getTime() -
+          new Date(day.date.split('.').reverse().join('-')).getTime() > 86400000 * 2) {
           weekendGroups.push([...currentWeekend]);
           currentWeekend = [];
         }
       });
-      
+
       weekendGroups.forEach((group, index) => {
         if (group.length === 1) {
           message += `• ${group[0]}\n`;
@@ -3120,12 +3313,12 @@ const InvoiceGenerator = () => {
       });
       message += `\n`;
     }
-    
+
     // Footer informativ
     message += `${'-'.repeat(50)}\n`;
     message += `ℹ️ Conform legislației române (Codul Muncii)\n`;
     message += `📚 Surse: Legea 53/2003, Legea 202/2008, BOR Calendar\n`;
-    
+
     alert(message);
   };
 
@@ -3175,7 +3368,7 @@ const InvoiceGenerator = () => {
    */
   const downloadPaymentQR = () => {
     if (!qrCodeDialog.qrDataUrl) return;
-    
+
     const filename = `payment-qr_${invoiceData.series || 'FAC'}_${invoiceData.number || '001'}.png`;
     paymentService.downloadQRCode(qrCodeDialog.qrDataUrl, filename);
   };
@@ -3194,12 +3387,12 @@ const InvoiceGenerator = () => {
       maxWidth="xl"
       seoSlug="invoice-generator"
     >
-        {/* Eroare ANAF */}
-        {anafError && (
+      {/* Eroare ANAF */}
+      {anafError && (
         <Alert severity="error" onClose={() => setAnafError('')} sx={{ mb: 3 }}>
-            {anafError}
-          </Alert>
-        )}
+          {anafError}
+        </Alert>
+      )}
 
       {/* Sidebar Fixed Menu - Floating pe dreapta */}
       <GoogleSheetsSidebar
@@ -3272,8 +3465,8 @@ const InvoiceGenerator = () => {
                   InputLabelProps={{ shrink: true }}
                 />
                 <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
-                  <FormControl 
-                    size="small" 
+                  <FormControl
+                    size="small"
                     variant="standard"
                     sx={{ minWidth: 90 }}
                   >
@@ -3312,7 +3505,7 @@ const InvoiceGenerator = () => {
                       variant="text"
                       color="info"
                       onClick={showWorkingDaysDetails}
-                      sx={{ 
+                      sx={{
                         fontSize: '0.7rem',
                         px: 1,
                         py: 0.3,
@@ -3386,9 +3579,9 @@ const InvoiceGenerator = () => {
                       Conversie → RON
                     </Button>
                   )}
-                  <IconButton 
-                    size="small" 
-                    color="info" 
+                  <IconButton
+                    size="small"
+                    color="info"
                     onClick={refreshBNRRates}
                     disabled={bnrLoading}
                     title="Reîmprospătează cursurile BNR"
@@ -3455,42 +3648,42 @@ const InvoiceGenerator = () => {
             </Typography>
 
             {lines.map((line, index) => (
-              <Box 
-                key={line.id} 
-                sx={{ 
-                  mb: 2, 
-                  p: 2, 
-                  bgcolor: 'grey.50', 
+              <Box
+                key={line.id}
+                sx={{
+                  mb: 2,
+                  p: 2,
+                  bgcolor: 'grey.50',
                   borderRadius: 1
                 }}
               >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <DragIndicatorIcon 
-                      sx={{ cursor: 'grab', color: 'text.secondary' }} 
+                    <DragIndicatorIcon
+                      sx={{ cursor: 'grab', color: 'text.secondary' }}
                       fontSize="small"
                     />
-                  <Typography variant="subtitle2" fontWeight="600">
-                    Linia {index + 1}
-                  </Typography>
+                    <Typography variant="subtitle2" fontWeight="600">
+                      Linia {index + 1}
+                    </Typography>
                   </Stack>
-                  
+
                   <Stack direction="row" spacing={0.5}>
                     {/* Buton Duplicate */}
                     <Tooltip title="Duplică linia">
-                      <IconButton 
-                        size="small" 
-                        color="info" 
+                      <IconButton
+                        size="small"
+                        color="info"
                         onClick={() => duplicateLine(line.id)}
                       >
                         <ContentCopyIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    
+
                     {/* Buton Discount/Reducere */}
                     <Tooltip title={visibleDiscounts.has(line.id) ? "Ascunde reduceri" : "Afișează reduceri"}>
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
                         color={visibleDiscounts.has(line.id) ? "warning" : "default"}
                         onClick={() => toggleDiscountVisibility(line.id)}
                         sx={{
@@ -3503,50 +3696,50 @@ const InvoiceGenerator = () => {
                         <LocalOfferIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    
+
                     {/* Buton Move Up */}
                     {index > 0 && (
                       <Tooltip title="Mută sus">
-                        <IconButton 
-                          size="small" 
-                          color="primary" 
+                        <IconButton
+                          size="small"
+                          color="primary"
                           onClick={() => moveLineUp(line.id)}
                         >
                           <ArrowUpwardIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     )}
-                    
+
                     {/* Buton Move Down */}
                     {index < lines.length - 1 && (
                       <Tooltip title="Mută jos">
-                        <IconButton 
-                          size="small" 
-                          color="primary" 
+                        <IconButton
+                          size="small"
+                          color="primary"
                           onClick={() => moveLineDown(line.id)}
                         >
                           <ArrowDownwardIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     )}
-                    
+
                     {/* Buton Delete */}
-                  {lines.length > 1 && (
+                    {lines.length > 1 && (
                       <Tooltip title="Șterge linia">
-                        <IconButton 
-                          size="small" 
-                          color="error" 
+                        <IconButton
+                          size="small"
+                          color="error"
                           onClick={() => deleteLine(line.id)}
                         >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
                       </Tooltip>
-                  )}
+                    )}
                   </Stack>
                 </Box>
 
                 <Grid container spacing={1}>
-                  <Grid size={{ xs: 12, md: 3.5 }}>
+                  <Grid size={{ xs: 12, md: 4.5  }}>
                     <TextField
                       fullWidth
                       size="small"
@@ -3555,7 +3748,7 @@ const InvoiceGenerator = () => {
                       onChange={(e) => updateLine(line.id, 'product', e.target.value)}
                     />
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 4, md: 1.5 }}>
+                  <Grid size={{ xs: 12, sm: 4, md: 1.2 }}>
                     <TextField
                       fullWidth
                       size="small"
@@ -3566,7 +3759,7 @@ const InvoiceGenerator = () => {
                       InputProps={{ inputProps: { min: 0.01, step: 0.01 } }}
                     />
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 6, md: 1.5 }}>
+                  <Grid size={{ xs: 12, sm: 6, md: 1.3 }}>
                     <TextField
                       fullWidth
                       size="small"
@@ -3575,18 +3768,16 @@ const InvoiceGenerator = () => {
                       value={line.purchasePrice}
                       onChange={(e) => updateLine(line.id, 'purchasePrice', e.target.value)}
                       InputProps={{
-                        endAdornment: <InputAdornment position="end">{invoiceData.currency}</InputAdornment>,
                         inputProps: { min: 0, step: 0.01 }
                       }}
-                      helperText="Opțional - preț achiziție"
-                      sx={{ 
-                        '& .MuiOutlinedInput-root': { 
-                          bgcolor: 'info.50' 
-                        } 
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          bgcolor: 'info.50'
+                        }
                       }}
                     />
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 6, md: 0.9 }}>
+                  <Grid size={{ xs: 12, sm: 6, md: 1 }}>
                     <TextField
                       fullWidth
                       size="small"
@@ -3598,15 +3789,14 @@ const InvoiceGenerator = () => {
                         endAdornment: <InputAdornment position="end">%</InputAdornment>,
                         inputProps: { min: 0, max: 1000, step: 0.01 }
                       }}
-                      helperText="Opțional"
-                      sx={{ 
-                        '& .MuiOutlinedInput-root': { 
-                          bgcolor: 'info.50' 
-                        } 
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          bgcolor: 'info.50'
+                        }
                       }}
                     />
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 4, md: 1.5 }}>
+                  <Grid size={{ xs: 12, sm: 4, md: 1.3 }}>
                     <TextField
                       fullWidth
                       size="small"
@@ -3615,7 +3805,6 @@ const InvoiceGenerator = () => {
                       value={line.unitNetPrice}
                       onChange={(e) => updateLine(line.id, 'unitNetPrice', e.target.value)}
                       InputProps={{
-                        endAdornment: <InputAdornment position="end">{invoiceData.currency}</InputAdornment>,
                         inputProps: { min: 0, step: 0.01 }
                       }}
                       helperText={
@@ -3625,7 +3814,7 @@ const InvoiceGenerator = () => {
                       }
                     />
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 4, md: 0.9 }}>
+                  <Grid size={{ xs: 12, sm: 4, md: 0.8 }}>
                     <TextField
                       fullWidth
                       size="small"
@@ -3660,7 +3849,7 @@ const InvoiceGenerator = () => {
                       ))}
                     </Stack>
                   </Grid>
-                  <Grid size={{ xs: 12, md: 2.1 }}>
+                  <Grid size={{ xs: 12, md: 1.8 }}>
                     <TextField
                       fullWidth
                       size="small"
@@ -3671,50 +3860,43 @@ const InvoiceGenerator = () => {
                         const totalGross = parseFloat(e.target.value) || 0;
                         const quantity = parseFloat(line.quantity) || 1;
                         const vatRate = parseFloat(line.vatRate) || 0;
-                        
+
                         // Calculează preț brut unitar din total
                         const unitGrossPrice = totalGross / quantity;
                         // Calculează preț net unitar
                         const unitNetPrice = unitGrossPrice / (1 + vatRate / 100);
-                        
+
                         const newLines = lines.map(l => {
                           if (l.id === line.id) {
-                            const updatedLine = {
+                            return {
                               ...l,
                               unitNetPrice: formatNumber(unitNetPrice),
                               unitGrossPrice: formatNumber(unitGrossPrice)
                             };
-                            
-                            // Dacă există preț de intrare, recalculează adaosul
-                            const purchasePrice = parseFloat(l.purchasePrice) || 0;
-                            if (purchasePrice > 0) {
-                              const newMarkup = ((unitNetPrice / purchasePrice) - 1) * 100;
-                              updatedLine.markup = formatNumber(Math.max(0, newMarkup));
-                            }
-                            
-                            return updatedLine;
                           }
                           return l;
                         });
                         setLines(newLines);
                       }}
                       InputProps={{
-                        endAdornment: <InputAdornment position="end">{invoiceData.currency}</InputAdornment>
+                        inputProps: { min: 0, step: 0.01 }
                       }}
-                      sx={{ 
-                        '& .MuiInputBase-input': { 
+                      sx={{
+                        '& .MuiInputBase-input': {
                           fontWeight: 700,
                           color: 'success.dark'
-                        } 
+                        }
                       }}
                       helperText={`${calculateLineTotal(line, 'net')} + ${calculateLineTotal(line, 'vat')} TVA`}
                     />
                   </Grid>
-                  
+
                   {/* Reducere pe linie - afișate doar dacă butonul de discount este activat */}
                   {visibleDiscounts.has(line.id) && (
                     <>
-                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      {/* Afișare reducere calculată (read-only) */}
+
+                      <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                         <TextField
                           fullWidth
                           size="small"
@@ -3727,14 +3909,21 @@ const InvoiceGenerator = () => {
                             inputProps: { min: 0, max: 100, step: 0.01 }
                           }}
                           helperText="Reducere procentuală pe linie"
-                          sx={{ 
-                            '& .MuiOutlinedInput-root': { 
-                              bgcolor: 'warning.50' 
-                            } 
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              bgcolor: 'warning.50',
+                              fontSize: '0.8rem' // sau '14px'
+                            },
+                            '& .MuiInputLabel-root': {
+                              fontSize: '0.8rem' // fontul pentru label
+                            },
+                            '& .MuiFormHelperText-root': {
+                              fontSize: '0.75rem' // fontul pentru helperText
+                            }
                           }}
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                         <TextField
                           fullWidth
                           size="small"
@@ -3743,15 +3932,61 @@ const InvoiceGenerator = () => {
                           value={line.discountAmount}
                           onChange={(e) => updateLine(line.id, 'discountAmount', e.target.value)}
                           InputProps={{
-                            endAdornment: <InputAdornment position="end">{invoiceData.currency}</InputAdornment>,
                             inputProps: { min: 0, step: 0.01 }
                           }}
                           helperText="Reducere sumă fixă pe linie"
-                          sx={{ 
-                            '& .MuiOutlinedInput-root': { 
-                              bgcolor: 'warning.50' 
-                            } 
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              bgcolor: 'warning.50',
+                              fontSize: '0.8rem' // sau '14px'
+                            },
+                            '& .MuiInputLabel-root': {
+                              fontSize: '0.8rem' // fontul pentru label
+                            },
+                            '& .MuiFormHelperText-root': {
+                              fontSize: '0.75rem' // fontul pentru helperText
+                            }
                           }}
+
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 2 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Reducere calculată"
+                          value={(() => {
+                            const discountPercent = parseFloat(line.discountPercent) || 0;
+                            const discountAmount = parseFloat(line.discountAmount) || 0;
+                            const hasDiscount = discountPercent > 0 || discountAmount > 0;
+                            if (!hasDiscount) return '-';
+                            const discount = parseFloat(calculateLineDiscount(line));
+                            return `-${discount.toFixed(2)}`;
+                          })()}
+                          InputProps={{
+                            readOnly: true
+                          }}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              bgcolor: 'warning.50',
+                              fontSize: '0.8rem' // sau '14px'
+                            },
+                            '& .MuiInputLabel-root': {
+                              fontSize: '0.8rem' // fontul pentru label
+                            },
+                            '& .MuiFormHelperText-root': {
+                              fontSize: '0.75rem' // fontul pentru helperText
+                            }
+                          }}
+
+                          helperText={(() => {
+                            const discountPercent = parseFloat(line.discountPercent) || 0;
+                            const discountAmount = parseFloat(line.discountAmount) || 0;
+                            if (discountPercent > 0 && discountAmount > 0) return `${discountPercent}% + ${discountAmount}`;
+                            if (discountPercent > 0) return `${discountPercent}%`;
+                            if (discountAmount > 0) return `${discountAmount}`;
+                            return 'Total reducere pe linie';
+                          })()}
                         />
                       </Grid>
                     </>
@@ -3798,8 +4033,8 @@ const InvoiceGenerator = () => {
         </Card>
 
         {/* Dialog Import Excel */}
-        <Dialog 
-          open={importDialogOpen} 
+        <Dialog
+          open={importDialogOpen}
           onClose={() => setImportDialogOpen(false)}
           maxWidth="md"
           fullWidth
@@ -3928,8 +4163,8 @@ const InvoiceGenerator = () => {
             <Button onClick={() => setImportDialogOpen(false)}>
               Anulează
             </Button>
-            <Button 
-              onClick={importExcelLines} 
+            <Button
+              onClick={importExcelLines}
               variant="contained"
               disabled={!columnMapping.product}
             >
@@ -3985,7 +4220,6 @@ const InvoiceGenerator = () => {
                     value={totalDiscount.amount}
                     onChange={(e) => setTotalDiscount({ ...totalDiscount, amount: e.target.value })}
                     InputProps={{
-                      endAdornment: <InputAdornment position="end">{invoiceData.currency}</InputAdornment>,
                       inputProps: { min: 0, step: 0.01 }
                     }}
                   />
@@ -4046,7 +4280,7 @@ const InvoiceGenerator = () => {
             <Typography variant="h6" gutterBottom>
               Note și Atașamente
             </Typography>
-            
+
             <Stack spacing={2}>
               {/* Câmp Note */}
               <TextField
@@ -4087,12 +4321,12 @@ const InvoiceGenerator = () => {
                     const totalBase64Size = attachedFiles.reduce((sum, file) => sum + (file.base64Size || file.base64?.length || 0), 0);
                     const estimatedXmlSize = totalBase64Size * 1.1; // +10% pentru structura XML
                     const totalOriginalSize = attachedFiles.reduce((sum, file) => sum + file.size, 0);
-                    
+
                     const originalMB = (totalOriginalSize / 1024 / 1024).toFixed(2);
                     const xmlMB = (estimatedXmlSize / 1024 / 1024).toFixed(2);
                     const percentage = (estimatedXmlSize / (5 * 1024 * 1024) * 100).toFixed(0);
                     const color = percentage > 80 ? '#d32f2f' : percentage > 60 ? '#ed6c02' : '#2e7d32';
-                    
+
                     return (
                       <span style={{ color: color, fontWeight: 'bold' }}>
                         <br />
@@ -4140,15 +4374,15 @@ const InvoiceGenerator = () => {
           <Typography variant="h6" gutterBottom textAlign="center" color="primary">
             Export & Descărcare
           </Typography>
-          
+
           {/* Butoane principale de export - pătrate pe un rând */}
           <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap" sx={{ mb: 3 }}>
             <Box sx={{ textAlign: 'center' }}>
               <Stack spacing={1}>
-              <Button
-                variant="contained"
-                color="error"
-                onClick={exportToPDF}
+                <Button
+                  variant="contained"
+                  color="error"
+                  onClick={exportToPDF}
                   sx={{
                     minWidth: 100,
                     minHeight: 100,
@@ -4161,9 +4395,9 @@ const InvoiceGenerator = () => {
                 >
                   <PictureAsPdfIcon sx={{ fontSize: 40, mb: 0.5 }} />
                   <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
-                Descarcă PDF
+                    Descarcă PDF
                   </Typography>
-              </Button>
+                </Button>
                 <Button
                   size="small"
                   variant="outlined"
@@ -4195,7 +4429,7 @@ const InvoiceGenerator = () => {
                 >
                   <DescriptionIcon sx={{ fontSize: 40, mb: 0.5 }} />
                   <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
-                  Descarcă Excel
+                    Descarcă Excel
                   </Typography>
                 </Button>
                 <Button
@@ -4212,10 +4446,10 @@ const InvoiceGenerator = () => {
             </Box>
 
             <Box sx={{ textAlign: 'center' }}>
-                <Button
-                  variant="contained"
-                  color="info"
-                  onClick={exportToXML}
+              <Button
+                variant="contained"
+                color="info"
+                onClick={exportToXML}
                 sx={{
                   minWidth: 100,
                   minHeight: 100,
@@ -4230,14 +4464,14 @@ const InvoiceGenerator = () => {
                 <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
                   Descarcă XML
                 </Typography>
-                </Button>
+              </Button>
             </Box>
 
             <Box sx={{ textAlign: 'center' }}>
-                <Button
-                  variant="outlined"
-                  color="warning"
-                  onClick={validateOnANAF}
+              <Button
+                variant="outlined"
+                color="warning"
+                onClick={validateOnANAF}
                 sx={{
                   minWidth: 100,
                   minHeight: 100,
@@ -4253,24 +4487,24 @@ const InvoiceGenerator = () => {
                 <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
                   Validează ANAF
                 </Typography>
-                </Button>
+              </Button>
             </Box>
           </Stack>
-                
+
           <Divider sx={{ my: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary">
               Acțiuni rapide
-                  </Typography>
-                </Divider>
-                
+            </Typography>
+          </Divider>
+
           {/* Butoane secundare - Google Drive + QR */}
           <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap">
             <Box sx={{ textAlign: 'center' }}>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  onClick={() => saveToGoogleDrive('pdf')}
-                  disabled={isUploadingToDrive}
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={() => saveToGoogleDrive('pdf')}
+                disabled={isUploadingToDrive}
                 sx={{
                   minWidth: 90,
                   minHeight: 90,
@@ -4285,15 +4519,15 @@ const InvoiceGenerator = () => {
                 <Typography variant="caption" sx={{ fontSize: '0.65rem', lineHeight: 1.2 }}>
                   PDF Drive
                 </Typography>
-                </Button>
+              </Button>
             </Box>
 
             <Box sx={{ textAlign: 'center' }}>
-                <Button
-                  variant="outlined"
-                  color="success"
-                  onClick={() => saveToGoogleDrive('excel')}
-                  disabled={isUploadingToDrive}
+              <Button
+                variant="outlined"
+                color="success"
+                onClick={() => saveToGoogleDrive('excel')}
+                disabled={isUploadingToDrive}
                 sx={{
                   minWidth: 90,
                   minHeight: 90,
@@ -4308,7 +4542,7 @@ const InvoiceGenerator = () => {
                 <Typography variant="caption" sx={{ fontSize: '0.65rem', lineHeight: 1.2 }}>
                   Excel Drive
                 </Typography>
-                </Button>
+              </Button>
             </Box>
 
             <Box sx={{ textAlign: 'center' }}>
@@ -4431,7 +4665,7 @@ const InvoiceGenerator = () => {
                 <strong>⚠️ Această opțiune este pentru spreadsheet-uri create manual</strong>
                 <br />
                 <br />
-                Dacă vrei să creezi un spreadsheet NOU automat cu toate sheet-urile necesare, 
+                Dacă vrei să creezi un spreadsheet NOU automat cu toate sheet-urile necesare,
                 închide acest dialog și apasă butonul <strong>"+ CREAZĂ"</strong>.
               </Alert>
 
@@ -4622,9 +4856,9 @@ const InvoiceGenerator = () => {
                 <CircularProgress />
               </Box>
             ) : previewDialog.type === 'pdf' && previewDialog.content ? (
-              <Box 
+              <Box
                 dangerouslySetInnerHTML={{ __html: previewDialog.content }}
-                sx={{ 
+                sx={{
                   bgcolor: 'background.paper',
                   borderRadius: 1,
                   border: '1px solid',
@@ -4753,7 +4987,7 @@ const InvoiceGenerator = () => {
                 </TableBody>
               </Table>
             </TableContainer>
-            
+
             <Alert severity="info" sx={{ mt: 2 }}>
               <Typography variant="body2">
                 💡 <strong>Sfat:</strong> Pe Mac, folosește <strong>Cmd</strong> în loc de <strong>Ctrl</strong>
@@ -4774,9 +5008,9 @@ const InvoiceGenerator = () => {
           onClose={() => setAutosaveSnackbar(false)}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
         >
-          <Alert 
-            onClose={() => setAutosaveSnackbar(false)} 
-            severity="success" 
+          <Alert
+            onClose={() => setAutosaveSnackbar(false)}
+            severity="success"
             variant="filled"
             sx={{ width: '100%' }}
           >

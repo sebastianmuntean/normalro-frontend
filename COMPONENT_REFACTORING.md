@@ -363,3 +363,4 @@ Refactorizarea oferă:
 - 🔄 PropTypes sau TypeScript pentru type safety
 - 🔄 Unit tests pentru fiecare componentă
 
+

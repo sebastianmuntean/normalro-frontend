@@ -220,3 +220,4 @@ Pentru tool-uri care folosesc `ToolLayout`, nu e nevoie să faci nimic - hook-ul
 **Data implementării:** 26 octombrie 2025  
 **Status:** ✅ COMPLET ȘI GATA DE DEPLOYMENT
 
+

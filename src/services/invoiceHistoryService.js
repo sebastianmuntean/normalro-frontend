@@ -16,7 +16,7 @@ class InvoiceHistoryService {
   }
 
   // Salvează o factură în istoric
-  saveInvoice(invoiceData, lines, totals, notes = '', attachedFiles = []) {
+  saveInvoice(invoiceData, lines, totals, notes = '', attachedFiles = [], totalDiscount = null) {
     try {
       const invoice = {
         guid: invoiceData.guid || '', // Păstrează GUID-ul dacă există
@@ -39,7 +39,8 @@ class InvoiceHistoryService {
           email: invoiceData.supplierEmail || '',
           bank: invoiceData.supplierBank || '',
           iban: invoiceData.supplierIBAN || '',
-          vatPrefix: invoiceData.supplierVatPrefix || 'RO'
+          vatPrefix: invoiceData.supplierVatPrefix || 'RO',
+          bankAccounts: invoiceData.supplierBankAccounts || [{ bank: '', iban: '', currency: 'RON' }]
         },
         client: {
           name: invoiceData.clientName || '',
@@ -51,15 +52,25 @@ class InvoiceHistoryService {
           country: invoiceData.clientCountry || 'Romania',
           phone: invoiceData.clientPhone || '',
           email: invoiceData.clientEmail || '',
-          vatPrefix: invoiceData.clientVatPrefix || 'RO'
+          vatPrefix: invoiceData.clientVatPrefix || 'RO',
+          bankAccounts: invoiceData.clientBankAccounts || [{ bank: '', iban: '', currency: 'RON' }]
         },
         lines: lines.map(line => ({
           product: line.product || '',
           quantity: line.quantity || '1',
+          purchasePrice: line.purchasePrice || '0.00',
+          markup: line.markup || '0.00',
           unitNetPrice: line.unitNetPrice || '0',
           vatRate: line.vatRate || '0',
-          unitGrossPrice: line.unitGrossPrice || '0'
+          unitGrossPrice: line.unitGrossPrice || '0',
+          discountPercent: line.discountPercent || '0.00',
+          discountAmount: line.discountAmount || '0.00'
         })),
+        totalDiscount: totalDiscount && totalDiscount.type !== 'none' ? {
+          type: totalDiscount.type || 'none',
+          percent: totalDiscount.percent || '0.00',
+          amount: totalDiscount.amount || '0.00'
+        } : null,
         totals: {
           net: totals.net || '0.00',
           vat: totals.vat || '0.00',

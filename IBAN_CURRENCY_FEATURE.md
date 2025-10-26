@@ -323,3 +323,4 @@ console.log(invoiceData.supplierBankAccounts[0]);
 
 **Funcționalitatea de valută pentru IBAN-uri este gata! 🎉💳**
 
+
