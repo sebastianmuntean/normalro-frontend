@@ -51,6 +51,8 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
   const [newProduct, setNewProduct] = useState({
     name: '',
     category: 'General',
+    purchasePrice: '',
+    markup: '',
     unitNetPrice: '',
     vatRate: DEFAULT_VAT_RATE,
     description: '',
@@ -97,6 +99,8 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
 
     templateService.saveProductTemplate({
       ...newProduct,
+      purchasePrice: newProduct.purchasePrice || '0.00',
+      markup: newProduct.markup || '0.00',
       unitGrossPrice: grossPrice.toFixed(2)
     });
 
@@ -104,6 +108,8 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
     setNewProduct({
       name: '',
       category: 'General',
+      purchasePrice: '',
+      markup: '',
       unitNetPrice: '',
       vatRate: DEFAULT_VAT_RATE,
       description: '',
@@ -121,6 +127,8 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
       onSelectProduct({
         product: template.name,
         quantity: template.defaultQuantity || '1',
+        purchasePrice: template.purchasePrice || '0.00',
+        markup: template.markup || '0.00',
         unitNetPrice: template.unitNetPrice,
         vatRate: template.vatRate,
         unitGrossPrice: template.unitGrossPrice
@@ -217,7 +225,7 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
               <TextField
                 fullWidth
                 size="small"
-                label="Căutare produse"
+                label="Căutare"
                 placeholder="Nume, descriere..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -298,10 +306,73 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
                   <TextField
                     fullWidth
                     size="small"
+                    label="Preț intrare"
+                    type="number"
+                    value={newProduct.purchasePrice}
+                    onChange={(e) => {
+                      const purchasePrice = e.target.value;
+                      const markup = parseFloat(newProduct.markup) || 0;
+                      let unitNetPrice = newProduct.unitNetPrice;
+                      
+                      // Calculează automat prețul net dacă există preț intrare și adaos
+                      if (parseFloat(purchasePrice) > 0 && markup >= 0) {
+                        unitNetPrice = (parseFloat(purchasePrice) * (1 + markup / 100)).toFixed(2);
+                      }
+                      
+                      setNewProduct({ 
+                        ...newProduct, 
+                        purchasePrice,
+                        unitNetPrice 
+                      });
+                    }}
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start">💰</InputAdornment>
+                    }}
+                    helperText="Cost achiziție"
+                  />
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Adaos %"
+                    type="number"
+                    value={newProduct.markup}
+                    onChange={(e) => {
+                      const markup = e.target.value;
+                      const purchasePrice = parseFloat(newProduct.purchasePrice) || 0;
+                      let unitNetPrice = newProduct.unitNetPrice;
+                      
+                      // Calculează automat prețul net dacă există preț intrare și adaos
+                      if (purchasePrice > 0 && parseFloat(markup) >= 0) {
+                        unitNetPrice = (purchasePrice * (1 + parseFloat(markup) / 100)).toFixed(2);
+                      }
+                      
+                      setNewProduct({ 
+                        ...newProduct, 
+                        markup,
+                        unitNetPrice 
+                      });
+                    }}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">%</InputAdornment>
+                    }}
+                    helperText="Marjă profit"
+                  />
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <TextField
+                    fullWidth
+                    size="small"
                     label="Preț net"
                     type="number"
                     value={newProduct.unitNetPrice}
                     onChange={(e) => setNewProduct({ ...newProduct, unitNetPrice: e.target.value })}
+                    helperText={
+                      parseFloat(newProduct.purchasePrice) > 0 && parseFloat(newProduct.markup) > 0
+                        ? `Auto: ${newProduct.purchasePrice} + ${newProduct.markup}%`
+                        : 'Preț vânzare'
+                    }
                   />
                 </Grid>
                 <Grid item xs={6} sm={3}>
@@ -369,6 +440,8 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
                     <TableCell width="30"></TableCell>
                     <TableCell><strong>Produs/Serviciu</strong></TableCell>
                     <TableCell><strong>Categorie</strong></TableCell>
+                    <TableCell align="right"><strong>Preț Intrare</strong></TableCell>
+                    <TableCell align="right"><strong>Adaos%</strong></TableCell>
                     <TableCell align="right"><strong>Preț Net</strong></TableCell>
                     <TableCell align="right"><strong>TVA%</strong></TableCell>
                     <TableCell align="right"><strong>Preț Brut</strong></TableCell>
@@ -418,6 +491,27 @@ const ProductTemplateDialog = ({ open, onClose, onSelectProduct }) => {
                       </TableCell>
                       <TableCell>
                         <Chip label={template.category} size="small" color="primary" variant="outlined" />
+                      </TableCell>
+                      <TableCell align="right">
+                        {template.purchasePrice && parseFloat(template.purchasePrice) > 0 ? (
+                          <Typography variant="body2" color="text.secondary">
+                            {template.purchasePrice}
+                          </Typography>
+                        ) : (
+                          <Typography variant="caption" color="text.disabled">-</Typography>
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        {template.markup && parseFloat(template.markup) > 0 ? (
+                          <Chip 
+                            label={`${template.markup}%`} 
+                            size="small" 
+                            color="info" 
+                            variant="outlined"
+                          />
+                        ) : (
+                          <Typography variant="caption" color="text.disabled">-</Typography>
+                        )}
                       </TableCell>
                       <TableCell align="right">{template.unitNetPrice}</TableCell>
                       <TableCell align="right">{template.vatRate}%</TableCell>

@@ -69,6 +69,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import SaveIcon from '@mui/icons-material/Save';
 import PrintIcon from '@mui/icons-material/Print';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
+import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import ToolLayout from '../../components/ToolLayout';
 import InvoiceHistoryDialog from '../../components/InvoiceHistoryDialog';
 import ProductTemplateDialog from '../../components/ProductTemplateDialog';
@@ -220,11 +221,25 @@ const InvoiceGenerator = () => {
       id: 1,
       product: '',
       quantity: '1',
+      purchasePrice: '0.00', // Preț de intrare/achiziție
+      markup: '0.00', // Adaos comercial (%)
       unitNetPrice: '0.00',
       vatRate: DEFAULT_VAT_RATE,
-      unitGrossPrice: '0.00'
+      unitGrossPrice: '0.00',
+      discountPercent: '0.00', // Reducere pe linie (%)
+      discountAmount: '0.00' // Reducere pe linie (sumă fixă)
     }
   ]);
+
+  // State pentru vizibilitatea câmpurilor de discount pe fiecare linie
+  const [visibleDiscounts, setVisibleDiscounts] = useState(new Set());
+
+  // State pentru reduceri/discount pe total
+  const [totalDiscount, setTotalDiscount] = useState({
+    type: 'none', // 'none', 'percent', 'amount'
+    percent: '0.00',
+    amount: '0.00'
+  });
 
   // Constantă pentru criptare/decriptare și numele cookie-ului
   const ENCRYPTION_KEY = 'normalro-invoice-supplier-data-2024';
@@ -730,9 +745,13 @@ const InvoiceGenerator = () => {
           id: Date.now() + index,
           product: String(product || ''),
           quantity: String(parseFloat(quantity) || 1),
+          purchasePrice: '0.00',
+          markup: '0.00',
           unitNetPrice: formatNumber(netPrice),
           vatRate: String(parseFloat(vatRate) || parseFloat(DEFAULT_VAT_RATE)), // Fallback la .env
-          unitGrossPrice: formatNumber(grossPrice)
+          unitGrossPrice: formatNumber(grossPrice),
+          discountPercent: '0.00',
+          discountAmount: '0.00'
         };
       })
       .filter(line => line !== null);
@@ -827,15 +846,31 @@ const InvoiceGenerator = () => {
     }
   };
 
+  const toggleDiscountVisibility = (lineId) => {
+    setVisibleDiscounts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(lineId)) {
+        newSet.delete(lineId);
+      } else {
+        newSet.add(lineId);
+      }
+      return newSet;
+    });
+  };
+
   const addLine = () => {
     const newId = Math.max(...lines.map(l => l.id)) + 1;
     setLines([...lines, {
       id: newId,
       product: '',
       quantity: '1',
+      purchasePrice: '0.00',
+      markup: '0.00',
       unitNetPrice: '0.00',
       vatRate: DEFAULT_VAT_RATE,
-      unitGrossPrice: '0.00'
+      unitGrossPrice: '0.00',
+      discountPercent: '0.00',
+      discountAmount: '0.00'
     }]);
   };
 
@@ -851,12 +886,32 @@ const InvoiceGenerator = () => {
 
       const updated = { ...line, [field]: value };
 
-      if (field === 'unitNetPrice' || field === 'vatRate') {
+      // Calculează automat prețul net din preț intrare + adaos
+      if (field === 'purchasePrice' || field === 'markup') {
+        const purchasePrice = parseFloat(updated.purchasePrice) || 0;
+        const markup = parseFloat(updated.markup) || 0;
+        
+        if (purchasePrice > 0) {
+          // Preț Net = Preț Intrare * (1 + Adaos%)
+          const calculatedNetPrice = purchasePrice * (1 + markup / 100);
+          updated.unitNetPrice = formatNumber(calculatedNetPrice);
+        }
+      }
+
+      if (field === 'unitNetPrice' || field === 'vatRate' || field === 'discountPercent' || field === 'discountAmount' || 
+          field === 'purchasePrice' || field === 'markup') {
         const net = parseFloat(updated.unitNetPrice);
         const vat = parseFloat(updated.vatRate);
+        const discountPercent = parseFloat(updated.discountPercent) || 0;
+        const discountAmount = parseFloat(updated.discountAmount) || 0;
+        
         if (!isNaN(net) && !isNaN(vat)) {
-          const vatAmount = Math.round(net * vat * 10000) / 1000000;
-          const gross = net + vatAmount;
+          // Aplică reducerile pe linie
+          const discountedNet = net * (1 - discountPercent / 100) - (discountAmount / parseFloat(updated.quantity) || 1);
+          const finalNet = Math.max(0, discountedNet);
+          
+          const vatAmount = Math.round(finalNet * vat * 10000) / 1000000;
+          const gross = finalNet + vatAmount;
           updated.unitGrossPrice = formatNumber(gross);
         }
       } else if (field === 'unitGrossPrice') {
@@ -880,6 +935,14 @@ const InvoiceGenerator = () => {
           // Recalculează preț net unitar
           const unitNet = Math.round((unitGross / (1 + vat / 100)) * 10000) / 10000;
           updated.unitNetPrice = formatNumber(unitNet);
+          
+          // Dacă există preț de intrare, recalculează adaosul
+          const purchasePrice = parseFloat(updated.purchasePrice) || 0;
+          if (purchasePrice > 0) {
+            // Calculează noul adaos: Adaos% = ((Preț Net / Preț Intrare) - 1) × 100
+            const newMarkup = ((unitNet / purchasePrice) - 1) * 100;
+            updated.markup = formatNumber(Math.max(0, newMarkup)); // Nu permite adaos negativ
+          }
         }
       }
 
@@ -919,9 +982,13 @@ const InvoiceGenerator = () => {
       id: Date.now(),
       product: product.product || '',
       quantity: product.quantity || '1',
+      purchasePrice: product.purchasePrice || '0.00',
+      markup: product.markup || '0.00',
       unitNetPrice: product.unitNetPrice || '0.00',
       vatRate: product.vatRate || DEFAULT_VAT_RATE,
-      unitGrossPrice: product.unitGrossPrice || '0.00'
+      unitGrossPrice: product.unitGrossPrice || '0.00',
+      discountPercent: '0.00',
+      discountAmount: '0.00'
     };
     
     setLines([...lines, newLine]);
@@ -1665,8 +1732,8 @@ const InvoiceGenerator = () => {
     
     try {
       if (type === 'pdf') {
-        // Generează preview HTML al PDF-ului
-        const previewHTML = generateInvoiceHTML();
+        // Generează preview HTML al PDF-ului (cu QR Code)
+        const previewHTML = await generateInvoiceHTML();
         setPreviewDialog({ open: true, type: 'pdf', content: previewHTML });
       } else if (type === 'excel') {
         // Generează preview table pentru Excel
@@ -1683,74 +1750,157 @@ const InvoiceGenerator = () => {
   /**
    * Generează HTML pentru preview PDF
    */
-  const generateInvoiceHTML = () => {
+  const generateInvoiceHTML = async () => {
     const totals = calculateTotals();
     
+    // Generează QR Code dacă există IBAN
+    let qrCodeImg = '';
+    if (invoiceData.supplierBankAccounts[0]?.iban && invoiceData.supplierName) {
+      try {
+        const qrDataUrl = await paymentService.generatePaymentQR({
+          iban: invoiceData.supplierBankAccounts[0].iban,
+          amount: parseFloat(totals.gross),
+          currency: invoiceData.currency,
+          beneficiary: invoiceData.supplierName,
+          reference: `Factura ${invoiceData.series || ''}${invoiceData.number || ''}`,
+          bic: ''
+        });
+        qrCodeImg = `<img src="${qrDataUrl}" style="width: 150px; height: 150px; display: block; margin: 0 auto;" />`;
+      } catch (error) {
+        console.warn('Nu s-a putut genera QR Code pentru preview:', error);
+      }
+    }
+    
     return `
-      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
-        <h1 style="text-align: center; color: #1976d2;">FACTURĂ</h1>
-        <div style="text-align: center; margin-bottom: 20px;">
+      <div style="font-family: Arial, sans-serif; font-size: 11px; padding: 20px; max-width: 800px; margin: 0 auto;">
+        <h1 style="text-align: center; font-size: 24px; margin: 0 0 15px 0; color: #1976d2;">FACTURĂ</h1>
+        <div style="text-align: center; margin-bottom: 25px; font-size: 11px;">
           <div>Seria: ${invoiceData.series || '-'} Nr: ${invoiceData.number || '-'}</div>
           <div>Data: ${invoiceData.issueDate || '-'}</div>
           ${invoiceData.dueDate ? `<div>Scadență: ${invoiceData.dueDate}</div>` : ''}
         </div>
         
-        <table style="width: 100%; margin-bottom: 20px;">
+        <table style="width: 100%; margin-bottom: 25px; border-collapse: collapse;">
           <tr>
-            <td style="width: 50%; vertical-align: top; padding-right: 10px;">
-              <strong>FURNIZOR:</strong><br/>
-              ${invoiceData.supplierName || '-'}<br/>
-              CUI: ${invoiceData.supplierCUI || '-'}<br/>
-              ${invoiceData.supplierAddress || '-'}<br/>
-              ${invoiceData.supplierCity || '-'}
+            <td style="width: 50%; vertical-align: top; padding-right: 15px;">
+              <strong style="font-size: 12px;">FURNIZOR:</strong><br/>
+              <div style="margin-top: 5px; line-height: 1.6;">
+                ${invoiceData.supplierName || '-'}<br/>
+                CUI: ${invoiceData.supplierCUI || '-'}<br/>
+                ${invoiceData.supplierRegCom ? `Reg Com: ${invoiceData.supplierRegCom}<br/>` : ''}
+                ${invoiceData.supplierAddress || '-'}<br/>
+                ${invoiceData.supplierCity || '-'}
+                ${invoiceData.supplierPhone ? `<br/>Tel: ${invoiceData.supplierPhone}` : ''}
+                ${invoiceData.supplierEmail ? `<br/>Email: ${invoiceData.supplierEmail}` : ''}
+                ${invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0 ? 
+                  invoiceData.supplierBankAccounts.map((account, index) => {
+                    if (!account.iban && !account.bank) return '';
+                    const label = invoiceData.supplierBankAccounts.length > 1 ? ` ${index + 1}` : '';
+                    let html = '';
+                    if (account.iban) html += `<br/><strong>IBAN${label} (${account.currency || 'RON'}):</strong> ${account.iban}`;
+                    if (account.bank) html += `<br/>Banca${label}: ${account.bank}`;
+                    return html;
+                  }).join('')
+                : ''}
+              </div>
             </td>
-            <td style="width: 50%; vertical-align: top; padding-left: 10px;">
-              <strong>BENEFICIAR:</strong><br/>
-              ${invoiceData.clientName || '-'}<br/>
-              CUI: ${invoiceData.clientCUI || '-'}<br/>
-              ${invoiceData.clientAddress || '-'}<br/>
-              ${invoiceData.clientCity || '-'}
+            <td style="width: 50%; vertical-align: top; padding-left: 15px;">
+              <strong style="font-size: 12px;">BENEFICIAR:</strong><br/>
+              <div style="margin-top: 5px; line-height: 1.6;">
+                ${invoiceData.clientName || '-'}<br/>
+                CUI: ${invoiceData.clientCUI || '-'}<br/>
+                ${invoiceData.clientRegCom ? `Reg Com: ${invoiceData.clientRegCom}<br/>` : ''}
+                ${invoiceData.clientAddress || '-'}<br/>
+                ${invoiceData.clientCity || '-'}
+                ${invoiceData.clientPhone ? `<br/>Tel: ${invoiceData.clientPhone}` : ''}
+                ${invoiceData.clientEmail ? `<br/>Email: ${invoiceData.clientEmail}` : ''}
+                ${invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0 ? 
+                  invoiceData.clientBankAccounts.map((account, index) => {
+                    if (!account.iban && !account.bank) return '';
+                    const label = invoiceData.clientBankAccounts.length > 1 ? ` ${index + 1}` : '';
+                    let html = '';
+                    if (account.iban) html += `<br/><strong>IBAN${label} (${account.currency || 'RON'}):</strong> ${account.iban}`;
+                    if (account.bank) html += `<br/>Banca${label}: ${account.bank}`;
+                    return html;
+                  }).join('')
+                : ''}
+              </div>
             </td>
           </tr>
         </table>
         
-        <table style="width: 100%; border-collapse: collapse;">
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
           <thead>
             <tr style="background-color: #2196F3; color: white;">
-              <th style="border: 1px solid #ddd; padding: 8px;">Nr.</th>
-              <th style="border: 1px solid #ddd; padding: 8px;">Produs/Serviciu</th>
-              <th style="border: 1px solid #ddd; padding: 8px;">Cant.</th>
-              <th style="border: 1px solid #ddd; padding: 8px;">Preț Net</th>
-              <th style="border: 1px solid #ddd; padding: 8px;">TVA%</th>
-              <th style="border: 1px solid #ddd; padding: 8px;">Total Brut</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Nr.</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Produs/Serviciu</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Cant.</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Preț Net</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">TVA%</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Suma TVA</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Preț Brut</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Total Net</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Total TVA</th>
+              <th style="border: 1px solid #ddd; padding: 8px; font-size: 10px; font-weight: bold;">Total Brut</th>
             </tr>
           </thead>
           <tbody>
             ${lines.map((line, index) => `
               <tr>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${index + 1}</td>
-                <td style="border: 1px solid #ddd; padding: 6px;">${line.product || '-'}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${line.quantity}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">${line.unitNetPrice} ${invoiceData.currency}</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${line.vatRate}%</td>
-                <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">${calculateLineTotal(line, 'gross')} ${invoiceData.currency}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${index + 1}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; font-size: 9px;">${line.product || '-'}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${line.quantity}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${line.unitNetPrice} ${invoiceData.currency}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 9px;">${line.vatRate}%</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineVat(line)} ${invoiceData.currency}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${line.unitGrossPrice} ${invoiceData.currency}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'net')} ${invoiceData.currency}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'vat')} ${invoiceData.currency}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: right; font-size: 9px;">${calculateLineTotal(line, 'gross')} ${invoiceData.currency}</td>
               </tr>
             `).join('')}
           </tbody>
           <tfoot>
             <tr style="background-color: #f5f5f5; font-weight: bold;">
-              <td colspan="5" style="border: 1px solid #ddd; padding: 8px;">TOTAL</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${totals.gross} ${invoiceData.currency}</td>
+              <td colspan="7" style="border: 1px solid #ddd; padding: 8px; font-size: 11px; font-weight: bold;">TOTAL FACTURĂ</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.net} ${invoiceData.currency}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.vat} ${invoiceData.currency}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 11px; font-weight: bold;">${totals.gross} ${invoiceData.currency}</td>
             </tr>
           </tfoot>
         </table>
         
         ${invoiceData.notes ? `
-          <div style="margin-top: 20px; padding: 10px; background-color: #f5f5f5; border-left: 4px solid #2196F3;">
-            <strong>Note:</strong><br/>
-            ${invoiceData.notes}
+          <div style="margin-top: 25px; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #2196F3; border-radius: 4px;">
+            <strong style="font-size: 11px;">Note:</strong><br/>
+            <div style="margin-top: 8px; font-size: 10px; line-height: 1.6; white-space: pre-wrap;">${invoiceData.notes}</div>
           </div>
         ` : ''}
+        
+        ${qrCodeImg ? `
+          <div style="margin-top: 30px; padding: 20px; background-color: #f5f5f5; border-radius: 8px; text-align: center;">
+            <strong style="font-size: 12px; color: #1976d2;">💳 PLATĂ RAPIDĂ CU COD QR</strong><br/>
+            <div style="margin-top: 10px;">
+              ${qrCodeImg}
+            </div>
+            <div style="margin-top: 10px; font-size: 10px; color: #666;">
+              Scanează codul QR cu aplicația de banking<br/>
+              pentru a plăti factura instant!
+            </div>
+          </div>
+        ` : ''}
+        
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; font-size: 9px; color: #999;">
+          Document generat la ${new Date().toLocaleString('ro-RO', { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })} de <strong>Normal.ro - Generator Facturi</strong>
+          <br/>
+          <a href="https://normal.ro" style="color: #999; text-decoration: none;">www.normal.ro</a>
+        </div>
       </div>
     `;
   };
@@ -1855,10 +2005,29 @@ const InvoiceGenerator = () => {
       totalGross += parseFloat(calculateLineTotal(line, 'gross')) || 0;
     });
 
+    // Aplică reducerea pe total (după calcularea totalurilor pe linii)
+    let discountAmount = 0;
+    if (totalDiscount.type === 'percent') {
+      const percent = parseFloat(totalDiscount.percent) || 0;
+      discountAmount = (totalGross * percent / 100);
+    } else if (totalDiscount.type === 'amount') {
+      discountAmount = parseFloat(totalDiscount.amount) || 0;
+    }
+
+    const finalGross = Math.max(0, totalGross - discountAmount);
+    
+    // Recalculează TVA proporțional cu reducerea aplicată
+    const grossRatio = totalGross > 0 ? finalGross / totalGross : 0;
+    const finalVat = totalVat * grossRatio;
+    const finalNet = totalNet * grossRatio;
+
     return {
-      net: totalNet.toFixed(2),
-      vat: totalVat.toFixed(2),
-      gross: totalGross.toFixed(2)
+      net: finalNet.toFixed(2),
+      vat: finalVat.toFixed(2),
+      gross: finalGross.toFixed(2),
+      originalGross: totalGross.toFixed(2),
+      discountAmount: discountAmount.toFixed(2),
+      discountType: totalDiscount.type
     };
   };
 
@@ -1914,8 +2083,16 @@ const InvoiceGenerator = () => {
                 ${invoiceData.supplierCity || '-'}
                 ${invoiceData.supplierPhone ? `<br/>Tel: ${invoiceData.supplierPhone}` : ''}
                 ${invoiceData.supplierEmail ? `<br/>Email: ${invoiceData.supplierEmail}` : ''}
-                ${invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0 && invoiceData.supplierBankAccounts[0].iban ? `<br/><strong>IBAN (${invoiceData.supplierBankAccounts[0].currency || 'RON'}):</strong> ${invoiceData.supplierBankAccounts[0].iban}` : ''}
-                ${invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0 && invoiceData.supplierBankAccounts[0].bank ? `<br/>Banca: ${invoiceData.supplierBankAccounts[0].bank}` : ''}
+                ${invoiceData.supplierBankAccounts && invoiceData.supplierBankAccounts.length > 0 ? 
+                  invoiceData.supplierBankAccounts.map((account, index) => {
+                    if (!account.iban && !account.bank) return '';
+                    const label = invoiceData.supplierBankAccounts.length > 1 ? ` ${index + 1}` : '';
+                    let html = '';
+                    if (account.iban) html += `<br/><strong>IBAN${label} (${account.currency || 'RON'}):</strong> ${account.iban}`;
+                    if (account.bank) html += `<br/>Banca${label}: ${account.bank}`;
+                    return html;
+                  }).join('')
+                : ''}
               </div>
             </td>
             <td style="width: 50%; vertical-align: top; padding-left: 15px;">
@@ -1928,8 +2105,16 @@ const InvoiceGenerator = () => {
                 ${invoiceData.clientCity || '-'}
                 ${invoiceData.clientPhone ? `<br/>Tel: ${invoiceData.clientPhone}` : ''}
                 ${invoiceData.clientEmail ? `<br/>Email: ${invoiceData.clientEmail}` : ''}
-                ${invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0 && invoiceData.clientBankAccounts[0].iban ? `<br/><strong>IBAN (${invoiceData.clientBankAccounts[0].currency || 'RON'}):</strong> ${invoiceData.clientBankAccounts[0].iban}` : ''}
-                ${invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0 && invoiceData.clientBankAccounts[0].bank ? `<br/>Banca: ${invoiceData.clientBankAccounts[0].bank}` : ''}
+                ${invoiceData.clientBankAccounts && invoiceData.clientBankAccounts.length > 0 ? 
+                  invoiceData.clientBankAccounts.map((account, index) => {
+                    if (!account.iban && !account.bank) return '';
+                    const label = invoiceData.clientBankAccounts.length > 1 ? ` ${index + 1}` : '';
+                    let html = '';
+                    if (account.iban) html += `<br/><strong>IBAN${label} (${account.currency || 'RON'}):</strong> ${account.iban}`;
+                    if (account.bank) html += `<br/>Banca${label}: ${account.bank}`;
+                    return html;
+                  }).join('')
+                : ''}
               </div>
             </td>
           </tr>
@@ -1992,6 +2177,18 @@ const InvoiceGenerator = () => {
             pentru a plăti factura instant!
           </div>
         </div>` : ''}
+        
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; font-size: 9px; color: #999;">
+          Document generat la ${new Date().toLocaleString('ro-RO', { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })} de <strong>Normal.ro - Generator Facturi</strong>
+          <br/>
+          www.normal.ro
+        </div>
       </div>
     `;
     
@@ -2147,7 +2344,20 @@ const InvoiceGenerator = () => {
           file.mimeType
         ]);
       });
+      excelData.push([]);
     }
+    
+    // Footer cu informații generare
+    excelData.push([]);
+    excelData.push(['---']);
+    excelData.push([`Document generat la ${new Date().toLocaleString('ro-RO', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    })} de Normal.ro - Generator Facturi`]);
+    excelData.push(['www.normal.ro']);
     
     // Creează worksheet principal
     const worksheet = XLSX.utils.aoa_to_sheet(excelData);
@@ -2984,12 +3194,12 @@ const InvoiceGenerator = () => {
       maxWidth="xl"
       seoSlug="invoice-generator"
     >
-      {/* Eroare ANAF */}
-      {anafError && (
+        {/* Eroare ANAF */}
+        {anafError && (
         <Alert severity="error" onClose={() => setAnafError('')} sx={{ mb: 3 }}>
-          {anafError}
-        </Alert>
-      )}
+            {anafError}
+          </Alert>
+        )}
 
       {/* Sidebar Fixed Menu - Floating pe dreapta */}
       <GoogleSheetsSidebar
@@ -3260,9 +3470,9 @@ const InvoiceGenerator = () => {
                       sx={{ cursor: 'grab', color: 'text.secondary' }} 
                       fontSize="small"
                     />
-                    <Typography variant="subtitle2" fontWeight="600">
-                      Linia {index + 1}
-                    </Typography>
+                  <Typography variant="subtitle2" fontWeight="600">
+                    Linia {index + 1}
+                  </Typography>
                   </Stack>
                   
                   <Stack direction="row" spacing={0.5}>
@@ -3274,6 +3484,23 @@ const InvoiceGenerator = () => {
                         onClick={() => duplicateLine(line.id)}
                       >
                         <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    
+                    {/* Buton Discount/Reducere */}
+                    <Tooltip title={visibleDiscounts.has(line.id) ? "Ascunde reduceri" : "Afișează reduceri"}>
+                      <IconButton 
+                        size="small" 
+                        color={visibleDiscounts.has(line.id) ? "warning" : "default"}
+                        onClick={() => toggleDiscountVisibility(line.id)}
+                        sx={{
+                          bgcolor: visibleDiscounts.has(line.id) ? 'warning.light' : 'transparent',
+                          '&:hover': {
+                            bgcolor: visibleDiscounts.has(line.id) ? 'warning.main' : 'action.hover'
+                          }
+                        }}
+                      >
+                        <LocalOfferIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     
@@ -3304,17 +3531,17 @@ const InvoiceGenerator = () => {
                     )}
                     
                     {/* Buton Delete */}
-                    {lines.length > 1 && (
+                  {lines.length > 1 && (
                       <Tooltip title="Șterge linia">
                         <IconButton 
                           size="small" 
                           color="error" 
                           onClick={() => deleteLine(line.id)}
                         >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
                       </Tooltip>
-                    )}
+                  )}
                   </Stack>
                 </Box>
 
@@ -3339,11 +3566,51 @@ const InvoiceGenerator = () => {
                       InputProps={{ inputProps: { min: 0.01, step: 0.01 } }}
                     />
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 4, md: 2 }}>
+                  <Grid size={{ xs: 12, sm: 6, md: 1.5 }}>
                     <TextField
                       fullWidth
                       size="small"
-                      label="Preț net"
+                      label="Preț intrare"
+                      type="number"
+                      value={line.purchasePrice}
+                      onChange={(e) => updateLine(line.id, 'purchasePrice', e.target.value)}
+                      InputProps={{
+                        endAdornment: <InputAdornment position="end">{invoiceData.currency}</InputAdornment>,
+                        inputProps: { min: 0, step: 0.01 }
+                      }}
+                      helperText="Opțional - preț achiziție"
+                      sx={{ 
+                        '& .MuiOutlinedInput-root': { 
+                          bgcolor: 'info.50' 
+                        } 
+                      }}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6, md: 0.9 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Adaos %"
+                      type="number"
+                      value={line.markup}
+                      onChange={(e) => updateLine(line.id, 'markup', e.target.value)}
+                      InputProps={{
+                        endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                        inputProps: { min: 0, max: 1000, step: 0.01 }
+                      }}
+                      helperText="Opțional"
+                      sx={{ 
+                        '& .MuiOutlinedInput-root': { 
+                          bgcolor: 'info.50' 
+                        } 
+                      }}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4, md: 1.5 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Preț unitar"
                       type="number"
                       value={line.unitNetPrice}
                       onChange={(e) => updateLine(line.id, 'unitNetPrice', e.target.value)}
@@ -3351,9 +3618,14 @@ const InvoiceGenerator = () => {
                         endAdornment: <InputAdornment position="end">{invoiceData.currency}</InputAdornment>,
                         inputProps: { min: 0, step: 0.01 }
                       }}
+                      helperText={
+                        parseFloat(line.purchasePrice) > 0 && parseFloat(line.markup) > 0
+                          ? `Auto: ${line.purchasePrice} + ${line.markup}%`
+                          : ''
+                      }
                     />
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 4, md: 1.5 }}>
+                  <Grid size={{ xs: 12, sm: 4, md: 0.9 }}>
                     <TextField
                       fullWidth
                       size="small"
@@ -3388,7 +3660,7 @@ const InvoiceGenerator = () => {
                       ))}
                     </Stack>
                   </Grid>
-                  <Grid size={{ xs: 12, md: 3.5 }}>
+                  <Grid size={{ xs: 12, md: 2.1 }}>
                     <TextField
                       fullWidth
                       size="small"
@@ -3407,11 +3679,20 @@ const InvoiceGenerator = () => {
                         
                         const newLines = lines.map(l => {
                           if (l.id === line.id) {
-                            return {
+                            const updatedLine = {
                               ...l,
                               unitNetPrice: formatNumber(unitNetPrice),
                               unitGrossPrice: formatNumber(unitGrossPrice)
                             };
+                            
+                            // Dacă există preț de intrare, recalculează adaosul
+                            const purchasePrice = parseFloat(l.purchasePrice) || 0;
+                            if (purchasePrice > 0) {
+                              const newMarkup = ((unitNetPrice / purchasePrice) - 1) * 100;
+                              updatedLine.markup = formatNumber(Math.max(0, newMarkup));
+                            }
+                            
+                            return updatedLine;
                           }
                           return l;
                         });
@@ -3429,6 +3710,52 @@ const InvoiceGenerator = () => {
                       helperText={`${calculateLineTotal(line, 'net')} + ${calculateLineTotal(line, 'vat')} TVA`}
                     />
                   </Grid>
+                  
+                  {/* Reducere pe linie - afișate doar dacă butonul de discount este activat */}
+                  {visibleDiscounts.has(line.id) && (
+                    <>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Reducere %"
+                          type="number"
+                          value={line.discountPercent}
+                          onChange={(e) => updateLine(line.id, 'discountPercent', e.target.value)}
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                            inputProps: { min: 0, max: 100, step: 0.01 }
+                          }}
+                          helperText="Reducere procentuală pe linie"
+                          sx={{ 
+                            '& .MuiOutlinedInput-root': { 
+                              bgcolor: 'warning.50' 
+                            } 
+                          }}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Reducere sumă fixă"
+                          type="number"
+                          value={line.discountAmount}
+                          onChange={(e) => updateLine(line.id, 'discountAmount', e.target.value)}
+                          InputProps={{
+                            endAdornment: <InputAdornment position="end">{invoiceData.currency}</InputAdornment>,
+                            inputProps: { min: 0, step: 0.01 }
+                          }}
+                          helperText="Reducere sumă fixă pe linie"
+                          sx={{ 
+                            '& .MuiOutlinedInput-root': { 
+                              bgcolor: 'warning.50' 
+                            } 
+                          }}
+                        />
+                      </Grid>
+                    </>
+                  )}
                 </Grid>
               </Box>
             ))}
@@ -3611,6 +3938,63 @@ const InvoiceGenerator = () => {
           </DialogActions>
         </Dialog>
 
+        {/* Reducere pe Total */}
+        <Card variant="outlined" sx={{ bgcolor: 'warning.50' }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Reducere pe Total
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Tip reducere</InputLabel>
+                  <Select
+                    value={totalDiscount.type}
+                    onChange={(e) => setTotalDiscount({ ...totalDiscount, type: e.target.value })}
+                    label="Tip reducere"
+                  >
+                    <MenuItem value="none">Fără reducere</MenuItem>
+                    <MenuItem value="percent">Procent</MenuItem>
+                    <MenuItem value="amount">Sumă fixă</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              {totalDiscount.type === 'percent' && (
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Procent reducere"
+                    type="number"
+                    value={totalDiscount.percent}
+                    onChange={(e) => setTotalDiscount({ ...totalDiscount, percent: e.target.value })}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                      inputProps: { min: 0, max: 100, step: 0.01 }
+                    }}
+                  />
+                </Grid>
+              )}
+              {totalDiscount.type === 'amount' && (
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Sumă reducere"
+                    type="number"
+                    value={totalDiscount.amount}
+                    onChange={(e) => setTotalDiscount({ ...totalDiscount, amount: e.target.value })}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">{invoiceData.currency}</InputAdornment>,
+                      inputProps: { min: 0, step: 0.01 }
+                    }}
+                  />
+                </Grid>
+              )}
+            </Grid>
+          </CardContent>
+        </Card>
+
         {/* Totaluri și Export */}
         <Paper sx={{ p: 3, bgcolor: 'primary.50', borderLeft: 4, borderColor: 'primary.main' }}>
           <Grid container spacing={3} alignItems="center">
@@ -3619,6 +4003,25 @@ const InvoiceGenerator = () => {
                 Total Factură
               </Typography>
               <Stack spacing={1}>
+                {totals.originalGross && parseFloat(totals.originalGross) > parseFloat(totals.gross) && (
+                  <>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography>Total brut inițial:</Typography>
+                      <Typography fontWeight="500" sx={{ textDecoration: 'line-through', color: 'text.secondary' }}>
+                        {totals.originalGross} {invoiceData.currency}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography color="error.main">
+                        {totalDiscount.type === 'percent' ? `${totalDiscount.percent}%` : 'Reducere'}: -{totals.discountAmount}
+                      </Typography>
+                      <Typography fontWeight="700" color="error.main">
+                        -{totals.discountAmount} {invoiceData.currency}
+                      </Typography>
+                    </Box>
+                    <Divider />
+                  </>
+                )}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography>Total net:</Typography>
                   <Typography fontWeight="700">{totals.net} {invoiceData.currency}</Typography>
@@ -3629,7 +4032,7 @@ const InvoiceGenerator = () => {
                 </Box>
                 <Divider />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="h6">Total brut:</Typography>
+                  <Typography variant="h6">Total brut final:</Typography>
                   <Typography variant="h5" fontWeight="800" color="success.dark">{totals.gross} {invoiceData.currency}</Typography>
                 </Box>
               </Stack>
@@ -3742,10 +4145,10 @@ const InvoiceGenerator = () => {
           <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap" sx={{ mb: 3 }}>
             <Box sx={{ textAlign: 'center' }}>
               <Stack spacing={1}>
-                <Button
-                  variant="contained"
-                  color="error"
-                  onClick={exportToPDF}
+              <Button
+                variant="contained"
+                color="error"
+                onClick={exportToPDF}
                   sx={{
                     minWidth: 100,
                     minHeight: 100,
@@ -3758,9 +4161,9 @@ const InvoiceGenerator = () => {
                 >
                   <PictureAsPdfIcon sx={{ fontSize: 40, mb: 0.5 }} />
                   <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
-                    Descarcă PDF
+                Descarcă PDF
                   </Typography>
-                </Button>
+              </Button>
                 <Button
                   size="small"
                   variant="outlined"
@@ -3792,7 +4195,7 @@ const InvoiceGenerator = () => {
                 >
                   <DescriptionIcon sx={{ fontSize: 40, mb: 0.5 }} />
                   <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
-                    Descarcă Excel
+                  Descarcă Excel
                   </Typography>
                 </Button>
                 <Button
@@ -3809,10 +4212,10 @@ const InvoiceGenerator = () => {
             </Box>
 
             <Box sx={{ textAlign: 'center' }}>
-              <Button
-                variant="contained"
-                color="info"
-                onClick={exportToXML}
+                <Button
+                  variant="contained"
+                  color="info"
+                  onClick={exportToXML}
                 sx={{
                   minWidth: 100,
                   minHeight: 100,
@@ -3827,14 +4230,14 @@ const InvoiceGenerator = () => {
                 <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
                   Descarcă XML
                 </Typography>
-              </Button>
+                </Button>
             </Box>
 
             <Box sx={{ textAlign: 'center' }}>
-              <Button
-                variant="outlined"
-                color="warning"
-                onClick={validateOnANAF}
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  onClick={validateOnANAF}
                 sx={{
                   minWidth: 100,
                   minHeight: 100,
@@ -3850,24 +4253,24 @@ const InvoiceGenerator = () => {
                 <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
                   Validează ANAF
                 </Typography>
-              </Button>
+                </Button>
             </Box>
           </Stack>
-
+                
           <Divider sx={{ my: 2 }}>
-            <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color="text.secondary">
               Acțiuni rapide
-            </Typography>
-          </Divider>
-
+                  </Typography>
+                </Divider>
+                
           {/* Butoane secundare - Google Drive + QR */}
           <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap">
             <Box sx={{ textAlign: 'center' }}>
-              <Button
-                variant="outlined"
-                color="primary"
-                onClick={() => saveToGoogleDrive('pdf')}
-                disabled={isUploadingToDrive}
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={() => saveToGoogleDrive('pdf')}
+                  disabled={isUploadingToDrive}
                 sx={{
                   minWidth: 90,
                   minHeight: 90,
@@ -3882,15 +4285,15 @@ const InvoiceGenerator = () => {
                 <Typography variant="caption" sx={{ fontSize: '0.65rem', lineHeight: 1.2 }}>
                   PDF Drive
                 </Typography>
-              </Button>
+                </Button>
             </Box>
 
             <Box sx={{ textAlign: 'center' }}>
-              <Button
-                variant="outlined"
-                color="success"
-                onClick={() => saveToGoogleDrive('excel')}
-                disabled={isUploadingToDrive}
+                <Button
+                  variant="outlined"
+                  color="success"
+                  onClick={() => saveToGoogleDrive('excel')}
+                  disabled={isUploadingToDrive}
                 sx={{
                   minWidth: 90,
                   minHeight: 90,
@@ -3905,7 +4308,7 @@ const InvoiceGenerator = () => {
                 <Typography variant="caption" sx={{ fontSize: '0.65rem', lineHeight: 1.2 }}>
                   Excel Drive
                 </Typography>
-              </Button>
+                </Button>
             </Box>
 
             <Box sx={{ textAlign: 'center' }}>
@@ -3980,6 +4383,10 @@ const InvoiceGenerator = () => {
             ⭐ <strong>Template-uri:</strong> Salvează produse și clienți frecvenți pentru completare rapidă. Click pe "Produse" pentru template-uri produse sau "Beneficiari" pentru clienți salvați. Template-urile sunt sincronizate automat cu Google Sheets dacă ești conectat.
             <br />
             🏢 <strong>Export SAGA:</strong> Din "Istoric Facturi" poți exporta facturi în formatul XML compatibil cu software-ul contabil SAGA. Filtrează facturile după interval de date sau serie/număr, apoi generează XML-ul pentru import în SAGA.
+            <br />
+            💰 <strong>Reduceri/Discount:</strong> Poți acorda reduceri atât pe linia de produs (procentual sau sumă fixă), cât și pe totalul facturii. Reducerile se aplică automat la calculul final și sunt afișate clar în factură.
+            <br />
+            📈 <strong>Calcul automat preț:</strong> Introdu "Preț intrare" (cost achiziție) și "Adaos %" (marjă profit) pentru a calcula automat prețul net de vânzare. Util pentru gestionarea marjei de profit pe fiecare produs.
           </Typography>
         </Paper>
 
