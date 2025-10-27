@@ -72,6 +72,7 @@ import KeyboardIcon from '@mui/icons-material/Keyboard';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
+import EmailIcon from '@mui/icons-material/Email';
 import ToolLayout from '../../components/ToolLayout';
 import InvoiceHistoryDialog from '../../components/InvoiceHistoryDialog';
 import ProductTemplateDialog from '../../components/ProductTemplateDialog';
@@ -87,6 +88,7 @@ import invoiceHistoryService from '../../services/invoiceHistoryService';
 import templateService from '../../services/templateService';
 import bnrService from '../../services/bnrService';
 import paymentService from '../../services/paymentService';
+import emailService from '../../services/emailService';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
@@ -273,6 +275,19 @@ const InvoiceGenerator = () => {
   const [invoiceVersions, setInvoiceVersions] = useState([]);
   const [showVersionsDialog, setShowVersionsDialog] = useState(false);
 
+  // State pentru trimitere email
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailProvider, setEmailProvider] = useState('gmail');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailProviders, setEmailProviders] = useState([]);
+  const [emailCredentials, setEmailCredentials] = useState({
+    email: '',
+    password: '',
+    smtpHost: '',
+    smtpPort: '587',
+    saveCredentials: false
+  });
+
   // State pentru furnizori (societăți proprii)
   const [supplierTemplateDialogOpen, setSupplierTemplateDialogOpen] = useState(false);
   const [savedSuppliers, setSavedSuppliers] = useState([]);
@@ -433,6 +448,7 @@ const InvoiceGenerator = () => {
     loadSupplierDataFromCookie();
     loadBNRRates(); // Încarcă cursurile BNR la inițializare
     loadProductCategories(); // Încarcă categoriile de produse
+    checkEmailProviders(); // Verifică providerii de email configurați
 
     // Inițializează Google Drive API
     const initGoogleDrive = async () => {
@@ -1106,8 +1122,14 @@ const InvoiceGenerator = () => {
 
   // Încarcă o factură din istoric în formular
   const loadInvoiceFromHistory = (invoice) => {
+    if (!invoice) {
+      console.error('Factură invalidă!');
+      return;
+    }
+
     // Încarcă date factură
     setInvoiceData({
+      guid: invoice.guid || '',
       series: invoice.series || '',
       number: invoice.number || '',
       issueDate: invoice.issueDate || new Date().toISOString().split('T')[0],
@@ -1115,43 +1137,77 @@ const InvoiceGenerator = () => {
       currency: invoice.currency || 'RON',
       notes: invoice.notes || '',
 
-      // Furnizor
-      supplierName: invoice.supplier.name || '',
-      supplierCUI: invoice.supplier.cui || '',
-      supplierRegCom: invoice.supplier.regCom || '',
-      supplierAddress: invoice.supplier.address || '',
-      supplierCity: invoice.supplier.city || '',
-      supplierCounty: invoice.supplier.county || '',
-      supplierCountry: invoice.supplier.country || 'Romania',
-      supplierPhone: invoice.supplier.phone || '',
-      supplierEmail: invoice.supplier.email || '',
-      supplierBank: invoice.supplier.bank || '',
-      supplierIBAN: invoice.supplier.iban || '',
-      supplierVatPrefix: invoice.supplier.vatPrefix || 'RO',
+      // Furnizor (compatibilitate cu facturi vechi)
+      supplierName: invoice.supplier?.name || '',
+      supplierCUI: invoice.supplier?.cui || '',
+      supplierRegCom: invoice.supplier?.regCom || '',
+      supplierAddress: invoice.supplier?.address || '',
+      supplierCity: invoice.supplier?.city || '',
+      supplierCounty: invoice.supplier?.county || '',
+      supplierCountry: invoice.supplier?.country || 'Romania',
+      supplierPhone: invoice.supplier?.phone || '',
+      supplierEmail: invoice.supplier?.email || '',
+      supplierVatPrefix: invoice.supplier?.vatPrefix || 'RO',
+      // Conturi bancare furnizor (compatibilitate cu facturi vechi - array vs obiect single)
+      supplierBankAccounts: (() => {
+        if (invoice.supplier?.bankAccounts && Array.isArray(invoice.supplier.bankAccounts) && invoice.supplier.bankAccounts.length > 0) {
+          return invoice.supplier.bankAccounts;
+        }
+        // Compatibilitate cu format vechi (iban + bank ca câmpuri separate)
+        if (invoice.supplier?.iban) {
+          return [{ bank: invoice.supplier.bank || '', iban: invoice.supplier.iban, currency: 'RON' }];
+        }
+        return [{ bank: '', iban: '', currency: 'RON' }];
+      })(),
 
-      // Client
-      clientName: invoice.client.name || '',
-      clientCUI: invoice.client.cui || '',
-      clientRegCom: invoice.client.regCom || '',
-      clientAddress: invoice.client.address || '',
-      clientCity: invoice.client.city || '',
-      clientCounty: invoice.client.county || '',
-      clientCountry: invoice.client.country || 'Romania',
-      clientPhone: invoice.client.phone || '',
-      clientEmail: invoice.client.email || '',
-      clientVatPrefix: invoice.client.vatPrefix || 'RO'
+      // Client (compatibilitate cu facturi vechi)
+      clientName: invoice.client?.name || '',
+      clientCUI: invoice.client?.cui || '',
+      clientRegCom: invoice.client?.regCom || '',
+      clientAddress: invoice.client?.address || '',
+      clientCity: invoice.client?.city || '',
+      clientCounty: invoice.client?.county || '',
+      clientCountry: invoice.client?.country || 'Romania',
+      clientPhone: invoice.client?.phone || '',
+      clientEmail: invoice.client?.email || '',
+      clientVatPrefix: invoice.client?.vatPrefix || 'RO',
+      // Conturi bancare client (compatibilitate cu facturi vechi)
+      clientBankAccounts: (() => {
+        if (invoice.client?.bankAccounts && Array.isArray(invoice.client.bankAccounts) && invoice.client.bankAccounts.length > 0) {
+          return invoice.client.bankAccounts;
+        }
+        return [{ bank: '', iban: '', currency: 'RON' }];
+      })()
     });
 
-    // Încarcă linii produse
-    if (invoice.lines && invoice.lines.length > 0) {
+    // Încarcă linii produse (compatibilitate cu facturi vechi)
+    if (invoice.lines && Array.isArray(invoice.lines) && invoice.lines.length > 0) {
       setLines(invoice.lines.map((line, index) => ({
         id: Date.now() + index,
         product: line.product || '',
         quantity: line.quantity || '1',
+        purchasePrice: line.purchasePrice || '0.00',
+        markup: line.markup || '0.00',
         unitNetPrice: line.unitNetPrice || '0.00',
-        vatRate: line.vatRate || '0',
-        unitGrossPrice: line.unitGrossPrice || '0.00'
+        vatRate: line.vatRate || DEFAULT_VAT_RATE,
+        unitGrossPrice: line.unitGrossPrice || '0.00',
+        discountPercent: line.discountPercent || '0.00',
+        discountAmount: line.discountAmount || '0.00'
       })));
+    } else {
+      // Resetează la o linie goală dacă nu există linii
+      setLines([{
+        id: Date.now(),
+        product: '',
+        quantity: '1',
+        purchasePrice: '0.00',
+        markup: '0.00',
+        unitNetPrice: '0.00',
+        vatRate: DEFAULT_VAT_RATE,
+        unitGrossPrice: '0.00',
+        discountPercent: '0.00',
+        discountAmount: '0.00'
+      }]);
     }
 
     // Scroll la top
@@ -4276,6 +4332,275 @@ const InvoiceGenerator = () => {
     setQrCodeDialog({ open: false, qrDataUrl: '', loading: false });
   };
 
+  // ===== Funcții Trimitere Email =====
+
+  /**
+   * Verifică providerii de email disponibili
+   */
+  const checkEmailProviders = async () => {
+    try {
+      const result = await emailService.getAvailableProviders();
+      if (result.success && result.providers) {
+        setEmailProviders(result.providers);
+        console.log('✅ Provideri email disponibili:', result.providers.map(p => p.displayName).join(', '));
+      }
+    } catch (error) {
+      console.error('Eroare verificare provideri email:', error);
+    }
+  };
+
+  /**
+   * Încarcă credențialele email salvate din localStorage
+   */
+  const loadEmailCredentials = () => {
+    try {
+      const saved = localStorage.getItem('normalro_email_credentials');
+      if (saved) {
+        const decrypted = decryptData(saved);
+        if (decrypted) {
+          setEmailCredentials(prev => ({
+            ...prev,
+            email: decrypted.email || '',
+            password: decrypted.password || '',
+            smtpHost: decrypted.smtpHost || '',
+            smtpPort: decrypted.smtpPort || '587',
+            saveCredentials: true
+          }));
+          console.log('✅ Credențiale email încărcate din localStorage');
+        }
+      }
+    } catch (error) {
+      console.error('Eroare încărcare credențiale email:', error);
+    }
+  };
+
+  /**
+   * Salvează credențialele email în localStorage (criptat)
+   */
+  const saveEmailCredentials = () => {
+    if (!emailCredentials.saveCredentials) {
+      // Șterge credențialele dacă nu sunt bifate pentru salvare
+      localStorage.removeItem('normalro_email_credentials');
+      return;
+    }
+
+    try {
+      const dataToSave = {
+        email: emailCredentials.email,
+        password: emailCredentials.password,
+        smtpHost: emailCredentials.smtpHost,
+        smtpPort: emailCredentials.smtpPort
+      };
+      const encrypted = encryptData(dataToSave);
+      localStorage.setItem('normalro_email_credentials', encrypted);
+      console.log('✅ Credențiale email salvate în localStorage (criptat)');
+    } catch (error) {
+      console.error('Eroare salvare credențiale email:', error);
+    }
+  };
+
+  /**
+   * Deschide dialogul de email și încarcă credențialele salvate
+   */
+  const openEmailDialog = () => {
+    loadEmailCredentials();
+    setEmailDialogOpen(true);
+  };
+
+  /**
+   * Generează subiectul email-ului
+   */
+  const generateEmailSubject = () => {
+    return `Factura ${invoiceData.series || 'FAC'} ${invoiceData.number || '001'} - ${invoiceData.supplierName || 'Furnizor'}`;
+  };
+
+  /**
+   * Generează corpul email-ului (text simplu)
+   */
+  const generateEmailBody = () => {
+    const totals = calculateTotals();
+    const firstSupplierAccount = invoiceData.supplierBankAccounts?.[0] || {};
+    
+    return `Bună ziua,
+
+Vă transmit factura ${invoiceData.series || 'FAC'} ${invoiceData.number || '001'}.
+
+Detalii factură:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📄 Serie/Nr: ${invoiceData.series || '-'} ${invoiceData.number || '-'}
+📅 Data emiterii: ${invoiceData.issueDate || '-'}
+${invoiceData.dueDate ? `⏰ Data scadenței: ${invoiceData.dueDate}\n` : ''}
+💰 Monedă: ${invoiceData.currency || 'RON'}
+
+Furnizor:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏢 ${invoiceData.supplierName || '-'}
+🆔 CUI: ${invoiceData.supplierCUI || '-'}
+${invoiceData.supplierAddress ? `📍 ${invoiceData.supplierAddress}\n` : ''}${invoiceData.supplierCity ? `🌆 ${invoiceData.supplierCity}\n` : ''}${invoiceData.supplierPhone ? `📞 ${invoiceData.supplierPhone}\n` : ''}${invoiceData.supplierEmail ? `✉️ ${invoiceData.supplierEmail}\n` : ''}${firstSupplierAccount.iban ? `🏦 IBAN: ${firstSupplierAccount.iban}\n` : ''}
+Beneficiar:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏢 ${invoiceData.clientName || '-'}
+🆔 CUI: ${invoiceData.clientCUI || '-'}
+
+Totaluri:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Total Net: ${totals.net} ${invoiceData.currency}
+📊 Total TVA: ${totals.vat} ${invoiceData.currency}
+💵 TOTAL DE PLATĂ: ${totals.gross} ${invoiceData.currency}
+
+${invoiceData.notes ? `Note:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${invoiceData.notes}\n\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📎 Vă rog să găsiți atașat fișierul PDF cu factura.
+
+${firstSupplierAccount.iban ? `Pentru plată:\nIBAN: ${firstSupplierAccount.iban}\nBeneficiar: ${invoiceData.supplierName}\n\n` : ''}Cu stimă,
+${invoiceData.supplierName || ''}`;
+  };
+
+  /**
+   * Deschide email cu Outlook/Hotmail (menține varianta veche doar pentru Outlook)
+   */
+  const sendEmailViaOutlook = async () => {
+    const subject = encodeURIComponent(generateEmailSubject());
+    const body = encodeURIComponent(generateEmailBody());
+    const to = encodeURIComponent(invoiceData.clientEmail || '');
+    
+    const outlookUrl = `https://outlook.live.com/mail/0/deeplink/compose?to=${to}&subject=${subject}&body=${body}`;
+    
+    // Descarcă PDF-ul automat
+    await exportToPDF();
+    
+    setTimeout(() => {
+      window.open(outlookUrl, '_blank');
+      alert(
+        '📧 Outlook deschis!\n\n' +
+        '1. Fișierul PDF a fost descărcat automat\n' +
+        '2. S-a deschis Outlook cu email-ul pre-completat\n' +
+        '3. Atașează fișierul PDF descărcat\n' +
+        '4. Verifică destinatarul și trimite email-ul'
+      );
+    }, 500);
+  };
+
+  /**
+   * Trimite email AUTOMAT prin backend (Gmail, Yahoo, Custom)
+   */
+  const sendEmailAutomatic = async () => {
+    // Validări credențiale
+    if (!emailCredentials.email || !emailCredentials.password) {
+      alert('❌ Introdu adresa ta de email și parola/App Password!');
+      return;
+    }
+
+    // Validare Custom SMTP
+    if (emailProvider === 'custom' && !emailCredentials.smtpHost) {
+      alert('❌ Pentru Custom SMTP, introdu și adresa serverului SMTP!');
+      return;
+    }
+
+    setIsSendingEmail(true);
+    setEmailDialogOpen(false);
+
+    try {
+      // 1. Generează PDF-ul ca Blob (nu descarcă)
+      const { imgData, canvas } = await generateSingleInvoicePDF();
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight) * 72 / 96;
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 10;
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+
+      // Generează Blob (nu descarcă)
+      const pdfBlob = pdf.output('blob');
+      const filename = `factura_${invoiceData.series || 'X'}_${invoiceData.number || '000'}_${invoiceData.issueDate}.pdf`;
+
+      console.log('📧 Trimitere email automată cu credențialele utilizatorului...');
+
+      // 2. Salvează credențialele dacă e bifat checkbox-ul
+      if (emailCredentials.saveCredentials) {
+        saveEmailCredentials();
+      }
+
+      // 3. Trimite prin backend cu credențialele utilizatorului
+      await emailService.sendInvoiceEmail(pdfBlob, {
+        provider: emailProvider,
+        to: invoiceData.clientEmail,
+        subject: generateEmailSubject(),
+        body: generateEmailBody(),
+        filename: filename,
+        fromName: invoiceData.supplierName || 'Normal.ro',
+        // CREDENȚIALE UTILIZATOR (trimise prin HTTPS, nu salvate pe server)
+        userEmail: emailCredentials.email,
+        userPassword: emailCredentials.password,
+        smtpHost: emailCredentials.smtpHost || undefined,
+        smtpPort: emailCredentials.smtpPort ? parseInt(emailCredentials.smtpPort) : undefined
+      });
+
+      // 4. Succes!
+      alert(
+        `✅ Email trimis cu succes!\n\n` +
+        `📧 De la: ${emailCredentials.email}\n` +
+        `📧 Către: ${invoiceData.clientEmail}\n` +
+        `📄 Factură: ${invoiceData.series || 'FAC'} ${invoiceData.number || '001'}\n` +
+        `💰 Total: ${totals.gross} ${invoiceData.currency}\n\n` +
+        `Factura a fost trimisă automat cu PDF-ul atașat!`
+      );
+
+      // Salvează în istoric și cookie
+      saveSupplierDataToCookie();
+      if (googleSheetsConnected) {
+        saveSupplierDataToSheets();
+      }
+
+    } catch (error) {
+      console.error('Eroare trimitere email:', error);
+      
+      // Mesaje de eroare specific
+      let errorMsg = `❌ Eroare trimitere email!\n\n${error.message}\n\n`;
+      
+      if (error.message.includes('Autentificare eșuată')) {
+        const providerInfo = emailProviders && emailProviders.length > 0 
+          ? emailProviders.find(p => p.name === emailProvider)
+          : null;
+        errorMsg += `Verifică:\n`;
+        if (providerInfo?.requiresAppPassword) {
+          errorMsg += `• Folosești App Password (nu parola normală)?\n`;
+          errorMsg += `• Generează App Password la:\n  ${providerInfo.appPasswordUrl}\n`;
+        } else {
+          errorMsg += `• Email-ul și parola sunt corecte?\n`;
+        }
+        errorMsg += `• Ai activat 2FA pentru ${providerInfo?.displayName || emailProvider}?`;
+      } else {
+        errorMsg += `Verifică:\n`;
+        errorMsg += `• Conexiunea la internet\n`;
+        errorMsg += `• Email-ul și parola sunt corecte\n`;
+        errorMsg += `• Email-ul destinatarului este valid`;
+      }
+      
+      alert(errorMsg);
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  /**
+   * Trimite email prin providerul selectat
+   */
+  const sendInvoiceEmail = async () => {
+    // Outlook folosește varianta veche (deschide browser)
+    if (emailProvider === 'outlook') {
+      setEmailDialogOpen(false);
+      await sendEmailViaOutlook();
+      return;
+    }
+
+    // Celelalte provideri trimit automat prin backend
+    await sendEmailAutomatic();
+  };
+
   // ===== Funcții Export Suplimentar =====
 
   /**
@@ -6345,6 +6670,34 @@ const InvoiceGenerator = () => {
                 </Typography>
               </Button>
             </Box>
+
+            <Box sx={{ textAlign: 'center' }}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={openEmailDialog}
+                disabled={!invoiceData.clientEmail}
+                sx={{
+                  minWidth: 100,
+                  minHeight: 100,
+                  width: 100,
+                  height: 100,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  p: 1.5
+                }}
+              >
+                <EmailIcon sx={{ fontSize: 40, mb: 0.5 }} />
+                <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, fontWeight: 600 }}>
+                  Trimite Email
+                </Typography>
+              </Button>
+              {!invoiceData.clientEmail && (
+                <Typography variant="caption" color="error" display="block" sx={{ mt: 0.5, fontSize: '0.65rem' }}>
+                  Lipsește email client
+                </Typography>
+              )}
+            </Box>
           </Stack>
 
           <Divider sx={{ my: 2 }}>
@@ -6465,6 +6818,8 @@ const InvoiceGenerator = () => {
             ✅ <strong>Validează XML:</strong> Butonul "Validează XML pe ANAF" descarcă XML-ul și deschide validatorul oficial ANAF pentru verificare înainte de încărcare.
             <br />
             🖨️ <strong>Print optimizat:</strong> Butonul "Print" deschide factura într-o fereastră nouă optimizată pentru printare (CSS print-friendly). Perfect pentru imprimare directă fără a salva PDF.
+            <br />
+            📧 <strong>Trimite Email (AUTOMAT cu credențialele TALE!):</strong> Trimite factura direct către client prin email - 100% automatizat folosind propriul tău cont de email! Suportă Gmail, Yahoo Mail, Custom SMTP (trimitere automată completă) și Outlook (manual). În dialog introduci adresa ta de email + App Password, apoi sistemul generează PDF-ul, îl uploadează temporar pe server, trimite email-ul prin SMTP folosind credențialele tale (NU sunt salvate pe server!), apoi șterge automat fișierul. Email-ul ajunge de la adresa TA personală/profesională, nu de la serverul nostru. Poți salva criptat credențialele în browser pentru refolosire rapidă (opțional).
             <br />
             ☁️ <strong>Google Drive:</strong> Salvează rapid fișierele (PDF/Excel) în Google Drive - descarcă automat și deschide Drive pentru upload.
             <br />
@@ -7669,6 +8024,430 @@ const InvoiceGenerator = () => {
           <DialogActions>
             <Button onClick={() => setProductCategoriesDialogOpen(false)}>
               Închide
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog Trimitere Email */}
+        <Dialog
+          open={emailDialogOpen}
+          onClose={() => !isSendingEmail && setEmailDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <EmailIcon color="primary" />
+                <Typography variant="h6">Trimite Factură prin Email</Typography>
+              </Box>
+              <IconButton 
+                onClick={() => setEmailDialogOpen(false)} 
+                size="small"
+                disabled={isSendingEmail}
+              >
+                <CloseIcon />
+              </IconButton>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Selectează providerul de email pentru trimitere
+            </Typography>
+          </DialogTitle>
+          <DialogContent>
+            {isSendingEmail ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 2 }}>
+                <CircularProgress size={60} />
+                <Typography variant="h6" color="primary">
+                  Se trimite email-ul...
+                </Typography>
+                <Typography variant="body2" color="text.secondary" textAlign="center">
+                  Generare PDF → Upload → Trimitere → Curățare
+                </Typography>
+              </Box>
+            ) : (
+              <Stack spacing={3} sx={{ mt: 2 }}>
+              {/* Informații despre email */}
+              <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                <Typography variant="subtitle2" gutterBottom fontWeight="600">
+                  📧 Detalii email:
+                </Typography>
+                <Stack spacing={1}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">Destinatar:</Typography>
+                    <Typography variant="body2" fontWeight="500">
+                      {invoiceData.clientEmail || '-'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">Client:</Typography>
+                    <Typography variant="body2" fontWeight="500">
+                      {invoiceData.clientName || '-'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">Factură:</Typography>
+                    <Typography variant="body2" fontWeight="500">
+                      {invoiceData.series || 'FAC'} {invoiceData.number || '001'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">Total:</Typography>
+                    <Typography variant="body2" fontWeight="700" color="success.main">
+                      {totals?.gross || '0.00'} {invoiceData.currency}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Paper>
+
+              {/* Informație securitate */}
+              <Alert severity="success">
+                <Typography variant="body2">
+                  <strong>🔒 Confidențial și Sigur</strong>
+                  <br />
+                  Credențialele tale sunt trimise DIRECT către serverul SMTP (Gmail/Yahoo/etc.) prin conexiune securizată HTTPS.
+                  <br />
+                  <strong>NU sunt salvate pe serverul nostru!</strong> Opțional, pot fi salvate criptat doar în browser-ul tău.
+                </Typography>
+              </Alert>
+
+              {/* Câmpuri credențiale utilizator */}
+              <Card variant="outlined" sx={{ bgcolor: 'primary.50', borderColor: 'primary.main' }}>
+                <CardContent>
+                  <Typography variant="subtitle2" gutterBottom fontWeight="600" color="primary.main">
+                    🔑 Credențialele tale de email
+                  </Typography>
+                  <Stack spacing={2}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Adresa ta de email"
+                      type="email"
+                      value={emailCredentials.email}
+                      onChange={(e) => setEmailCredentials({ ...emailCredentials, email: e.target.value })}
+                      placeholder="ex: firma.ta@gmail.com"
+                      helperText="Email-ul tău personal/profesional (de pe care trimiți facturi)"
+                    />
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label={(() => {
+                        const provider = emailProviders && emailProviders.length > 0 
+                          ? emailProviders.find(p => p.name === emailProvider)
+                          : null;
+                        return provider?.requiresAppPassword ? 'App Password' : 'Parolă';
+                      })()}
+                      type="password"
+                      value={emailCredentials.password}
+                      onChange={(e) => setEmailCredentials({ ...emailCredentials, password: e.target.value })}
+                      placeholder={(() => {
+                        const provider = emailProviders && emailProviders.length > 0 
+                          ? emailProviders.find(p => p.name === emailProvider)
+                          : null;
+                        return provider?.requiresAppPassword ? 'ex: abcd efgh ijkl mnop' : 'Parola contului de email';
+                      })()}
+                      helperText={(() => {
+                        const provider = emailProviders && emailProviders.length > 0 
+                          ? emailProviders.find(p => p.name === emailProvider)
+                          : null;
+                        if (provider?.requiresAppPassword) {
+                          return (
+                            <span>
+                              ⚠️ Pentru {provider.displayName} folosește <strong>App Password</strong> (nu parola normală).{' '}
+                              <a href={provider.appPasswordUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>
+                                Generează aici →
+                              </a>
+                            </span>
+                          );
+                        }
+                        return 'Parola contului tău de email';
+                      })()}
+                    />
+
+                    {/* Custom SMTP Settings (doar pentru provider custom) */}
+                    {emailProvider === 'custom' && (
+                      <>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="SMTP Host"
+                          value={emailCredentials.smtpHost}
+                          onChange={(e) => setEmailCredentials({ ...emailCredentials, smtpHost: e.target.value })}
+                          placeholder="ex: smtp.gmail.com"
+                          helperText="Adresa serverului SMTP"
+                        />
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="SMTP Port"
+                          type="number"
+                          value={emailCredentials.smtpPort}
+                          onChange={(e) => setEmailCredentials({ ...emailCredentials, smtpPort: e.target.value })}
+                          placeholder="587"
+                          helperText="Portul SMTP (implicit: 587 cu STARTTLS)"
+                        />
+                      </>
+                    )}
+
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={emailCredentials.saveCredentials}
+                          onChange={(e) => setEmailCredentials({ ...emailCredentials, saveCredentials: e.target.checked })}
+                          size="small"
+                        />
+                      }
+                      label={
+                        <Typography variant="body2">
+                          Salvează credențialele în browser (criptat, doar pe acest calculator)
+                        </Typography>
+                      }
+                    />
+                  </Stack>
+                </CardContent>
+              </Card>
+
+              {/* Selecție provider */}
+              <FormControl fullWidth>
+                <InputLabel>Provider Email</InputLabel>
+                <Select
+                  value={emailProvider}
+                  onChange={(e) => setEmailProvider(e.target.value)}
+                  label="Provider Email"
+                >
+                  <MenuItem value="gmail">
+                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: '100%' }}>
+                      <Box
+                        component="span"
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: '50%',
+                          bgcolor: '#EA4335',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        G
+                      </Box>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" fontWeight="500">Gmail</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Trimitere automată prin backend
+                        </Typography>
+                      </Box>
+                      <Chip 
+                        label="AUTO" 
+                        size="small" 
+                        color="success" 
+                        sx={{ fontSize: '0.65rem', height: 20 }}
+                      />
+                    </Stack>
+                  </MenuItem>
+                  <MenuItem value="outlook">
+                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: '100%' }}>
+                      <Box
+                        component="span"
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: '50%',
+                          bgcolor: '#0078D4',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        O
+                      </Box>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" fontWeight="500">Outlook / Hotmail</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Deschide web browser (manual)
+                        </Typography>
+                      </Box>
+                      <Chip 
+                        label="MANUAL" 
+                        size="small" 
+                        color="warning" 
+                        sx={{ fontSize: '0.65rem', height: 20 }}
+                      />
+                    </Stack>
+                  </MenuItem>
+                  <MenuItem value="yahoo">
+                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: '100%' }}>
+                      <Box
+                        component="span"
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: '50%',
+                          bgcolor: '#6001D2',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        Y
+                      </Box>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" fontWeight="500">Yahoo Mail</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Trimitere automată prin backend
+                        </Typography>
+                      </Box>
+                      <Chip 
+                        label="AUTO" 
+                        size="small" 
+                        color="success" 
+                        sx={{ fontSize: '0.65rem', height: 20 }}
+                      />
+                    </Stack>
+                  </MenuItem>
+                  <MenuItem value="mailto">
+                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: '100%' }}>
+                      <Box
+                        component="span"
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: '50%',
+                          bgcolor: '#607D8B',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        📧
+                      </Box>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" fontWeight="500">Alt Provider SMTP</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Custom SMTP (configurabil în .env)
+                        </Typography>
+                      </Box>
+                      <Chip 
+                        label="AUTO" 
+                        size="small" 
+                        color="success" 
+                        sx={{ fontSize: '0.65rem', height: 20 }}
+                      />
+                    </Stack>
+                  </MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* Preview subiect și corp */}
+              <Accordion>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="subtitle2">
+                    👁️ Preview Email
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Stack spacing={2}>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" fontWeight="600">
+                        Subiect:
+                      </Typography>
+                      <Paper sx={{ p: 1, mt: 0.5, bgcolor: 'grey.50' }}>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                          {generateEmailSubject()}
+                        </Typography>
+                      </Paper>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" fontWeight="600">
+                        Corp mesaj:
+                      </Typography>
+                      <Paper sx={{ p: 1.5, mt: 0.5, bgcolor: 'grey.50', maxHeight: 300, overflow: 'auto' }}>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontFamily: 'monospace',
+                            fontSize: '0.75rem',
+                            whiteSpace: 'pre-wrap',
+                            lineHeight: 1.6
+                          }}
+                        >
+                          {generateEmailBody()}
+                        </Typography>
+                      </Paper>
+                    </Box>
+                  </Stack>
+                </AccordionDetails>
+              </Accordion>
+
+              {/* Instrucțiuni diferite pentru AUTO vs MANUAL */}
+              {emailProvider === 'outlook' ? (
+                <Alert severity="info">
+                  <Typography variant="body2">
+                    <strong>📌 Outlook (Manual):</strong>
+                    <br />
+                    1. Fișierul PDF va fi descărcat automat
+                    <br />
+                    2. Se va deschide Outlook cu email-ul pre-completat
+                    <br />
+                    3. Atașează manual fișierul PDF descărcat
+                    <br />
+                    4. Verifică destinatarul și trimite
+                    <br />
+                    <br />
+                    <strong>💡 Nu necesită credențiale</strong> - folosește interfața web Outlook
+                  </Typography>
+                </Alert>
+              ) : (
+                <Alert severity="success">
+                  <Typography variant="body2">
+                    <strong>✨ Trimitere Automată:</strong>
+                    <br />
+                    1. Se generează PDF-ul automat
+                    <br />
+                    2. Se uploadează temporar pe server
+                    <br />
+                    3. Se trimite email-ul cu PDF atașat (prin credențialele tale)
+                    <br />
+                    4. Se șterge automat fișierul de pe server
+                    <br />
+                    <br />
+                    <strong>💡 Total automatizat!</strong> Folosește credențialele tale personale.
+                  </Typography>
+                </Alert>
+              )}
+              </Stack>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={() => setEmailDialogOpen(false)}
+              disabled={isSendingEmail}
+            >
+              Anulează
+            </Button>
+            <Button
+              onClick={sendInvoiceEmail}
+              variant="contained"
+              color="primary"
+              startIcon={isSendingEmail ? <CircularProgress size={20} color="inherit" /> : <EmailIcon />}
+              disabled={
+                isSendingEmail || 
+                (emailProvider !== 'outlook' && (!emailCredentials.email || !emailCredentials.password)) ||
+                (emailProvider === 'custom' && !emailCredentials.smtpHost)
+              }
+            >
+              {isSendingEmail ? 'Se trimite...' : (emailProvider === 'outlook' ? 'Deschide Outlook' : 'Trimite Automat')}
             </Button>
           </DialogActions>
         </Dialog>
