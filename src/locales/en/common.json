@@ -17,17 +17,6 @@
     "toolsSubtitle": "Each utility works independently and is optimized for both Romanian and English content.",
     "openTool": "Open tool"
   },
-  "categories": {
-    "invoicing": "Invoicing",
-    "conversion": "Conversion",
-    "calculators": "Calculators",
-    "textGenerators": "Text Generators",
-    "textUtilities": "Text Utilities",
-    "colors": "Colors",
-    "cssDesign": "CSS & Design",
-    "development": "Development",
-    "utilities": "Utilities"
-  },
   "tools": {
     "slugGenerator": {
       "title": "Slug generator",

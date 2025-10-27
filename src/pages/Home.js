@@ -9,12 +9,13 @@ import BuildCircleIcon from '@mui/icons-material/BuildCircle';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AdSenseAd from '../components/AdSenseAd';
-import { toolCategories } from '../data/tools';
+import { tools as catalog } from '../data/tools';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 import '../App.css';
 
 const Home = () => {
   const { t } = useTranslation();
+  const [tools] = useState(catalog);
   const theme = useTheme();
   
   useDocumentTitle(
@@ -22,18 +23,15 @@ const Home = () => {
     'Colecție de instrumente online: generatoare, convertoare, calculatoare și multe altele. Toate gratuite și ușor de folosit.'
   );
 
-  const preparedCategories = useMemo(
+  const preparedTools = useMemo(
     () =>
-      toolCategories.map(category => ({
-        ...category,
-        tools: category.tools
-          .filter((tool) => tool.slug !== 'invoice-generator') // Exclude featured tool
-          .map((tool) => ({
-            ...tool,
-            route: tool.route || `/tools/${tool.slug}`
-          }))
-      })).filter(category => category.tools.length > 0), // Only show categories with tools
-    []
+      tools
+        .filter((tool) => tool.slug !== 'invoice-generator') // Exclude featured tool
+        .map((tool) => ({
+          ...tool,
+          route: tool.route || `/tools/${tool.slug}`
+        })),
+    [tools]
   );
 
   return (
@@ -217,7 +215,7 @@ const Home = () => {
       </Container>
 
       <Container sx={{ py: { xs: 4, md: 6 } }}>
-        <Stack spacing={1} mb={4} alignItems="center" textAlign="center">
+        <Stack spacing={1} mb={3} alignItems="center" textAlign="center">
           <BuildCircleIcon color="primary" sx={{ fontSize: 32 }} />
           <Typography variant="h4" component="h2" sx={{ fontWeight: 600, fontSize: { xs: '1.5rem', md: '2rem' } }}>
             {t('home.toolsTitle')}
@@ -227,189 +225,117 @@ const Home = () => {
           </Typography>
         </Stack>
 
-        <Stack spacing={5}>
-          {preparedCategories.map((category) => {
-            const categoryGradients = {
-              'invoicing': ['#667eea', '#764ba2'],
-              'conversion': ['#f093fb', '#f5576c'],
-              'calculators': ['#4facfe', '#00f2fe'],
-              'textGenerators': ['#43e97b', '#38f9d7'],
-              'textUtilities': ['#fa709a', '#fee140'],
-              'colors': ['#30cfd0', '#330867'],
-              'cssDesign': ['#a8edea', '#fed6e3'],
-              'development': ['#ff9a56', '#ff6a88'],
-              'utilities': ['#ffecd2', '#fcb69f']
-            };
-            const gradientColors = categoryGradients[category.id] || ['#667eea', '#764ba2'];
+        <Box
+          sx={{
+            position: 'relative',
+            borderRadius: 4,
+            p: { xs: 1.5, sm: 2 },
+            backgroundColor: theme.palette.background.paper,
+            boxShadow: '0 20px 35px rgba(15, 23, 42, 0.1)'
+          }}
+        >
+          <Box
+            sx={{
+              columnCount: { xs: 1, sm: 2, md: 3, lg: 4 },
+              columnGap: { xs: 2, sm: 2.5 }
+            }}
+          >
+            {preparedTools.map((tool, index) => {
+              const heightPalette = [200, 240, 180, 220, 210, 260];
+              const gradientPalette = [
+                ['#dfe7fd', '#f7f1ff'],
+                ['#fde2e4', '#fff1d0'],
+                ['#e2f0cb', '#f5f8d3'],
+                ['#d0ebff', '#f1f5ff'],
+                ['#f8edeb', '#ffe5ec'],
+                ['#e3f2fd', '#ede7f6']
+              ];
+              const pair = gradientPalette[index % gradientPalette.length];
 
-            return (
-              <Box key={category.id}>
-                {/* Category Header */}
-                <Box
+              return (
+                <Paper
+                  key={tool.slug}
+                  component={Link}
+                  to={tool.route}
+                  elevation={0}
                   sx={{
-                    mb: 3,
-                    pb: 2,
-                    borderBottom: `3px solid`,
-                    borderImage: `linear-gradient(90deg, ${gradientColors[0]}, ${gradientColors[1]}) 1`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1.5
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 2,
-                      background: `linear-gradient(135deg, ${gradientColors[0]}, ${gradientColors[1]})`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: `0 8px 24px ${alpha(gradientColors[0], 0.3)}`
-                    }}
-                  >
-                    <BuildCircleIcon sx={{ color: 'white', fontSize: 28 }} />
-                  </Box>
-                  <Typography
-                    variant="h5"
-                    sx={{
-                      fontWeight: 700,
-                      background: `linear-gradient(135deg, ${gradientColors[0]}, ${gradientColors[1]})`,
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      fontSize: { xs: '1.25rem', md: '1.5rem' }
-                    }}
-                  >
-                    {t(category.nameKey)}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      ml: 'auto',
-                      color: 'text.secondary',
-                      fontWeight: 600
-                    }}
-                  >
-                    {category.tools.length} {category.tools.length === 1 ? 'unealtă' : 'unelte'}
-                  </Typography>
-                </Box>
-
-                {/* Category Tools Grid */}
-                <Box
-                  sx={{
-                    position: 'relative',
+                    display: 'inline-block',
+                    width: '100%',
+                    mb: { xs: 2, sm: 2.5 },
                     borderRadius: 4,
-                    p: { xs: 1.5, sm: 2 },
-                    backgroundColor: theme.palette.background.paper,
-                    boxShadow: '0 20px 35px rgba(15, 23, 42, 0.08)'
+                    overflow: 'hidden',
+                    textDecoration: 'none',
+                    position: 'relative',
+                    height: heightPalette[index % heightPalette.length],
+                    backgroundImage: `linear-gradient(135deg, ${pair[0]}, ${pair[1]})`,
+                    boxShadow: '0 16px 28px rgba(15, 23, 42, 0.1)',
+                    transition: 'transform 200ms ease, box-shadow 200ms ease',
+                    color: theme.palette.common.white,
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 20px 35px rgba(15, 23, 42, 0.16)'
+                    }
                   }}
                 >
                   <Box
                     sx={{
-                      columnCount: { xs: 1, sm: 2, md: 3, lg: 4 },
-                      columnGap: { xs: 2, sm: 2.5 }
+                      position: 'absolute',
+                      inset: 0,
+                      background:
+                        'radial-gradient(circle at 20% 20%, rgba(255,255,255,0.2), transparent 55%), radial-gradient(circle at 80% 15%, rgba(255,255,255,0.18), transparent 60%)',
+                      pointerEvents: 'none'
+                    }}
+                  />
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: `linear-gradient(to bottom, ${alpha('#000', 0)} 30%, ${alpha('#000', 0.6)})`,
+                      pointerEvents: 'none'
+                    }}
+                  />
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      bottom: 16,
+                      left: 16,
+                      right: 16,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1
                     }}
                   >
-                    {category.tools.map((tool, index) => {
-                      const heightPalette = [200, 240, 180, 220, 210, 260];
-                      const gradientPalette = [
-                        ['#dfe7fd', '#f7f1ff'],
-                        ['#fde2e4', '#fff1d0'],
-                        ['#e2f0cb', '#f5f8d3'],
-                        ['#d0ebff', '#f1f5ff'],
-                        ['#f8edeb', '#ffe5ec'],
-                        ['#e3f2fd', '#ede7f6']
-                      ];
-                      const pair = gradientPalette[index % gradientPalette.length];
-
-                      return (
-                        <Paper
-                          key={tool.slug}
-                          component={Link}
-                          to={tool.route}
-                          elevation={0}
-                          sx={{
-                            display: 'inline-block',
-                            width: '100%',
-                            mb: { xs: 2, sm: 2.5 },
-                            borderRadius: 4,
-                            overflow: 'hidden',
-                            textDecoration: 'none',
-                            position: 'relative',
-                            height: heightPalette[index % heightPalette.length],
-                            backgroundImage: `linear-gradient(135deg, ${pair[0]}, ${pair[1]})`,
-                            boxShadow: '0 16px 28px rgba(15, 23, 42, 0.1)',
-                            transition: 'transform 200ms ease, box-shadow 200ms ease',
-                            color: theme.palette.common.white,
-                            '&:hover': {
-                              transform: 'translateY(-4px)',
-                              boxShadow: '0 20px 35px rgba(15, 23, 42, 0.16)'
-                            }
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              position: 'absolute',
-                              inset: 0,
-                              background:
-                                'radial-gradient(circle at 20% 20%, rgba(255,255,255,0.2), transparent 55%), radial-gradient(circle at 80% 15%, rgba(255,255,255,0.18), transparent 60%)',
-                              pointerEvents: 'none'
-                            }}
-                          />
-                          <Box
-                            sx={{
-                              position: 'absolute',
-                              inset: 0,
-                              background: `linear-gradient(to bottom, ${alpha('#000', 0)} 30%, ${alpha('#000', 0.6)})`,
-                              pointerEvents: 'none'
-                            }}
-                          />
-                          <Box
-                            sx={{
-                              position: 'absolute',
-                              bottom: 16,
-                              left: 16,
-                              right: 16,
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: 1
-                            }}
-                          >
-                            <Typography 
-                              variant="subtitle1" 
-                              sx={{ 
-                                fontWeight: 700, 
-                                letterSpacing: 0.3,
-                                fontSize: { xs: '0.9rem', sm: '1rem' }
-                              }}
-                            >
-                              {t(tool.titleKey)}
-                            </Typography>
-                            <Typography 
-                              variant="caption" 
-                              sx={{ 
-                                color: 'rgba(255, 255, 255, 0.85)',
-                                fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                                lineHeight: 1.4,
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis'
-                              }}
-                            >
-                              {t(tool.descriptionKey, { defaultValue: 'Descoperă această unealtă utilă' })}
-                            </Typography>
-                          </Box>
-                        </Paper>
-                      );
-                    })}
+                    <Typography 
+                      variant="subtitle1" 
+                      sx={{ 
+                        fontWeight: 700, 
+                        letterSpacing: 0.3,
+                        fontSize: { xs: '0.9rem', sm: '1rem' }
+                      }}
+                    >
+                      {t(tool.titleKey)}
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        color: 'rgba(255, 255, 255, 0.85)',
+                        fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                        lineHeight: 1.4,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}
+                    >
+                      {t(tool.descriptionKey, { defaultValue: 'Descoperă această unealtă utilă' })}
+                    </Typography>
                   </Box>
-                </Box>
-              </Box>
-            );
-          })}
-        </Stack>
+                </Paper>
+              );
+            })}
+          </Box>
+        </Box>
       </Container>
 
       {/* AdSense Bottom Ad */}

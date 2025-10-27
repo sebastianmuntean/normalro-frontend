@@ -39,19 +39,15 @@ class GoogleSheetsService {
   /**
    * Formatează numele sheet-ului pentru a fi folosit în API calls
    * Sheet-urile cu spații sau caractere speciale trebuie wrapped în ghilimele simple
-   * IMPORTANT: În A1 notation, sheet names cu spații TREBUIE să fie în single quotes
    */
   formatSheetName(sheetName) {
-    // Escape single quotes existente (dublându-le conform A1 notation)
-    let escaped = sheetName.replace(/'/g, "''");
-    
-    // Dacă sheet name conține spații, exclamation marks, sau alte caractere speciale
-    // trebuie wrapped în single quotes conform A1 notation
+    // Dacă sheet name conține spații sau caractere speciale, wrap în ghilimele simple
     if (sheetName.includes(' ') || sheetName.includes('!') || sheetName.includes("'")) {
+      // Escape single quotes existente
+      const escaped = sheetName.replace(/'/g, "''");
       return `'${escaped}'`;
     }
-    
-    return escaped;
+    return sheetName;
   }
 
   /**
@@ -64,8 +60,6 @@ class GoogleSheetsService {
     try {
       // Citește toate datele din coloana A (GUID)
       const formattedSheetName = this.formatSheetName(sheetName);
-      console.log(`🔍 Căutare GUID în sheet: "${sheetName}" -> formatted: "${formattedSheetName}"`);
-      
       const response = await window.gapi.client.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: `${formattedSheetName}!A:A`
@@ -82,16 +76,7 @@ class GoogleSheetsService {
       
       return null; // Nu găsește GUID-ul
     } catch (error) {
-      console.error(`❌ Eroare căutare GUID ${guid} în "${sheetName}":`, error);
-      console.error(`📋 Formatted sheet name: "${this.formatSheetName(sheetName)}"`);
-      console.error(`📄 Error body:`, error.body);
-      
-      // Verifică dacă sheet-ul există
-      if (error.status === 400 && error.body && error.body.includes('Unable to parse range')) {
-        console.error(`⚠️ Sheet-ul "${sheetName}" nu există sau are un nume diferit în spreadsheet!`);
-        console.error(`💡 Sugestie: Verifică numele sheet-urilor în spreadsheet sau recrează spreadsheet-ul.`);
-      }
-      
+      console.error(`Eroare căutare GUID ${guid} în ${sheetName}:`, error);
       return null;
     }
   }
@@ -871,87 +856,6 @@ class GoogleSheetsService {
       console.error('Spreadsheet invalid:', error);
       return false;
     }
-  }
-
-  /**
-   * Verifică dacă un sheet există în spreadsheet
-   */
-  async sheetExists(sheetName) {
-    try {
-      const response = await window.gapi.client.sheets.spreadsheets.get({
-        spreadsheetId: this.spreadsheetId
-      });
-      
-      const sheets = response.result.sheets || [];
-      return sheets.some(sheet => sheet.properties.title === sheetName);
-    } catch (error) {
-      console.error(`Eroare verificare sheet "${sheetName}":`, error);
-      return false;
-    }
-  }
-
-  /**
-   * Creează un sheet lipsă în spreadsheet
-   */
-  async createMissingSheet(sheetName) {
-    try {
-      console.log(`📝 Creez sheet lipsă: "${sheetName}"`);
-      
-      // Creează sheet-ul
-      const createResponse = await window.gapi.client.sheets.spreadsheets.batchUpdate({
-        spreadsheetId: this.spreadsheetId,
-        resource: {
-          requests: [{
-            addSheet: {
-              properties: {
-                title: sheetName,
-                gridProperties: {
-                  rowCount: sheetName === this.SHEET_NAMES.INVOICES ? 500 : 100,
-                  columnCount: 20
-                }
-              }
-            }
-          }]
-        }
-      });
-
-      const newSheet = createResponse.result.replies[0].addSheet;
-      console.log(`✅ Sheet "${sheetName}" creat cu succes (ID: ${newSheet.properties.sheetId})`);
-
-      // Inițializează headers pentru sheet-ul nou creat
-      await this.initializeSheetHeaders(this.spreadsheetId, [newSheet]);
-      
-      return true;
-    } catch (error) {
-      console.error(`❌ Eroare creare sheet "${sheetName}":`, error);
-      return false;
-    }
-  }
-
-  /**
-   * Verifică și creează toate sheet-urile necesare
-   */
-  async ensureAllSheetsExist() {
-    const requiredSheets = [
-      this.SHEET_NAMES.SUPPLIER,
-      this.SHEET_NAMES.PRODUCTS,
-      this.SHEET_NAMES.CLIENTS,
-      this.SHEET_NAMES.INVOICES
-    ];
-
-    console.log('🔍 Verificare sheet-uri necesare...');
-    
-    for (const sheetName of requiredSheets) {
-      const exists = await this.sheetExists(sheetName);
-      if (!exists) {
-        console.warn(`⚠️ Sheet "${sheetName}" lipsește!`);
-        await this.createMissingSheet(sheetName);
-      } else {
-        console.log(`✅ Sheet "${sheetName}" există`);
-      }
-    }
-    
-    console.log('✅ Toate sheet-urile necesare sunt prezente');
   }
 
   /**
