@@ -70,6 +70,8 @@ import SaveIcon from '@mui/icons-material/Save';
 import PrintIcon from '@mui/icons-material/Print';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import EditIcon from '@mui/icons-material/Edit';
+import CheckIcon from '@mui/icons-material/Check';
 import ToolLayout from '../../components/ToolLayout';
 import InvoiceHistoryDialog from '../../components/InvoiceHistoryDialog';
 import ProductTemplateDialog from '../../components/ProductTemplateDialog';
@@ -253,6 +255,8 @@ const InvoiceGenerator = () => {
   const [productCategoriesDialogOpen, setProductCategoriesDialogOpen] = useState(false);
   const [productCategories, setProductCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [editingCategoryData, setEditingCategoryData] = useState({ name: '', color: '', icon: '' });
 
   // State pentru fișa client
   const [clientProfileDialogOpen, setClientProfileDialogOpen] = useState(false);
@@ -1769,6 +1773,41 @@ const InvoiceGenerator = () => {
 
     const updatedCategories = productCategories.filter(cat => cat.id !== categoryId);
     saveProductCategories(updatedCategories);
+  };
+
+  /**
+   * Începe editarea unei categorii
+   */
+  const startEditingCategory = (category) => {
+    setEditingCategoryId(category.id);
+    setEditingCategoryData({
+      name: category.name,
+      color: category.color,
+      icon: category.icon
+    });
+  };
+
+  /**
+   * Salvează modificările categoriei
+   */
+  const saveEditingCategory = () => {
+    if (!editingCategoryData.name.trim()) {
+      alert('❌ Numele categoriei nu poate fi gol!');
+      return;
+    }
+
+    updateProductCategory(editingCategoryId, editingCategoryData);
+    setEditingCategoryId(null);
+    setEditingCategoryData({ name: '', color: '', icon: '' });
+    alert('✅ Categorie actualizată cu succes!');
+  };
+
+  /**
+   * Anulează editarea
+   */
+  const cancelEditingCategory = () => {
+    setEditingCategoryId(null);
+    setEditingCategoryData({ name: '', color: '', icon: '' });
   };
 
   // ===== Funcții Fișa Client =====
@@ -6456,6 +6495,8 @@ const InvoiceGenerator = () => {
             <br />
             &nbsp;&nbsp;• <strong>Personalizare:</strong> Fiecare categorie are nume, culoare și icon personalizabil
             <br />
+            &nbsp;&nbsp;• <strong>Editare:</strong> Click pe iconița ✏️ pentru a modifica numele, culoarea sau icon-ul unei categorii existente
+            <br />
             &nbsp;&nbsp;• <strong>Filtrare:</strong> Filtrează rapid produsele din șabloane după categorie
             <br />
             &nbsp;&nbsp;• <strong>Categorii implicite:</strong> La prima utilizare sunt create automat categorii (Servicii, Produse, Consultanță)
@@ -7413,52 +7454,121 @@ const InvoiceGenerator = () => {
                     {productCategories.map((category) => {
                       const products = templateService.getProductTemplates();
                       const productsCount = products.filter(p => p.category === category.id).length;
+                      const isEditing = editingCategoryId === category.id;
 
                       return (
-                        <Card key={category.id} variant="outlined">
+                        <Card key={category.id} variant="outlined" sx={{ bgcolor: isEditing ? 'primary.50' : 'white' }}>
                           <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                            <Stack direction="row" alignItems="center" justifyContent="space-between">
-                              <Stack direction="row" alignItems="center" spacing={1.5}>
-                                <Box
-                                  sx={{
-                                    width: 40,
-                                    height: 40,
-                                    borderRadius: 1,
-                                    bgcolor: category.color,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '1.2rem'
-                                  }}
-                                >
-                                  {category.icon}
-                                </Box>
-                                <Box>
-                                  <Typography variant="subtitle2" fontWeight="600">
-                                    {category.name}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    {productsCount} produse
-                                  </Typography>
-                                </Box>
+                            {isEditing ? (
+                              // Mod editare
+                              <Stack spacing={2}>
+                                <Grid container spacing={1.5}>
+                                  <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                      fullWidth
+                                      size="small"
+                                      label="Nume categorie"
+                                      value={editingCategoryData.name}
+                                      onChange={(e) => setEditingCategoryData({ ...editingCategoryData, name: e.target.value })}
+                                      autoFocus
+                                    />
+                                  </Grid>
+                                  <Grid size={{ xs: 6, sm: 3 }}>
+                                    <TextField
+                                      fullWidth
+                                      size="small"
+                                      label="Culoare"
+                                      type="color"
+                                      value={editingCategoryData.color}
+                                      onChange={(e) => setEditingCategoryData({ ...editingCategoryData, color: e.target.value })}
+                                    />
+                                  </Grid>
+                                  <Grid size={{ xs: 6, sm: 3 }}>
+                                    <TextField
+                                      fullWidth
+                                      size="small"
+                                      label="Icon"
+                                      value={editingCategoryData.icon}
+                                      onChange={(e) => setEditingCategoryData({ ...editingCategoryData, icon: e.target.value })}
+                                    />
+                                  </Grid>
+                                </Grid>
+                                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={cancelEditingCategory}
+                                    startIcon={<CloseIcon />}
+                                  >
+                                    Anulează
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    color="success"
+                                    onClick={saveEditingCategory}
+                                    startIcon={<CheckIcon />}
+                                  >
+                                    Salvează
+                                  </Button>
+                                </Stack>
                               </Stack>
-                              <Stack direction="row" spacing={0.5}>
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => {
-                                    const confirmed = window.confirm(
-                                      `Ești sigur că vrei să ștergi categoria "${category.name}"?`
-                                    );
-                                    if (confirmed) {
-                                      deleteProductCategory(category.id);
-                                    }
-                                  }}
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
+                            ) : (
+                              // Mod vizualizare
+                              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                <Stack direction="row" alignItems="center" spacing={1.5}>
+                                  <Box
+                                    sx={{
+                                      width: 40,
+                                      height: 40,
+                                      borderRadius: 1,
+                                      bgcolor: category.color,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '1.2rem'
+                                    }}
+                                  >
+                                    {category.icon}
+                                  </Box>
+                                  <Box>
+                                    <Typography variant="subtitle2" fontWeight="600">
+                                      {category.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {productsCount} produse
+                                    </Typography>
+                                  </Box>
+                                </Stack>
+                                <Stack direction="row" spacing={0.5}>
+                                  <Tooltip title="Editează categoria">
+                                    <IconButton
+                                      size="small"
+                                      color="primary"
+                                      onClick={() => startEditingCategory(category)}
+                                    >
+                                      <EditIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Șterge categoria">
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => {
+                                        const confirmed = window.confirm(
+                                          `Ești sigur că vrei să ștergi categoria "${category.name}"?`
+                                        );
+                                        if (confirmed) {
+                                          deleteProductCategory(category.id);
+                                        }
+                                      }}
+                                    >
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Stack>
                               </Stack>
-                            </Stack>
+                            )}
                           </CardContent>
                         </Card>
                       );
@@ -7473,6 +7583,8 @@ const InvoiceGenerator = () => {
                   <strong>💡 Cum funcționează categoriile?</strong>
                   <br />
                   • Creează categorii pentru diferite tipuri de produse/servicii
+                  <br />
+                  • <strong>Editare:</strong> Click pe iconița ✏️ pentru a modifica numele, culoarea sau icon-ul
                   <br />
                   • Când salvezi un produs ca șablon, poți selecta categoria
                   <br />
