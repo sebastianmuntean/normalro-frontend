@@ -17,6 +17,17 @@
     "toolsSubtitle": "Fiecare utilitar funcționează independent și este optimizat atât pentru conținut în română, cât și în engleză.",
     "openTool": "Deschide unealta"
   },
+  "categories": {
+    "invoicing": "Facturare",
+    "conversion": "Conversii",
+    "calculators": "Calculatoare",
+    "textGenerators": "Generatoare Text",
+    "textUtilities": "Utilități Text",
+    "colors": "Culori",
+    "cssDesign": "CSS & Design",
+    "development": "Dezvoltare",
+    "utilities": "Utilitare"
+  },
   "tools": {
     "slugGenerator": {
       "title": "Generator slug",

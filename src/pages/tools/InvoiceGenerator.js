@@ -70,6 +70,8 @@ import SaveIcon from '@mui/icons-material/Save';
 import PrintIcon from '@mui/icons-material/Print';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import EditIcon from '@mui/icons-material/Edit';
+import CheckIcon from '@mui/icons-material/Check';
 import ToolLayout from '../../components/ToolLayout';
 import InvoiceHistoryDialog from '../../components/InvoiceHistoryDialog';
 import ProductTemplateDialog from '../../components/ProductTemplateDialog';
@@ -253,6 +255,8 @@ const InvoiceGenerator = () => {
   const [productCategoriesDialogOpen, setProductCategoriesDialogOpen] = useState(false);
   const [productCategories, setProductCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [editingCategoryData, setEditingCategoryData] = useState({ name: '', color: '', icon: '' });
 
   // State pentru fișa client
   const [clientProfileDialogOpen, setClientProfileDialogOpen] = useState(false);
@@ -1549,6 +1553,12 @@ const InvoiceGenerator = () => {
       await googleSheetsService.requestAuthorization();
       console.log('✅ Autorizare obținută');
 
+      // Verifică și creează sheet-urile lipsă
+      console.log('🔍 Verificare sheet-uri necesare...');
+      setSyncStatus('Verificare sheet-uri...');
+      await googleSheetsService.ensureAllSheetsExist();
+      console.log('✅ Toate sheet-urile sunt prezente');
+
       let stats = {
         supplier: false,
         products: 0,
@@ -1743,6 +1753,46 @@ const InvoiceGenerator = () => {
       cat.id === categoryId ? { ...cat, ...updates } : cat
     );
     saveProductCategories(updatedCategories);
+  };
+
+  /**
+   * Începe editarea unei categorii
+   */
+  const startEditingCategory = (category) => {
+    setEditingCategoryId(category.id);
+    setEditingCategoryData({
+      name: category.name,
+      color: category.color,
+      icon: category.icon
+    });
+  };
+
+  /**
+   * Anulează editarea
+   */
+  const cancelEditingCategory = () => {
+    setEditingCategoryId(null);
+    setEditingCategoryData({ name: '', color: '', icon: '' });
+  };
+
+  /**
+   * Salvează modificările categoriei
+   */
+  const saveEditedCategory = () => {
+    if (!editingCategoryData.name.trim()) {
+      alert('❌ Numele categoriei nu poate fi gol!');
+      return;
+    }
+
+    updateProductCategory(editingCategoryId, {
+      name: editingCategoryData.name,
+      color: editingCategoryData.color,
+      icon: editingCategoryData.icon,
+      updatedAt: new Date().toISOString()
+    });
+
+    alert(`✅ Categoria "${editingCategoryData.name}" a fost actualizată!`);
+    cancelEditingCategory();
   };
 
   /**
@@ -7413,52 +7463,181 @@ const InvoiceGenerator = () => {
                     {productCategories.map((category) => {
                       const products = templateService.getProductTemplates();
                       const productsCount = products.filter(p => p.category === category.id).length;
+                      const isEditing = editingCategoryId === category.id;
 
                       return (
-                        <Card key={category.id} variant="outlined">
+                        <Card key={category.id} variant="outlined" sx={{ 
+                          bgcolor: isEditing ? 'primary.50' : 'transparent',
+                          borderColor: isEditing ? 'primary.main' : 'divider'
+                        }}>
                           <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                            <Stack direction="row" alignItems="center" justifyContent="space-between">
-                              <Stack direction="row" alignItems="center" spacing={1.5}>
-                                <Box
-                                  sx={{
-                                    width: 40,
-                                    height: 40,
-                                    borderRadius: 1,
-                                    bgcolor: category.color,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '1.2rem'
-                                  }}
-                                >
-                                  {category.icon}
-                                </Box>
-                                <Box>
-                                  <Typography variant="subtitle2" fontWeight="600">
-                                    {category.name}
+                            {isEditing ? (
+                              // Formular editare inline
+                              <Stack spacing={2}>
+                                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                  <Typography variant="subtitle2" fontWeight="600" color="primary.main">
+                                    ✏️ Editare categorie
                                   </Typography>
+                                  {/* Preview live */}
+                                  <Stack direction="row" alignItems="center" spacing={1}>
+                                    <Typography variant="caption" color="text.secondary">
+                                      Preview:
+                                    </Typography>
+                                    <Box
+                                      sx={{
+                                        width: 32,
+                                        height: 32,
+                                        borderRadius: 1,
+                                        bgcolor: editingCategoryData.color,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '1rem',
+                                        border: '1px solid',
+                                        borderColor: 'divider'
+                                      }}
+                                    >
+                                      {editingCategoryData.icon}
+                                    </Box>
+                                    <Typography variant="body2" fontWeight="500">
+                                      {editingCategoryData.name || '(fără nume)'}
+                                    </Typography>
+                                  </Stack>
+                                </Stack>
+                                <Grid container spacing={2}>
+                                  <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                      fullWidth
+                                      size="small"
+                                      label="Nume categorie"
+                                      value={editingCategoryData.name}
+                                      onChange={(e) => setEditingCategoryData({ ...editingCategoryData, name: e.target.value })}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                          e.preventDefault();
+                                          saveEditedCategory();
+                                        } else if (e.key === 'Escape') {
+                                          cancelEditingCategory();
+                                        }
+                                      }}
+                                      autoFocus
+                                      required
+                                    />
+                                  </Grid>
+                                  <Grid size={{ xs: 6, sm: 3 }}>
+                                    <TextField
+                                      fullWidth
+                                      size="small"
+                                      label="Culoare"
+                                      type="color"
+                                      value={editingCategoryData.color}
+                                      onChange={(e) => setEditingCategoryData({ ...editingCategoryData, color: e.target.value })}
+                                    />
+                                  </Grid>
+                                  <Grid size={{ xs: 6, sm: 3 }}>
+                                    <TextField
+                                      fullWidth
+                                      size="small"
+                                      label="Icon (emoji)"
+                                      value={editingCategoryData.icon}
+                                      onChange={(e) => setEditingCategoryData({ ...editingCategoryData, icon: e.target.value })}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                          e.preventDefault();
+                                          saveEditedCategory();
+                                        } else if (e.key === 'Escape') {
+                                          cancelEditingCategory();
+                                        }
+                                      }}
+                                      placeholder="📁"
+                                      helperText="ex: 📦 🛠️ 💼"
+                                    />
+                                  </Grid>
+                                </Grid>
+                                <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
                                   <Typography variant="caption" color="text.secondary">
-                                    {productsCount} produse
+                                    💡 Enter = salvează • Esc = anulează
                                   </Typography>
-                                </Box>
+                                  <Stack direction="row" spacing={1}>
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      onClick={cancelEditingCategory}
+                                      startIcon={<CloseIcon />}
+                                    >
+                                      Anulează
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      variant="contained"
+                                      color="primary"
+                                      onClick={saveEditedCategory}
+                                      startIcon={<CheckIcon />}
+                                    >
+                                      Salvează
+                                    </Button>
+                                  </Stack>
+                                </Stack>
                               </Stack>
-                              <Stack direction="row" spacing={0.5}>
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => {
-                                    const confirmed = window.confirm(
-                                      `Ești sigur că vrei să ștergi categoria "${category.name}"?`
-                                    );
-                                    if (confirmed) {
-                                      deleteProductCategory(category.id);
-                                    }
-                                  }}
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
+                            ) : (
+                              // Afișare normală
+                              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                <Stack direction="row" alignItems="center" spacing={1.5}>
+                                  <Box
+                                    sx={{
+                                      width: 40,
+                                      height: 40,
+                                      borderRadius: 1,
+                                      bgcolor: category.color,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '1.2rem'
+                                    }}
+                                  >
+                                    {category.icon}
+                                  </Box>
+                                  <Box>
+                                    <Typography variant="subtitle2" fontWeight="600">
+                                      {category.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {productsCount} produse
+                                      {category.updatedAt && (
+                                        <> • Actualizat: {new Date(category.updatedAt).toLocaleDateString('ro-RO')}</>
+                                      )}
+                                    </Typography>
+                                  </Box>
+                                </Stack>
+                                <Stack direction="row" spacing={0.5}>
+                                  <Tooltip title="Editează categoria">
+                                    <IconButton
+                                      size="small"
+                                      color="primary"
+                                      onClick={() => startEditingCategory(category)}
+                                    >
+                                      <EditIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Șterge categoria">
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => {
+                                        const confirmed = window.confirm(
+                                          `Ești sigur că vrei să ștergi categoria "${category.name}"?`
+                                        );
+                                        if (confirmed) {
+                                          deleteProductCategory(category.id);
+                                        }
+                                      }}
+                                    >
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Stack>
                               </Stack>
-                            </Stack>
+                            )}
                           </CardContent>
                         </Card>
                       );
@@ -7474,11 +7653,15 @@ const InvoiceGenerator = () => {
                   <br />
                   • Creează categorii pentru diferite tipuri de produse/servicii
                   <br />
+                  • Editează categoriile existente (nume, culoare, icon) cu butonul ✏️
+                  <br />
                   • Când salvezi un produs ca șablon, poți selecta categoria
                   <br />
                   • Filtrează rapid produsele din șabloane după categorie
                   <br />
                   • Produsele rămân salvate chiar dacă ștergi categoria
+                  <br />
+                  • Preview live în timpul editării pentru a vedea schimbările instant
                 </Typography>
               </Alert>
             </Stack>
